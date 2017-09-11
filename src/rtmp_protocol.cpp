@@ -7,7 +7,7 @@
 #include "common_define.h"
 #include "io_buffer.h"
 #include "rtmp_protocol.h"
-#include "socket.h"
+#include "fd.h"
 #include "util.h"
 
 using namespace std;
@@ -20,12 +20,19 @@ using any::Vector;
 using any::Map;
 using any::Null;
 
-RtmpProtocol::RtmpProtocol(Socket* socket)
+RtmpProtocol::RtmpProtocol(Fd* fd)
     :
-    socket_(socket),
+    socket_(fd),
     handshake_status_(kStatus_0),
     in_chunk_size_(128),
-    out_chunk_size_(128)
+    out_chunk_size_(128),
+    video_fps_(0),
+    audio_fps_(0),
+    video_frame_recv_(0),
+    audio_frame_recv_(0),
+    last_calc_fps_ms_(0),
+    last_calc_video_frame_(0),
+    last_calc_audio_frame_(0)
 {
 }
 
@@ -211,11 +218,10 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
 
                 if (io_buffer.Size() >= chunk_header_len + message_header_len + read_len)
                 {
-                    rtmp_msg.len += read_len;
-
                     io_buffer.Skip(chunk_header_len + message_header_len);
+                    io_buffer.ReadAndCopy(rtmp_msg.msg + rtmp_msg.len, read_len);
 
-                    io_buffer.ReadAndCopy(rtmp_msg.msg, read_len);
+                    rtmp_msg.len += read_len;
 
                     if (rtmp_msg.len == rtmp_msg.message_length)
                     {
@@ -223,8 +229,11 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
                     }
                     else
                     {
-                        cout << LMSG << "enough chunk data, no enough messge data" << endl;
-                        return kNoEnoughData;
+                        cout << LMSG << "enough chunk data, no enough messge data,message_length:" << rtmp_msg.message_length 
+                                     << ",cur_len:" << rtmp_msg.len << ",io_buffer.Size():" << io_buffer.Size() << endl;
+
+                        // 这里也要返回success
+                        return kSuccess;
                     }
                 }
                 else
@@ -244,10 +253,44 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
             RtmpMessage& rtmp_msg = csid_head_[cs_id];
 
             cout << LMSG << "message done|typeid:" << (uint16_t)rtmp_msg.message_type_id << endl;
+            cout << LMSG << "media_queue_.size():" << media_queue_.size()
+                         << ",audio_queue_.size():" << audio_queue_.size()
+                         << ",video_queue_.size():" << video_queue_.size()
+                         << endl;
 
             OnRtmpMessage(rtmp_msg);
 
-            free(rtmp_msg.msg);
+            if (rtmp_msg.message_type_id == 8)
+            {
+                Payload audio_payload(rtmp_msg.msg, rtmp_msg.len);
+
+                media_queue_.push_back(audio_payload);
+                audio_queue_.push_back(audio_payload);
+
+                // XXX:可以放到定时器,满了就以后肯定都是满了,不用每次都判断
+                if (audio_fps_ != 0 && audio_queue_.size() > 10 * audio_fps_)
+                {
+                    audio_queue_.pop_front();
+                }
+            }
+            else if (rtmp_msg.message_type_id == 9)
+            {
+                Payload video_payload(rtmp_msg.msg, rtmp_msg.len);
+
+                media_queue_.push_back(video_payload);
+                video_queue_.push_back(video_payload);
+                //
+                // XXX:可以放到定时器,满了就以后肯定都是满了,不用每次都判断
+                if (video_fps_ != 0 && video_queue_.size() > 10 * video_fps_)
+                {
+                    video_queue_.pop_front();
+                }
+            }
+            else
+            {
+                free(rtmp_msg.msg);
+            }
+
             rtmp_msg.msg = NULL;
             rtmp_msg.len = 0;
 
@@ -374,6 +417,18 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
         }
         break;
 
+        case kAudio:
+        {
+            ++audio_frame_recv_;
+        }
+        break;
+
+        case kVideo:
+        {
+            ++video_frame_recv_;
+        }
+        break;
+
         case kAmf0Command:
         {
             string amf((const char*)rtmp_msg.msg, rtmp_msg.len);
@@ -437,7 +492,7 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
                                             {
                                                 pos = tc_url_.find("/", pos + 1);
 
-                                                if (i == 3)
+                                                if (i == 3 && pos != string::npos)
                                                 {
                                                     stream_name_ = tc_url_.substr(pos + 1);
                                                     cout << "stream_name_:" << stream_name_ << endl;
@@ -608,11 +663,84 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
                     else if (command == "FCPublish")
                     {
                     }
+                    else if (command == "deleteStream")
+                    {
+                    }
+                    else if (command == "FCUnpublish")
+                    {
+                    }
                 }
             }
         }
         break;
 
+        case kMetaData:
+        {
+            string amf((const char*)rtmp_msg.msg, rtmp_msg.len);
+
+            AmfCommand amf_command;
+            int ret = Amf0::Decode(amf,  amf_command);
+            cout << LMSG << "ret:" << ret << ", amf_command.size():" <<  amf_command.size() << endl;
+
+            for (size_t index = 0; index != amf_command.size(); ++index)
+            {
+                const auto& command = amf_command[index];
+
+                if (command != NULL)
+                {
+                    cout << LMSG << "v type:" << command->TypeStr() << endl;
+                }
+                else
+                {
+                    cout << LMSG << "v NULL" << endl;
+                }
+            }
+        }
+        break;
+
+        default: 
+        {
+        }
+        break;
+
+    }
+}
+
+int RtmpProtocol::OnStop()
+{
+    media_queue_.clear();
+    audio_queue_.clear();
+    video_queue_.clear();
+
+    for (const auto& kv : csid_head_)
+    {
+        if (kv.second.msg != NULL)
+        {
+            free(kv.second.msg);
+        }
+    }
+
+    csid_head_.clear();
+}
+
+int RtmpProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)
+{
+    if (last_calc_fps_ms_ == 0)
+    {
+        last_calc_fps_ms_ = now_in_ms;
+        last_calc_video_frame_ = video_frame_recv_;
+        last_calc_audio_frame_ = audio_frame_recv_;
+    }
+    else
+    {
+        video_fps_ = video_frame_recv_ - last_calc_video_frame_;
+        audio_fps_ = audio_frame_recv_ - last_calc_audio_frame_;
+
+        cout << LMSG << "[STAT] stream:" << stream_name_ << ",video_fps:" << video_fps_ << ",audio_fps:" << audio_fps_ << ",interval:" << interval << endl;
+
+        last_calc_fps_ms_ = now_in_ms;
+        last_calc_video_frame_ = video_frame_recv_;
+        last_calc_audio_frame_ = audio_frame_recv_;
     }
 }
 

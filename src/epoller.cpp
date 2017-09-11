@@ -1,14 +1,15 @@
 #include <string.h>
 
 #include <iostream>
+#include <sstream>
 
 #include "common_define.h"
 #include "epoller.h"
-#include "socket.h"
+#include "fd.h"
 
 using namespace std;
 
-static string Evnet2Str(const uint32_t& events)
+static string Event2Str(const uint32_t& events)
 {
     string ret = "[";
 
@@ -47,95 +48,97 @@ int Epoller::Run()
     return WaitIoEvent(100);
 }
 
-int Epoller::EnableSocket(Socket* socket, const uint32_t& event)
+int Epoller::EnableSocket(Fd* fd, const uint32_t& event)
 {
     int op = 0;
 
-    if (socket_map_.count(socket) == 0)
+    if (socket_map_.count(fd) == 0)
     {
-        socket_map_[socket] = event;
+        socket_map_[fd] = event;
         op = EPOLL_CTL_ADD;
     }
     else
     {
-        if (socket_map_[socket] & event == event)
+        if (socket_map_[fd] & event == event)
         {
             return 0;
         }
         else
         {
-            socket_map_[socket] |= event;
+            socket_map_[fd] |= event;
             op = EPOLL_CTL_MOD;
         }
     }
 
-    cout << LMSG << "socket:" << socket << ",fd:" << socket->GetFd() << ",op:" << op << ",events:" << Evnet2Str(socket_map_[socket]) << endl;
+    cout << LMSG << "fd:" << fd << ",fd:" << fd->GetFd() << ",op:" << op << ",events:" << Event2Str(socket_map_[fd]) << endl;
 
     epoll_event ep_ev = {0};
 
-    ep_ev.events = socket_map_[socket];
-    ep_ev.data.ptr = socket;
+    ep_ev.events = socket_map_[fd];
+    ep_ev.data.ptr = fd;
 
-    return Ctrl(op, socket->GetFd(), ep_ev);
+    return Ctrl(op, fd->GetFd(), ep_ev);
 }
 
-int Epoller::DisableSocket(Socket* socket, const uint32_t& event)
+int Epoller::DisableSocket(Fd* fd, const uint32_t& event)
 {
     int op = 0;
     int final_event = 0;
 
-    if (socket_map_.count(socket) == 0)
+    if (socket_map_.count(fd) == 0)
     {
-        cout << "can't find socket" << socket << endl;
+        cout << "can't find fd" << fd << endl;
         return -1;
     }
 
-    if (socket_map_[socket] & event == 0)
+    if (socket_map_[fd] & event == 0)
     {
-        cout << "socket no listen " << event << " event" << endl;
+        cout << "fd no listen " << event << " event" << endl;
         return -1;
     }
 
-    socket_map_[socket] &= (~event);
+    socket_map_[fd] &= (~event);
 
     op = EPOLL_CTL_MOD;
-    final_event = socket_map_[socket];
+    final_event = socket_map_[fd];
 
-    if (socket_map_[socket] == 0)
+    if (socket_map_[fd] == 0)
     {
         op = EPOLL_CTL_DEL;
-        socket_map_.erase(socket);
+        socket_map_.erase(fd);
     }
 
     epoll_event ep_ev = {0};
 
     ep_ev.events = final_event;
-    ep_ev.data.ptr = socket;
+    ep_ev.data.ptr = fd;
 
-    return Ctrl(op, socket->GetFd(), ep_ev);
+    return Ctrl(op, fd->GetFd(), ep_ev);
 }
 
-int Epoller::RemoveSocket(Socket* socket)
+int Epoller::RemoveSocket(Fd* fd)
 {
     int op = 0;
     int final_event = 0;
 
-    if (socket_map_.count(socket) == 0)
+    if (socket_map_.count(fd) == 0)
     {
-        cout << "can't find socket" << socket << endl;
+        cout << LMSG << "can't find fd" << fd << endl;
         return -1;
     }
+
+    cout << LMSG << "remove fd:" << fd << endl;
 
     op = EPOLL_CTL_DEL;
 
     epoll_event ep_ev = {0};
 
-    ep_ev.events = socket_map_[socket];
-    ep_ev.data.ptr = socket;
+    ep_ev.events = socket_map_[fd];
+    ep_ev.data.ptr = fd;
 
-    socket_map_.erase(socket);
+    socket_map_.erase(fd);
 
-    return Ctrl(op, socket->GetFd(), ep_ev);
+    return Ctrl(op, fd->GetFd(), ep_ev);
 }
     
 int Epoller::WaitIoEvent(const uint32_t& timeout_ms)
@@ -144,19 +147,20 @@ int Epoller::WaitIoEvent(const uint32_t& timeout_ms)
 
     int num_events = epoll_wait(fd_, events, sizeof(events), timeout_ms);
 
-    map<Socket*, uint32_t> socket_event;
+    map<Fd*, uint32_t> socket_event;
     if (num_events > 0)
     {
-        cout << LMSG << num_events << " event happend" << endl;
+        //cout << LMSG << num_events << " event happend" << endl;
 
         for (size_t n = 0; n != num_events; ++n)
         {
-            Socket* socket = (Socket*)events[n].data.ptr;
-            socket_event[socket] = events[n].events;
+            Fd* fd = (Fd*)events[n].data.ptr;
+            socket_event[fd] = events[n].events;
         }
     }
     else if (num_events == 0)
     {
+        //DumpSocketMap();
     }
     else
     {
@@ -168,15 +172,15 @@ int Epoller::WaitIoEvent(const uint32_t& timeout_ms)
     return num_events;
 }
 
-void Epoller::HandleEvent(map<Socket*, uint32_t>& socket_event)
+void Epoller::HandleEvent(map<Fd*, uint32_t>& socket_event)
 {
     auto iter = socket_event.begin();
 
     while (iter != socket_event.end())
     {
-        Socket* socket = iter->first;
+        Fd* fd = iter->first;
 
-        if (socket == NULL)
+        if (fd == NULL)
         {
             ++iter;
             continue;
@@ -185,20 +189,20 @@ void Epoller::HandleEvent(map<Socket*, uint32_t>& socket_event)
 
         if (iter->second & EPOLLIN)
         {
-            int ret = socket->OnRead();
+            int ret = fd->OnRead();
             if (ret == kClose || ret == kError)
             {
-                delete socket;
+                delete fd;
                 ++iter;
                 continue;
             }
         }
 
-        // FIXME: socket delte in function[OnRead]
+        // FIXME: fd delte in function[OnRead]
 
         if (iter->second & EPOLLOUT)
         {
-            socket->OnWrite();
+            fd->OnWrite();
         }
 
         ++iter;
@@ -214,4 +218,20 @@ int Epoller::Ctrl(const int& op, const int& fd, epoll_event& ep_ev)
     }
 
     return err;
+}
+
+void Epoller::DumpSocketMap()
+{
+    ostringstream os;
+    os << "socket_map_.size():" << socket_map_.size() << endl;
+    for (const auto& kv : socket_map_)
+    {
+        Fd* fd = kv.first;
+        const uint32_t& event = kv.second;
+        os << fd << "=>" << Event2Str(event) << endl;
+    }
+
+    cout << LMSG << endl;
+    cout << os.str() << endl;
+    cout << TRACE << endl;
 }

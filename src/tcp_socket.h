@@ -3,12 +3,12 @@
 
 #include "epoller.h"
 #include "io_buffer.h"
-#include "socket.h"
+#include "fd.h"
 
 class Epoller;
 class SocketHandle;
 
-class TcpSocket : public Socket
+class TcpSocket : public Fd
 {
 public:
     TcpSocket(Epoller* epoller, const int& fd, SocketHandle* handler);

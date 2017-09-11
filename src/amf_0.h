@@ -124,6 +124,7 @@ private:
     static int DecodeBoolean(BitBuffer& bit_buffer, Any*& result);
     static int DecodeString(BitBuffer& bit_buffer, Any*& result);
     static int DecodeObject(BitBuffer& bit_buffer, Any*& result);
+    static int DecodeEcmaArray(BitBuffer& bit_buffer, Any*& result);
     static int DecodeNull(BitBuffer& bit_buffer, Any*& result);
 
     static int Encode(const Any* any, IoBuffer& output);

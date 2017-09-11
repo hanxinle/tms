@@ -1,11 +1,16 @@
+#include <signal.h>
+
 #include <iostream>
 
 #include "any.h"
 #include "bit_buffer.h"
+#include "ref_ptr.h"
 #include "stream_mgr.h"
 #include "epoller.h"
 #include "socket_util.h"
 #include "tcp_socket.h"
+#include "timer_in_second.h"
+#include "timer_in_millsecond.h"
 
 using namespace any;
 using namespace std;
@@ -13,6 +18,8 @@ using namespace socket_util;
 
 int main(int argc, char* argv[])
 {
+    signal(SIGPIPE,SIG_IGN);
+
     Int i(1);
     Double d(1.0);
     String str("1.0");
@@ -55,6 +62,17 @@ int main(int argc, char* argv[])
 
     cout << endl;
 
+    {
+        Payload b((uint8_t*)malloc(1024), 1024);
+
+        Payload bb(b);
+
+        vector<Payload> vb;
+
+        vb.push_back(b);
+        vb.push_back(bb);
+    }
+
     Epoller epoller;
 
     int server_fd = CreateNonBlockTcpSocket();
@@ -66,8 +84,16 @@ int main(int argc, char* argv[])
 
     StreamMgr stream_mgr;
 
+    SetNonBlock(server_fd);
+
     TcpSocket server_socket(&epoller, server_fd, &stream_mgr);
+    server_socket.EnableRead();
     server_socket.AsServerSocket();
+
+    TimerInSecond timer_in_second(&epoller);
+    TimerInMillSecond timer_in_millsecond(&epoller);
+
+    timer_in_second.AddTimerSecondHandle(&stream_mgr);
 
     while (true)
     {

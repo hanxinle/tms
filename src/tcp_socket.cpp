@@ -12,7 +12,7 @@ using namespace socket_util;
 
 TcpSocket::TcpSocket(Epoller* epoller, const int& fd, SocketHandle* handler)
     :
-    Socket(epoller, fd),
+    Fd(epoller, fd),
     server_socket_(false),
     handler_(handler)
 {
@@ -36,6 +36,7 @@ int TcpSocket::OnRead()
             cout << LMSG << "accept " << client_ip << ":" << client_port << endl;
 
             TcpSocket* tcp_socket = new TcpSocket(epoller_, client_fd, handler_);
+            SetNonBlock(client_fd);
 
             tcp_socket->EnableRead();
         }
@@ -44,24 +45,43 @@ int TcpSocket::OnRead()
     {
         uint8_t buf[1024*64];
 
-        int bytes = read_buffer_.ReadFromFdAndWrite(fd_);
-        if (bytes > 0)
+        while (true)
         {
-            if (handler_ != NULL)
+            int bytes = read_buffer_.ReadFromFdAndWrite(fd_);
+            if (bytes > 0)
             {
-                handler_->HandleRead(read_buffer_, *this);
+                if (handler_ != NULL)
+                {
+                    handler_->HandleRead(read_buffer_, *this);
+                }
             }
-        }
-        else if (bytes == 0)
-        {
-            cout << LMSG << "close by peer" << endl;
+            else if (bytes == 0)
+            {
+                cout << LMSG << "close by peer" << endl;
 
-            return kClose;
-        }
-        else
-        {
-            cout << LMSG << "read err:" << strerror(errno) << endl;
-            return kError;
+                if (handler_ != NULL)
+                {
+                    handler_->HandleClose(read_buffer_, *this);
+                }
+
+                return kClose;
+            }
+            else
+            {
+                if (errno == EAGAIN || errno == EWOULDBLOCK)
+                {
+                    break;
+                }
+
+                cout << LMSG << "read err:" << strerror(errno) << endl;
+
+                if (handler_ != NULL)
+                {
+                    handler_->HandleError(read_buffer_, *this);
+                }
+
+                return kError;
+            }
         }
     }
 }

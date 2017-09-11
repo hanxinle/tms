@@ -4,22 +4,27 @@
 #include <map>
 
 #include "socket_handle.h"
+#include "timer_handle.h"
 
 using std::map;
 
+class Fd;
 class RtmpProtocol;
-class Socket;
 
-class StreamMgr : public SocketHandle
+class StreamMgr : public SocketHandle, public TimerSecondHandle
 {
 public:
     StreamMgr();
     ~StreamMgr();
 
-    virtual int HandleRead(IoBuffer& io_buffer, Socket& socket);
+    virtual int HandleRead(IoBuffer& io_buffer, Fd& fd);
+    virtual int HandleClose(IoBuffer& io_buffer, Fd& fd);
+    virtual int HandleError(IoBuffer& io_buffer, Fd& fd);
+
+    virtual int HandleTimerInSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
 
 private:
-    RtmpProtocol* GetOrCreateProtocol(Socket& socket);
+    RtmpProtocol* GetOrCreateProtocol(Fd& fd);
 
 private:
 

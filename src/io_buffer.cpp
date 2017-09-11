@@ -59,9 +59,11 @@ int IoBuffer::ReadFromFdAndWrite(const int& fd)
     }
     else
     {
-        cout << LMSG << "read err:" << strerror(errno) << endl;
+        if (errno != EAGAIN && errno != EWOULDBLOCK)
+        {
+            cout << LMSG << "read err:" << strerror(errno) << endl;
+        }
     }
-
 
     return bytes;
 }

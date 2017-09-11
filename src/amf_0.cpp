@@ -119,6 +119,12 @@ int Amf0::Decode(const int& type, BitBuffer& bit_buffer, Any*& result)
             break;
         }
 
+        case kEcmaArray:
+        {
+            ret = DecodeEcmaArray(bit_buffer, result);
+            break;
+        }
+
         case kNull:
         {
             ret = DecodeNull(bit_buffer, result);
@@ -247,6 +253,82 @@ int Amf0::DecodeObject(BitBuffer& bit_buffer, Any*& result)
         }
 
         result->ToMap().Insert(key, val);
+    }
+
+    if (error)
+    {
+        delete result;
+        return -1;
+    }
+
+    return 0;
+}
+
+int Amf0::DecodeEcmaArray(BitBuffer& bit_buffer, Any*& result)
+{
+    uint32_t element_count = 0;
+
+    if (! bit_buffer.MoreThanBytes(4))
+    {
+        cout << LMSG << "bit_buffer no more than 4 bytes" << endl;
+        return -1;
+    }
+
+    bool error = false;
+
+    bit_buffer.GetBytes(4, element_count);
+
+    cout << LMSG << "element_count:" << element_count << endl;
+
+    result = new Map();
+
+    for (uint32_t c = 0; c != element_count; ++c)
+    {
+        uint16_t key_len = 0;
+
+        if (bit_buffer.GetBytes(2, key_len) == 0)
+        {
+            if (! bit_buffer.MoreThanBytes(key_len))
+            {
+                cout << LMSG << "bit_buffer no more than " << key_len << " bytes" << endl;
+                error = true;
+                break;
+            }
+
+            string key;
+
+            bit_buffer.GetString(key_len, key);
+
+            cout << LMSG << "index:" << c << ",key:[" << key << "],key_len:" << key_len << ",bit_buffer.size:" << bit_buffer.BytesLeft() << endl;
+
+            int type = kUnknown;
+            if (GetType(bit_buffer, type) != 0)
+            {
+                error = true;
+                break;
+            }
+
+            if (type == kUnknown)
+            {
+                error = true;
+                break;
+            }
+
+            if (type == kObjectEnd)
+            {
+                break;
+            }
+
+            Any* val;
+            if (Decode(type, bit_buffer, val) != 0)
+            {
+                cout << LMSG << "decode key" << key << " failed" << endl;
+                error = true;
+                break;
+            }
+
+            result->ToMap().Insert(key, val);
+        }
     }
 
     if (error)

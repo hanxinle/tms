@@ -11,9 +11,15 @@
 #include <iostream>
 #include <string>
 
+#include "common_define.h"
+
+using std::string;
+using std::cout;
+using std::endl;
+
 namespace socket_util
 {
-    inline int IpStr2Num(const std::string& ip_str, uint32_t& ip_num)
+    inline int IpStr2Num(const string& ip_str, uint32_t& ip_num)
     {
         in_addr addr;
 
@@ -25,18 +31,18 @@ namespace socket_util
         }
         else
         {
-            std::cout << "inet_pton err:" << strerror(errno) << ",ip:" << ip_str << std::endl;
+            cout << LMSG << "inet_pton err:" << strerror(errno) << ",ip:" << ip_str << endl;
             ret = -1;
         }
 
         return ret;
     }
 
-    inline std::string IpNum2Str(const uint32_t& ip_num)
+    inline string IpNum2Str(const uint32_t& ip_num)
     {
         in_addr addr = {0};
         char buf[INET6_ADDRSTRLEN] = {0};
-        std::string str;
+        string str;
 
         addr.s_addr = ip_num;
 
@@ -48,13 +54,13 @@ namespace socket_util
         }
         else
         {
-            std::cout << "inet_ntop err:" << strerror(errno) << std::endl;
+            cout << LMSG << "inet_ntop err:" << strerror(errno) << endl;
         }
         
         return str;
     }
 
-    inline int CreateSocketAddrInet(const std::string& ip, const uint16_t& port, sockaddr_in& addr_in)
+    inline int CreateSocketAddrInet(const string& ip, const uint16_t& port, sockaddr_in& addr_in)
     {
         memset(&addr_in, 0, sizeof(addr_in));
 
@@ -71,7 +77,7 @@ namespace socket_util
         return 0;
     }
 
-    inline void SocketAddrInetToIpPort(const sockaddr_in& addr_in, std::string& ip, uint16_t& port)
+    inline void SocketAddrInetToIpPort(const sockaddr_in& addr_in, string& ip, uint16_t& port)
     {
         ip = IpNum2Str(addr_in.sin_addr.s_addr);
         port = ntohs(addr_in.sin_port);
@@ -83,7 +89,7 @@ namespace socket_util
 
         if (fd < 0)
         {
-            std::cout << "socket err:" << strerror(errno) << std::endl;
+            cout << LMSG << "socket err:" << strerror(errno) << endl;
         }
 
         return fd;
@@ -95,7 +101,7 @@ namespace socket_util
 
         if (fd < 0)
         {
-            std::cout << "socket err:" << strerror(errno) << std::endl;
+            cout << LMSG << "socket err:" << strerror(errno) << endl;
         }
 
         return fd;
@@ -107,15 +113,15 @@ namespace socket_util
         int ret = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &i, sizeof(i));
         if (ret < 0)
         {
-            std::cout << "setsockopt err:" << strerror(errno) << std::endl;
+            cout << LMSG << "setsockopt err:" << strerror(errno) << endl;
         }
 
         return ret;
     }
 
-    inline std::string GetIpByHost(const std::string& host)
+    inline string GetIpByHost(const string& host)
     {
-        std::string ret;
+        string ret;
 
         addrinfo ai;
         memset(&ai, 0, sizeof(addrinfo));
@@ -128,7 +134,7 @@ namespace socket_util
         int err = getaddrinfo(host.c_str(), NULL, &ai, &result);
         if (err != 0)
         {
-            std::cout << "getaddrinfo err:" << strerror(errno) << std::endl;
+            cout << LMSG << "getaddrinfo err:" << strerror(errno) << endl;
         }
         else
         {
@@ -145,7 +151,7 @@ namespace socket_util
         return ret;
     }
 
-    inline int Connect(const int& fd, const std::string& ip, const uint16_t& port)
+    inline int Connect(const int& fd, const string& ip, const uint16_t& port)
     {
         sockaddr_in addr;
         int ret = CreateSocketAddrInet(ip, port, addr);
@@ -158,27 +164,27 @@ namespace socket_util
         ret = connect(fd, (sockaddr*)&addr, sizeof(addr));
         if (ret < 0)
         {
-            std::cout << "connect err:" << strerror(errno) << std::endl;
+            cout << LMSG << "connect err:" << strerror(errno) << endl;
         }
 
         return ret;
     }
 
-    inline int ConnectHost(const int& fd, const std::string& host, const uint16_t& port)
+    inline int ConnectHost(const int& fd, const string& host, const uint16_t& port)
     {
-        std::string ip = GetIpByHost(host);
+        string ip = GetIpByHost(host);
 
         if (ip.empty())
         {
             return -1;
         }
 
-        std::cout << "host:" << host << ",ip:" << ip << std::endl;
+        cout << LMSG << "host:" << host << ",ip:" << ip << endl;
 
         return Connect(fd, ip, port);
     }
 
-    inline int Bind(const int& fd, const std::string& ip, const uint16_t& port)
+    inline int Bind(const int& fd, const string& ip, const uint16_t& port)
     {
         sockaddr_in addr;
         int ret = CreateSocketAddrInet(ip, port, addr);
@@ -191,7 +197,7 @@ namespace socket_util
         ret = bind(fd, (sockaddr*)&addr, sizeof(addr));
         if (ret < 0)
         {
-            std::cout << "bind err:" << strerror(errno) << std::endl;
+            cout << LMSG << "bind err:" << strerror(errno) << endl;
         }
 
         return ret;
@@ -203,13 +209,13 @@ namespace socket_util
 
         if (ret < 0)
         {
-            std::cout << "listen err:" << strerror(errno) << std::endl;
+            cout << LMSG << "listen err:" << strerror(errno) << endl;
         }
 
         return ret;
     }
 
-    inline int Accept(const int& fd, std::string& ip, uint16_t& port)
+    inline int Accept(const int& fd, string& ip, uint16_t& port)
     {
         sockaddr_in addr;
         socklen_t len = sizeof(addr);
@@ -217,7 +223,7 @@ namespace socket_util
         int ret = accept(fd, (sockaddr*)&addr, &len);
         if (ret < 0)
         {
-            std::cout << "accept err:" << strerror(errno) << std::endl;
+            cout << LMSG << "accept err:" << strerror(errno) << endl;
         }
         else
         {
@@ -232,18 +238,34 @@ namespace socket_util
 		int flags = fcntl(fd, F_GETFL, 0);
     	if (flags < 0)
     	{
-    	    std::cout << "fcntl err:" << strerror(errno) << std::endl;
+    	    cout << LMSG << "fcntl err:" << strerror(errno) << endl;
     	    return flags;
     	}
 
     	flags |= O_NONBLOCK;
     	if (fcntl(fd, F_SETFL, flags) < 0)
     	{
-    	    std::cout << "fcntl err:" << strerror(errno) << std::endl;
+    	    cout << LMSG << "fcntl err:" << strerror(errno) << endl;
     	    return -1;
     	}
 
     	return 0;
+    }
+
+    inline int GetSocketError(const int& fd, int& err)
+    {
+        socklen_t err_len = sizeof(err);
+        int ret = getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &err_len);
+
+        if (ret != 0)
+        {
+            cout << LMSG << "getsockopt err:" << strerror(errno) << endl;
+            return -1;
+        }
+
+        cout << LMSG << "fd:" << fd << ",err:" << err << endl;
+
+        return 0;
     }
 
 } // namespace socket_util

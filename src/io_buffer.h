@@ -55,7 +55,9 @@ public:
             start_ = buf_;
             end_ = buf_;
 
+#ifdef DEBUG
             cout << LMSG << "adjust start_ and end_ to buf_" << endl;
+#endif
         }
 
         return end_ - start_;

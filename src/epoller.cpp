@@ -59,7 +59,7 @@ int Epoller::EnableSocket(Fd* fd, const uint32_t& event)
     }
     else
     {
-        if (socket_map_[fd] & event == event)
+        if (socket_map_[fd] & event)
         {
             return 0;
         }
@@ -101,6 +101,8 @@ int Epoller::DisableSocket(Fd* fd, const uint32_t& event)
 
     op = EPOLL_CTL_MOD;
     final_event = socket_map_[fd];
+
+    cout << LMSG << "fd:" << fd << ",fd:" << fd->GetFd() << ",op:" << op << ",events:" << Event2Str(final_event) << endl;
 
     if (socket_map_[fd] == 0)
     {

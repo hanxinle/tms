@@ -29,7 +29,9 @@ IoBuffer::~IoBuffer()
 {
     if (buf_ != NULL)
     {
+#ifdef DEBUG
         cout << LMSG << "capacity_:" << capacity_ << ",Size():" << Size() << ",CapacityLeft():" << CapacityLeft() << ",buf:" << (void*)buf_ << endl;
+#endif
         free(buf_);
         buf_ = NULL;
 
@@ -44,13 +46,17 @@ int IoBuffer::ReadFromFdAndWrite(const int& fd)
 {
     MakeSpaceIfNeed(1024*64);
 
+#ifdef DEBUG
     cout << LMSG << "IoBuffer capacity:" << CapacityLeft() << endl;
+#endif
 
     int bytes = read(fd, end_, CapacityLeft());
 
     if (bytes > 0)
     {
+#ifdef DEBUG
         cout << LMSG << "read " << bytes << " bytes" << endl;
+#endif
         end_ += bytes;
     }
     else if (bytes == 0)
@@ -180,7 +186,9 @@ int IoBuffer::MakeSpaceIfNeed(const size_t& len)
 
     size_t new_capacity = max(capacity_ + len, capacity_ * 2);
 
+#ifdef DEBUG
     cout << LMSG << "cur_capacity:" << cur_capacity << ",new_capacity:" << new_capacity << endl;
+#endif
 
     buf_ = (uint8_t*)realloc(buf_, new_capacity);
 

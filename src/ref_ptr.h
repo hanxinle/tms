@@ -11,6 +11,7 @@
 using std::atomic;
 using std::cout;
 using std::endl;
+using std::hex;
 
 class RefPtr
 {
@@ -28,7 +29,9 @@ public:
 
         if(ptr_ != NULL)
         {
+#ifdef DEBUG
             cout << LMSG << "free ptr_:" << (void*)ptr_ << endl;
+#endif
             free(ptr_);
         }
     }
@@ -74,6 +77,16 @@ public:
     {
     }
 
+    void SetTimestamp(const uint32_t& timestamp)
+    {
+        timestamp_ = timestamp;
+    }
+
+    uint32_t GetTimestamp()
+    {
+        return timestamp_;
+    }
+
     void Reset(uint8_t* ptr, const uint64_t& len)
     {
         if (ref_ptr_ != NULL)
@@ -90,11 +103,15 @@ public:
     {
         uint32_t referenct_count = ref_ptr_->DecRefCount();
 
+#ifdef DEBUG
         cout << LMSG << "referenct count:" << referenct_count << endl;
+#endif
 
         if (referenct_count == 0)
         {
+#ifdef DEBUG
             cout << LMSG << "now delete ref_ptr_:" << (void*)ref_ptr_ << endl;
+#endif
             delete ref_ptr_;
         }
     }
@@ -105,8 +122,12 @@ public:
         {
             this->ref_ptr_ = other.ref_ptr_;
             uint32_t referenct_count = ref_ptr_->AddRefCount();
+            this->len_ = other.len_;
+            this->timestamp_ = other.timestamp_;
 
+#ifdef DEBUG
             cout << LMSG << "referenct count:" << referenct_count << endl;
+#endif
         }
     }
 
@@ -116,8 +137,12 @@ public:
         {
             this->ref_ptr_ = other.ref_ptr_;
             uint32_t referenct_count = ref_ptr_->AddRefCount();
+            this->len_ = other.len_;
+            this->timestamp_ = other.timestamp_;
 
+#ifdef DEBUG
             cout << LMSG << "referenct count:" << referenct_count << endl;
+#endif
         }
     }
 
@@ -155,6 +180,7 @@ public:
 private:
     RefPtr* ref_ptr_;
     uint64_t len_;
+    uint32_t timestamp_;
 };
 
 

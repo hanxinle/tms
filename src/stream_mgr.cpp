@@ -2,7 +2,9 @@
 #include "fd.h"
 #include "stream_mgr.h"
 
-StreamMgr::StreamMgr()
+StreamMgr::StreamMgr(Epoller* epoller)
+    :
+    epoller_(epoller)
 {
 }
 
@@ -49,15 +51,57 @@ int StreamMgr::HandleError(IoBuffer& io_buffer, Fd& socket)
     fd_protocol_.erase(socket.GetFd());
 }
 
+int StreamMgr::HandleConnected(Fd& socket)
+{
+    RtmpProtocol* rtmp_protocol = GetOrCreateProtocol(socket);
+
+    rtmp_protocol->OnConnected();
+}
+
 RtmpProtocol* StreamMgr::GetOrCreateProtocol(Fd& socket)
 {
     int fd = socket.GetFd();
     if (fd_protocol_.count(fd) == 0)
     {
-        fd_protocol_[fd] = new RtmpProtocol(&socket);
+        fd_protocol_[fd] = new RtmpProtocol(epoller_, &socket, this);
     }
 
     return fd_protocol_[fd];
+}
+
+bool StreamMgr::RegisterStream(const string& app, const string& stream_name, RtmpProtocol* rtmp_protocol)
+{
+    auto& stream_protocol_ = app_stream_protocol_[app];
+
+    if (stream_protocol_.find(stream_name) != stream_protocol_.end())
+    {
+        cout << LMSG << "stream_name:" << stream_name << " already registered" << endl;
+        return false;
+    }
+
+    stream_protocol_.insert(make_pair(stream_name, rtmp_protocol));
+    cout << LMSG << "register app:" << app << ", stream_name:" << stream_name << endl;
+
+    return true;
+}
+
+RtmpProtocol* StreamMgr::GetRtmpProtocolByAppStream(const string& app, const string& stream_name)
+{
+    auto iter_app = app_stream_protocol_.find(app);
+
+    if (iter_app == app_stream_protocol_.end())
+    {
+        return NULL;
+    }
+
+    auto iter_stream = iter_app->second.find(stream_name);
+
+    if (iter_stream == iter_app->second.end())
+    {
+        return NULL;
+    }
+
+    return iter_stream->second;
 }
 
 int StreamMgr::HandleTimerInSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)

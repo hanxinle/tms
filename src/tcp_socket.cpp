@@ -37,50 +37,54 @@ int TcpSocket::OnRead()
 
             TcpSocket* tcp_socket = new TcpSocket(epoller_, client_fd, handler_);
             SetNonBlock(client_fd);
+            tcp_socket->SetConnected();
 
             tcp_socket->EnableRead();
         }
     }
     else
     {
-        uint8_t buf[1024*64];
-
-        while (true)
+        if (connect_status_ == kConnected)
         {
-            int bytes = read_buffer_.ReadFromFdAndWrite(fd_);
-            if (bytes > 0)
+            uint8_t buf[1024*64];
+
+            while (true)
             {
-                if (handler_ != NULL)
+                int bytes = read_buffer_.ReadFromFdAndWrite(fd_);
+                if (bytes > 0)
                 {
-                    handler_->HandleRead(read_buffer_, *this);
+                    if (handler_ != NULL)
+                    {
+                        handler_->HandleRead(read_buffer_, *this);
+                    }
                 }
-            }
-            else if (bytes == 0)
-            {
-                cout << LMSG << "close by peer" << endl;
-
-                if (handler_ != NULL)
+                else if (bytes == 0)
                 {
-                    handler_->HandleClose(read_buffer_, *this);
-                }
+                    cout << LMSG << "close by peer" << endl;
 
-                return kClose;
-            }
-            else
-            {
-                if (errno == EAGAIN || errno == EWOULDBLOCK)
+                    if (handler_ != NULL)
+                    {
+                        handler_->HandleClose(read_buffer_, *this);
+                    }
+
+                    return kClose;
+                }
+                else
                 {
-                    break;
+                    if (errno == EAGAIN || errno == EWOULDBLOCK)
+                    {
+                        break;
+                    }
+
+                    cout << LMSG << "read err:" << strerror(errno) << endl;
+
+                    if (handler_ != NULL)
+                    {
+                        handler_->HandleError(read_buffer_, *this);
+                    }
+
+                    return kError;
                 }
-
-                cout << LMSG << "read err:" << strerror(errno) << endl;
-
-                if (handler_ != NULL)
-                {
-                    handler_->HandleError(read_buffer_, *this);
-                }
-
-                return kError;
             }
         }
     }
@@ -88,19 +92,39 @@ int TcpSocket::OnRead()
 
 int TcpSocket::OnWrite()
 {
-    int ret = write_buffer_.WriteToFd(fd_);
-
-    if (write_buffer_.Empty())
+    if (connect_status_ == kConnected)
     {
-        DisableWrite();
+        int ret = write_buffer_.WriteToFd(fd_);
+
+        if (write_buffer_.Empty())
+        {
+            DisableWrite();
+        }
+
+        if (ret < 0)
+        {
+            // FIXME:write err
+        }
+
+        return ret;
+    }
+    else if (connect_status_ == kConnecting)
+    {
+        int err = -1;
+        if (GetSocketError(fd_, err) != 0 || err != 0)
+        {
+            cout << LMSG << "when socket connected err:" << strerror(err) << endl;
+            handler_->HandleError(read_buffer_, *this);
+        }
+        else
+        {
+            cout << LMSG << "connected" << endl;
+            SetConnected();
+            handler_->HandleConnected(*this);
+        }
     }
 
-    if (ret < 0)
-    {
-        // FIXME:write err
-    }
-
-    return ret;
+    return 0;
 }
 
 int TcpSocket::Send(const uint8_t* data, const size_t& len)
@@ -112,7 +136,9 @@ int TcpSocket::Send(const uint8_t* data, const size_t& len)
 
         if (ret > 0)
         {
-            cout << LMSG << "direct send " << ret << " bytes" << endl;
+#ifdef DEBUG
+            cout << LMSG << "direct send " << ret << " bytes" << ",left:" << (len - ret) << " bytes" << endl;
+#endif
             if (ret < len)
             {
                 write_buffer_.Write(data + ret, len - ret);
@@ -121,7 +147,10 @@ int TcpSocket::Send(const uint8_t* data, const size_t& len)
         }
         else if (ret == 0)
         {
-            assert(false);
+            if (len != 0)
+            {
+                assert(false);
+            }
         }
         else
         {

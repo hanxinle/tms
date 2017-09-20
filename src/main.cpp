@@ -82,7 +82,7 @@ int main(int argc, char* argv[])
 
     Listen(server_fd);
 
-    StreamMgr stream_mgr;
+    StreamMgr stream_mgr(&epoller);
 
     SetNonBlock(server_fd);
 

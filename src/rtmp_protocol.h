@@ -4,15 +4,14 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#include <deque>
 #include <map>
 #include <sstream>
 #include <set>
 
 #include "ref_ptr.h"
 #include "socket_util.h"
+#include "wrap_ptr.h"
 
-using std::deque;
 using std::map;
 using std::string;
 using std::ostringstream;
@@ -20,6 +19,7 @@ using std::set;
 
 class Epoller;
 class Fd;
+class HttpFlvProtocol;
 class IoBuffer;
 class StreamMgr;
 class TcpSocket;
@@ -104,6 +104,18 @@ struct RtmpMessage
 
     uint8_t* msg;
     uint32_t len;
+};
+
+struct TsMedia
+{
+    TsMedia()
+        :
+        duration(0)
+    {
+    }
+
+    double duration;
+    string buffer;
 };
 
 class RtmpProtocol
@@ -210,7 +222,21 @@ public:
         return true;
     }
 
-    bool RemovePlayer(RtmpProtocol* protocol)
+    bool AddFlvPlayer(HttpFlvProtocol* protocol)
+    {
+        if (flv_player_.count(protocol))
+        {
+            return false;
+        }
+
+        flv_player_.insert(protocol);
+
+        OnNewFlvPlayer(protocol);
+        
+        return true;
+    }
+
+    bool RemoveRtmpPlayer(RtmpProtocol* protocol)
     {
         if (rtmp_player_.count(protocol) == 0)
         {
@@ -222,9 +248,42 @@ public:
         return true;
     }
 
+    bool RemoveFlvPlayer(HttpFlvProtocol* protocol)
+    {
+        if (flv_player_.count(protocol) == 0)
+        {
+            return false;
+        }
+
+        flv_player_.erase(protocol);
+
+        return true;
+    }
+
+    string GetM3U8()
+    {
+        return m3u8_;
+    }
+
+    string GetTs(const uint64_t& ts)
+    {
+        auto iter = ts_queue_.find(ts);
+
+        if (iter == ts_queue_.end())
+        {
+            return "";
+        }
+
+        return iter->second.buffer;
+    }
+
+    void UpdateM3U8();
+    void PacketTs();
+
 private:
     int OnRtmpMessage(RtmpMessage& rtmp_msg);
     int OnNewRtmpPlayer(RtmpProtocol* protocol);
+    int OnNewFlvPlayer(HttpFlvProtocol* protocol);
     int SendRtmpMessage(const uint8_t& message_type_id, const uint8_t* data, const size_t& len);
     int SendMediaData(const RtmpMessage& media);
 
@@ -248,6 +307,11 @@ private:
     map<uint64_t, Payload> video_queue_;
     map<uint64_t, Payload> audio_queue_;
 
+    map<uint64_t, WrapPtr> raw_video_queue_;
+    map<uint64_t, WrapPtr> raw_audio_queue_;
+
+    map<uint64_t, TsMedia> ts_queue_;
+
     uint32_t video_fps_;
     uint32_t audio_fps_;
 
@@ -263,12 +327,17 @@ private:
 
     set<RtmpProtocol*> rtmp_forwards_;
     set<RtmpProtocol*> rtmp_player_;
+    set<HttpFlvProtocol*> flv_player_;
     
     RtmpProtocol* rtmp_src_;
 
     string metadata_;
     string aac_header_;
     string avc_header_;
+
+    string sps_;
+    string pps_;
+    string sei_;
 
     string last_send_command_;
 
@@ -283,6 +352,13 @@ private:
     uint32_t last_video_message_length_;
     uint32_t last_audio_message_length_;
     uint8_t last_message_type_id_;
+
+    string m3u8_;
+    uint64_t ts_seq_;
+    uint8_t ts_couter_;
+    uint32_t video_pid_;
+    uint32_t audio_pid_;
+    uint32_t pmt_pid_;
 };
 
 #endif // __RTMP_PROTOCOL_H__

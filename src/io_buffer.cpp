@@ -44,7 +44,7 @@ IoBuffer::~IoBuffer()
 
 int IoBuffer::ReadFromFdAndWrite(const int& fd)
 {
-    MakeSpaceIfNeed(1024*64);
+    MakeSpaceIfNeed(kEnlargeSize);
 
 #ifdef DEBUG
     cout << LMSG << "IoBuffer capacity:" << CapacityLeft() << endl;

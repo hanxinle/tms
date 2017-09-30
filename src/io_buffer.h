@@ -10,6 +10,10 @@ using std::string;
 using std::cout;
 using std::endl;
 
+const uint64_t kDefaultSize = 1024*64;
+const uint64_t kShrinkSize = 2*1024*64;
+const uint64_t kEnlargeSize = 1024*64;
+
 class IoBuffer
 {
 public:
@@ -52,8 +56,7 @@ public:
 
         if (end_ == start_)
         {
-            start_ = buf_;
-            end_ = buf_;
+            ShrinkCapacity(kDefaultSize);
 
 #ifdef DEBUG
             cout << LMSG << "adjust start_ and end_ to buf_" << endl;
@@ -70,6 +73,20 @@ public:
 
 private:
     int MakeSpaceIfNeed(const size_t& len);
+    void ShrinkCapacity(const size_t& capacity)
+    {
+        if (capacity_ > kShrinkSize)
+        {
+            cout << LMSG << "shrink " << capacity_ << "->" << capacity << endl;
+
+            free(buf_);
+            capacity_ = capacity;
+            buf_ = (uint8_t*)malloc(capacity_);
+        }
+
+        start_ = buf_;
+        end_ = buf_;
+    }
 
 private:
     uint8_t *buf_;

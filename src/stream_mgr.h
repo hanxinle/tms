@@ -2,11 +2,13 @@
 #define __STREAM_MGR_H__
 
 #include <map>
+#include <string>
 
 #include "socket_handle.h"
 #include "timer_handle.h"
 
 using std::map;
+using std::string;
 
 class Epoller;
 class Fd;

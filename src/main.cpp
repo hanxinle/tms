@@ -4,6 +4,9 @@
 
 #include "any.h"
 #include "bit_buffer.h"
+#include "bit_stream.h"
+#include "http_flv_mgr.h"
+#include "http_hls_mgr.h"
 #include "ref_ptr.h"
 #include "stream_mgr.h"
 #include "epoller.h"
@@ -11,6 +14,7 @@
 #include "tcp_socket.h"
 #include "timer_in_second.h"
 #include "timer_in_millsecond.h"
+#include "util.h"
 
 using namespace any;
 using namespace std;
@@ -63,6 +67,23 @@ int main(int argc, char* argv[])
     cout << endl;
 
     {
+        BitStream bit_stream(1024);
+        uint8_t buf[5] = {0xBE, 0xA0, 0x11, 0x78, 0xFF};
+
+        // 00100001
+        bit_stream.WriteBits(3, (uint8_t)1);
+        bit_stream.WriteBits(2, (uint8_t)0);
+        bit_stream.WriteBits(3, (uint8_t)1);
+        bit_stream.WriteBytes(2, (uint64_t)0xFA);
+        bit_stream.WriteData(5, buf);
+
+
+        cout << "BitStream:" << bit_stream.GetData() << ",size:" << bit_stream.SizeInBytes() << endl;
+        cout << Util::Bin2Hex(bit_stream.GetData(), bit_stream.SizeInBytes()) << endl;
+        cout << TRACE << endl;
+    }
+
+    {
         Payload b((uint8_t*)malloc(1024), 1024);
 
         Payload bb(b);
@@ -75,20 +96,45 @@ int main(int argc, char* argv[])
 
     Epoller epoller;
 
-    int server_fd = CreateNonBlockTcpSocket();
+    int server_rtmp_fd = CreateNonBlockTcpSocket();
 
-    ReuseAddr(server_fd);
-    Bind(server_fd, "0.0.0.0", 1935);
+    ReuseAddr(server_rtmp_fd);
+    Bind(server_rtmp_fd, "0.0.0.0", 1935);
+    Listen(server_rtmp_fd);
+    SetNonBlock(server_rtmp_fd);
 
-    Listen(server_fd);
+    int server_flv_fd = CreateNonBlockTcpSocket();
+
+    ReuseAddr(server_flv_fd);
+    Bind(server_flv_fd, "0.0.0.0", 8787);
+    Listen(server_flv_fd);
+    SetNonBlock(server_flv_fd);
+
+    int server_hls_fd = CreateNonBlockTcpSocket();
+
+    ReuseAddr(server_hls_fd);
+    Bind(server_hls_fd, "0.0.0.0", 8788);
+    Listen(server_hls_fd);
+    SetNonBlock(server_hls_fd);
 
     StreamMgr stream_mgr(&epoller);
 
-    SetNonBlock(server_fd);
+    TcpSocket server_rtmp_socket(&epoller, server_rtmp_fd, &stream_mgr);
+    server_rtmp_socket.EnableRead();
+    server_rtmp_socket.AsServerSocket();
 
-    TcpSocket server_socket(&epoller, server_fd, &stream_mgr);
-    server_socket.EnableRead();
-    server_socket.AsServerSocket();
+    HttpFlvMgr http_flv_mgr(&epoller, &stream_mgr);
+
+    TcpSocket server_flv_socket(&epoller, server_flv_fd, &http_flv_mgr);
+    server_flv_socket.EnableRead();
+    server_flv_socket.AsServerSocket();
+
+    HttpHlsMgr http_hls_mgr(&epoller, &stream_mgr);
+
+    TcpSocket server_hls_socket(&epoller, server_hls_fd, &http_hls_mgr);
+    server_hls_socket.EnableRead();
+    server_hls_socket.AsServerSocket();
+
 
     TimerInSecond timer_in_second(&epoller);
     TimerInMillSecond timer_in_millsecond(&epoller);

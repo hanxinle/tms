@@ -66,20 +66,62 @@ public:
     Payload()
         :
         ref_ptr_(NULL),
-        len_(0)
+        len_(0),
+        frame_type_(kUnknownFrame)
     {
     }
 
     Payload(uint8_t* ptr, const uint64_t& len)
         :
         ref_ptr_(new RefPtr(ptr)),
-        len_(len)
+        len_(len),
+        is_key_frame_(false)
     {
+    }
+
+    void SetIFrame()
+    {
+        frame_type_ = kIframe;
+    }
+
+    void SetBFrame()
+    {
+        frame_type_ = kBframe;
+    }
+
+    void SetPFrame()
+    {
+        frame_type_ = kPframe;
+    }
+
+    bool IsIFrame()
+    {
+        return frame_type_ == kIframe;
+    }
+
+    bool IsBFrame()
+    {
+        return frame_type_ == kBframe;
+    }
+
+    bool IsPFrame()
+    {
+        return frame_type_ == kPframe;
     }
 
     void SetTimestamp(const uint32_t& timestamp)
     {
         timestamp_ = timestamp;
+    }
+
+    void SetKeyFrame()
+    {
+        is_key_frame_ = true;
+    }
+
+    bool IsKeyFrame()
+    {
+        return is_key_frame_;
     }
 
     uint32_t GetTimestamp()
@@ -124,6 +166,8 @@ public:
             uint32_t referenct_count = ref_ptr_->AddRefCount();
             this->len_ = other.len_;
             this->timestamp_ = other.timestamp_;
+            this->is_key_frame_ = other.is_key_frame_;
+            this->frame_type_ = other.frame_type_;
 
 #ifdef DEBUG
             cout << LMSG << "referenct count:" << referenct_count << endl;
@@ -139,6 +183,8 @@ public:
             uint32_t referenct_count = ref_ptr_->AddRefCount();
             this->len_ = other.len_;
             this->timestamp_ = other.timestamp_;
+            this->is_key_frame_ = other.is_key_frame_;
+            this->frame_type_ = other.frame_type_;
 
 #ifdef DEBUG
             cout << LMSG << "referenct count:" << referenct_count << endl;
@@ -181,6 +227,8 @@ private:
     RefPtr* ref_ptr_;
     uint64_t len_;
     uint32_t timestamp_;
+    bool is_key_frame_;
+    uint8_t frame_type_;
 };
 
 

@@ -86,6 +86,11 @@ public:
         return frame_type_ == kPframe;
     }
 
+    uint8_t GetFrameType()
+    {
+        return frame_type_;
+    }
+
     void SetDts(const uint32_t& dts)
     {
         dts_ = dts;

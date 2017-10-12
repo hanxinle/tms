@@ -109,6 +109,11 @@ public:
         return frame_type_ == kPframe;
     }
 
+    uint8_t GetFrameType()
+    {
+        return frame_type_;
+    }
+
     void SetTimestamp(const uint32_t& timestamp)
     {
         timestamp_ = timestamp;

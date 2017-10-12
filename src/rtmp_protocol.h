@@ -8,6 +8,7 @@
 #include <sstream>
 #include <set>
 
+#include "crc32.h"
 #include "ref_ptr.h"
 #include "socket_util.h"
 #include "wrap_ptr.h"
@@ -280,6 +281,34 @@ public:
     void UpdateM3U8();
     void PacketTs();
 
+    uint16_t GetAudioContinuityCounter()
+    {
+        uint16_t ret = audio_continuity_counter_;
+
+        ++audio_continuity_counter_;
+
+        if (audio_continuity_counter_ == 0x10)
+        {
+            audio_continuity_counter_ = 0x00;
+        }
+
+        return ret;
+    }
+
+    uint16_t GetVideoContinuityCounter()
+    {
+        uint16_t ret = video_continuity_counter_;
+
+        ++video_continuity_counter_;
+
+        if (video_continuity_counter_ == 0x10)
+        {
+            video_continuity_counter_ = 0x00;
+        }
+
+        return ret;
+    }
+
 private:
     int OnRtmpMessage(RtmpMessage& rtmp_msg);
     int OnNewRtmpPlayer(RtmpProtocol* protocol);
@@ -335,6 +364,8 @@ private:
     string aac_header_;
     string avc_header_;
 
+    uint8_t adts_header_[7];
+
     string sps_;
     string pps_;
     string sei_;
@@ -359,6 +390,11 @@ private:
     uint32_t video_pid_;
     uint32_t audio_pid_;
     uint32_t pmt_pid_;
+
+    uint8_t audio_continuity_counter_;
+    uint8_t video_continuity_counter_;
+
+    CRC32 crc_32_;
 };
 
 #endif // __RTMP_PROTOCOL_H__

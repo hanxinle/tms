@@ -66,7 +66,9 @@ RtmpProtocol::RtmpProtocol(Epoller* epoller, Fd* fd, StreamMgr* stream_mgr)
     ts_couter_(0),
     video_pid_(0x100),
     audio_pid_(0x101),
-    pmt_pid_(0xABC)
+    pmt_pid_(0xABC),
+    audio_continuity_counter_(0),
+    video_continuity_counter_(0)
 {
     cout << LMSG << endl;
 }
@@ -669,8 +671,10 @@ void RtmpProtocol::PacketTs()
         bs.WriteBits(16, 0x0001);
         bs.WriteBits(3, 0x07);
         bs.WriteBits(13, pmt_pid_);
-        uint32_t crc32 = CRC32(bs.GetData(), bs.SizeInBytes());
+        uint32_t crc32 = crc_32_.GetCrc32(bs.GetData() + 5, bs.SizeInBytes() - 5);
         bs.WriteBytes(4, crc32);
+
+        cout << LMSG << "crc32:" << crc32 << endl;
 
         int left_bytes = 188 - bs.SizeInBytes();
 
@@ -702,6 +706,7 @@ void RtmpProtocol::PacketTs()
         uint16_t length = 23;
 
         bs.WriteBits(12, length);
+        // TODO:文档这里都是8bit,但实现得是16bit
         bs.WriteBits(16, 0x0001);
         bs.WriteBits(2, 0x03);
         bs.WriteBits(5, 0);
@@ -725,8 +730,11 @@ void RtmpProtocol::PacketTs()
         bs.WriteBits(4, 0x0F);
         bs.WriteBits(12, 0x0000);
 
-        uint32_t crc32 = CRC32(bs.GetData(), bs.SizeInBytes());
+        // 这里要是5,不能是4,ts header后面多出来的一个字节不知道是啥
+        uint32_t crc32 = crc_32_.GetCrc32(bs.GetData() + 5, bs.SizeInBytes() - 5);
         bs.WriteBytes(4, crc32);
+
+        cout << LMSG << "crc32:" << crc32 << endl;
 
         int left_bytes = 188 - bs.SizeInBytes();
 
@@ -785,13 +793,18 @@ void RtmpProtocol::PacketTs()
 
         string buffer;
 
-        static uint8_t ts_header_size = 4;
-        static uint8_t adaptation_size = 8;
-        static uint8_t pes_header_size = 19;
+        uint8_t ts_header_size = 4;
+        uint8_t adaptation_size = 8;
+        uint8_t pes_header_size = 19;
+
+        if (! is_video)
+        {
+            adaptation_size = 2;
+            pes_header_size = 14;
+        }
 
         cout << LMSG << "is video:" << is_video << endl;
 
-        uint16_t continuity_counter = 0;
         while (i < payload.GetLen())
         {
             uint32_t header_size = ts_header_size;
@@ -806,7 +819,18 @@ void RtmpProtocol::PacketTs()
                 adaptation_field_control = 3;
 
                 //　音频负载通常小于188,这里要做下处理
-                //if (
+                if (payload.GetLen() + ts_header_size + adaptation_size + pes_header_size < 188)
+                {
+                    if (is_video)
+                    {
+                        adaption_stuffing_bytes = 188 - (payload.GetLen() + ts_header_size + adaptation_size + pes_header_size + 6/*00 00 00 01 09 BC*/);
+                    }
+                    else
+                    {
+                        adaption_stuffing_bytes = 188 - (payload.GetLen() + ts_header_size + adaptation_size + pes_header_size);
+                    }
+                    header_size += adaption_stuffing_bytes;
+                }
             }
             else
             {
@@ -855,12 +879,13 @@ void RtmpProtocol::PacketTs()
             ts_bs.WriteBits(2, 0);              // transport_scrambling_control
             ts_bs.WriteBits(2, adaptation_field_control);
 
-            ts_bs.WriteBits(4, continuity_counter);
-
-            ++continuity_counter;
-            if (continuity_counter == 0x10)
+            if (is_video)
             {
-                continuity_counter = 1;
+                ts_bs.WriteBits(4, GetVideoContinuityCounter());
+            }
+            else
+            {
+                ts_bs.WriteBits(4, GetAudioContinuityCounter());
             }
 
             //cout << LMSG << "i:" << i << ",adaptation_field_control:" << (uint16_t)adaptation_field_control << endl;
@@ -869,30 +894,31 @@ void RtmpProtocol::PacketTs()
                 // adaption
                 uint64_t timestamp = (uint64_t)payload.GetDts() * 90;
 
-                ts_bs.WriteBytes(1, 7);
-                ts_bs.WriteBytes(1, 0x10);
+                if (is_video)
+                {
+                    ts_bs.WriteBytes(1, 7 + adaption_stuffing_bytes);
+                    ts_bs.WriteBytes(1, 0x50);
 
-                uint64_t pcr_base = timestamp;
-                uint16_t pcr_ext = 0;
+                    uint64_t pcr_base = timestamp;
+                    uint16_t pcr_ext = 0;
 
-                const uint8_t* t = ts_bs.GetData() + ts_bs.SizeInBytes() - 6;
-
-                uint64_t o = ((uint64_t)t[0] << 25) | ((uint64_t)t[1] << 17) | ((uint64_t)t[2] << 9) | ((uint64_t)t[1] << 1) | ((t[0] & 0x80)>>7);
-
-                cout << "pcr_base:" << pcr_base << ",o:" << o << endl;
-                cout << Util::Bin2Hex((const uint8_t*)&pcr_base, sizeof(pcr_base)) << endl;
-
-
-                ts_bs.WriteBits(33, pcr_base);
-                ts_bs.WriteBits(6, 0x00);
-                ts_bs.WriteBits(9, pcr_ext);
-
-                cout << Util::Bin2Hex(ts_bs.GetData() + ts_bs.SizeInBytes() - 6, 6) << endl;
-                //cout << LMSG << timestamp << ",hex:" << Util::Bin2Hex((const uint8_t*)&timestamp, 8) << endl;
+                    ts_bs.WriteBits(33, pcr_base);
+                    ts_bs.WriteBits(6, 0x00);
+                    ts_bs.WriteBits(9, pcr_ext);
+                }
+                else
+                {
+                    ts_bs.WriteBytes(1, 1 + adaption_stuffing_bytes);
+                    // audio no pcr
+                    ts_bs.WriteBytes(1, 0x40);
+                }
 
                 if (adaption_stuffing_bytes > 0)
                 {
-                    ts_bs.WriteBytes(adaption_stuffing_bytes, 0xFF);
+                    for (uint8_t i = 0; i != adaption_stuffing_bytes; ++i)
+                    {
+                        ts_bs.WriteBytes(1, 0xFF);
+                    }
                 }
             }
 
@@ -908,17 +934,34 @@ void RtmpProtocol::PacketTs()
                 {
                     ts_bs.WriteBytes(1, 0xc0);
                 }
+
+                if (is_video)
+                {
+                    ts_bs.WriteBytes(2, (uint64_t)payload.GetLen());
+                }
+                else
+                {
+                    ts_bs.WriteBytes(2, (uint64_t)payload.GetLen() + 3 + 5 + 7);
+                }
+
+                ts_bs.WriteBytes(1, 0x80);
+
+                if (is_video)
+                {
+                    ts_bs.WriteBytes(1, 0xc0);
+                    ts_bs.WriteBytes(1, 10);
+                }
+                else
+                {
+                    ts_bs.WriteBytes(1, 0x80);
+                    ts_bs.WriteBytes(1, 5);
+                }
+
                 uint32_t timestamp = payload.GetPts() * 90;
 
                 uint16_t t_32_30 = (timestamp & 0xC0000000) >> 29;
                 uint16_t t_29_15 = (timestamp & 0x3FFF8000) >> 15;
                 uint16_t t_14_0  = (timestamp & 0x00007FFF);
-
-
-                ts_bs.WriteBytes(2, (uint64_t)payload.GetLen() - 5);
-                ts_bs.WriteBytes(1, 0x80);
-                ts_bs.WriteBytes(1, 0xc0);
-                ts_bs.WriteBytes(1, 10);
 
                 // pts
                 ts_bs.WriteBits(4, 0x02);
@@ -935,28 +978,29 @@ void RtmpProtocol::PacketTs()
                 t_29_15 = (timestamp & 0x3FFF8000) >> 15;
                 t_14_0  = (timestamp & 0x00007FFF);
 
-                // dts
-                ts_bs.WriteBits(4, 0x02);
-                ts_bs.WriteBits(3, t_32_30);
-                ts_bs.WriteBits(1, 1);
-                ts_bs.WriteBits(15, t_29_15);
-                ts_bs.WriteBits(1, 1);
-                ts_bs.WriteBits(15, t_14_0);
-                ts_bs.WriteBits(1, 1);
-
-                cout << LMSG << "timestamp:" << timestamp << endl;
-                cout << LMSG << Util::Bin2Hex(ts_bs.GetData() + ts_bs.SizeInBytes() - 10, 10) << endl;
+                if (is_video)
+                {
+                    // dts
+                    ts_bs.WriteBits(4, 0x02);
+                    ts_bs.WriteBits(3, t_32_30);
+                    ts_bs.WriteBits(1, 1);
+                    ts_bs.WriteBits(15, t_29_15);
+                    ts_bs.WriteBits(1, 1);
+                    ts_bs.WriteBits(15, t_14_0);
+                    ts_bs.WriteBits(1, 1);
+                }
 
                 if (is_video)
                 {
                     // split nalu
                     ts_bs.WriteBytes(4, 0x00000001);
-                    ts_bs.WriteBytes(1, 0x09);
-                    ts_bs.WriteBytes(1, 0xBC);
+                    ts_bs.WriteBytes(1, 0x09); // 分隔符
+                    ts_bs.WriteBytes(1, 0xBC); // 这个随便填
                     header_size += 6;
                 }
             }
 
+            //cout << "header_size:" << header_size << ",ts_bs.SizeInBytes():" << ts_bs.SizeInBytes() << ",is_video:" << is_video << endl;
             assert(header_size == ts_bs.SizeInBytes());
 
             // SPS PPS before I frame
@@ -964,16 +1008,12 @@ void RtmpProtocol::PacketTs()
             {
                 if (payload.IsIFrame())
                 {
+                    // nalu type在payload的第一个字节
                     ts_bs.WriteBytes(4, 0x00000001);
                     ts_bs.WriteData(sps_.size(), (const uint8_t*)sps_.data());
 
                     ts_bs.WriteBytes(4, 0x00000001);
                     ts_bs.WriteData(pps_.size(), (const uint8_t*)pps_.data());
-
-                    // SEI的长度可能会过长
-                    if (! sei_.empty())
-                    {
-                    }
 
                     ts_bs.WriteBytes(4, 0x00000001);
                     //ts_bs.WriteBytes(1, 0x65);
@@ -995,19 +1035,25 @@ void RtmpProtocol::PacketTs()
 
                     cout << LMSG << "B frame" << endl;
                 }
+                else
+                {
+                    cout << LMSG << "Unknown frame:" << (uint16_t)payload.GetFrameType() << endl;
+                }
             }
 
-            if (! is_video && aac_header_.size() > 2)
+            if (i == 0 && ! is_video && aac_header_.size() > 2)
             {
-                ts_bs.WriteData(aac_header_.size() - 2, (const uint8_t*)aac_header_.data() + 2);
+                // 有卡顿声音的头
+                adts_header_[3] |=(uint8_t)((payload.GetLen() & 0x1800) >> 11);           //frame length：value   高2bits
+                adts_header_[4] = (uint8_t)((payload.GetLen() & 0x7f8) >> 3);     //frame length:value    中间8bits 
+                adts_header_[5] |= (uint8_t)((payload.GetLen() & 0x7) << 5);       //frame length:value    低3bits
+
+                ts_bs.WriteData(7, adts_header_);
             }
 
             int bytes_left = 188 - ts_bs.SizeInBytes();
 
             ts_bs.WriteData(bytes_left, data);
-
-            //cout << TRACE << endl;
-            //cout << Util::Bin2Hex(ts_bs.GetData(), ts_bs.SizeInBytes()) << endl;
 
             data += bytes_left;
             i += bytes_left;
@@ -1084,6 +1130,58 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
                     aac_header_.assign((const char*)rtmp_msg.msg, rtmp_msg.len);
                     cout << LMSG << "recv aac_header_" << ",size:" << aac_header_.size() << endl;
                     cout << Util::Bin2Hex(rtmp_msg.msg, rtmp_msg.len) << endl;
+
+                    string header = aac_header_.substr(2);
+
+                    {   
+                        uint8_t audio_object_type = 0;
+                        uint8_t sampling_frequency_index = 0;
+                        uint8_t channel_config = 0;
+                         
+                        //audio object type:5bit
+                        audio_object_type = header[0] & 0xf8;
+                        audio_object_type >>= 3;
+                         
+                        //sampling frequency index:4bit
+                        //高3bits
+                        sampling_frequency_index = header[0] & 0x07;
+                        sampling_frequency_index <<= 1;
+                        //低1bit
+                        uint8_t tmp = header[1] & 0x80;
+                        tmp >>= 7;
+                        sampling_frequency_index |= tmp;
+
+                        cout << LMSG << "sampling_frequency_index:" << (uint16_t)sampling_frequency_index << endl;
+                         
+                        //channel config:4bits
+                        channel_config = header[1] & 0x78;
+                        channel_config >>= 3;
+                        
+                        adts_header_[0] = 0xff;         //syncword:0xfff                          高8bits
+                        adts_header_[1] = 0xf0;         //syncword:0xfff                          低4bits
+                        adts_header_[1] |= (0 << 3);    //MPEG Version:0 for MPEG-4,1 for MPEG-2  1bit
+                        adts_header_[1] |= (0 << 1);    //Layer:0                                 2bits 
+                        adts_header_[1] |= 1;           //protection absent:1                     1bit
+                        
+                        adts_header_[2] = (audio_object_type - 1)<<6;            //profile:audio_object_type - 1                      2bits
+                        adts_header_[2] |= (sampling_frequency_index & 0x0f)<<2; //sampling frequency index:sampling_frequency_index  4bits 
+                        adts_header_[2] |= (0 << 1);                             //private bit:0                                      1bit
+                        adts_header_[2] |= (channel_config & 0x04)>>2;           //channel configuration:channel_config               高1bit
+                        
+                        adts_header_[3] = (channel_config & 0x03)<<6;     //channel configuration:channel_config      低2bits
+                        adts_header_[3] |= (0 << 5);                      //original：0                               1bit
+                        adts_header_[3] |= (0 << 4);                      //home：0                                   1bit
+                        adts_header_[3] |= (0 << 3);                      //copyright id bit：0                       1bit  
+                        adts_header_[3] |= (0 << 2);                      //copyright id start：0                     1bit
+                        
+                        // ADTS帧长度,有具体帧时再赋值
+                        //adts_header_[3] |= ((AdtsLen & 0x1800) >> 11);           //frame length：value   高2bits
+                        //adts_header_[4] = (uint8_t)((AdtsLen & 0x7f8) >> 3);     //frame length:value    中间8bits 
+                        //adts_header_[5] = (uint8_t)((AdtsLen & 0x7) << 5);       //frame length:value    低3bits
+
+                        adts_header_[5] |= 0x1f;                                 //buffer fullness:0x7ff 高5bits 
+                        adts_header_[6] = 0xfc;
+                    }
                 }
                 else
                 {
@@ -1102,10 +1200,11 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
 
                 WrapPtr audio_raw_ptr(rtmp_msg.msg + 2, rtmp_msg.len - 2);
                 audio_raw_ptr.SetDts(rtmp_msg.timestamp_calc);
+                audio_raw_ptr.SetPts(rtmp_msg.timestamp_calc);
 
                 audio_queue_.insert(make_pair(audio_frame_recv_, audio_payload));
 
-                //raw_audio_queue_.insert(make_pair(audio_frame_recv_, audio_raw_ptr));
+                raw_audio_queue_.insert(make_pair(audio_frame_recv_, audio_raw_ptr));
 
                 // XXX:可以放到定时器,满了就以后肯定都是满了,不用每次都判断
                 if ((audio_fps_ != 0 && audio_queue_.size() > 20 * audio_fps_) || audio_queue_.size() >= 800)
@@ -1298,7 +1397,7 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
                     {
                         uint32_t nalu_len = (data[l]<<24)|(data[l+1]<<16)|(data[l+2]<<8)|data[l+3];
 
-                        cout << Util::Bin2Hex(data+l, 5) << endl;
+                        cout << "Nalu length + NALU type:[" << Util::Bin2Hex(data+l, 5) << "]" << endl;
 
                         uint8_t nalu_header = data[l+4];
 
@@ -1314,16 +1413,16 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
                         bool push_raw = true;
 
                         WrapPtr video_raw_ptr(data + l + 4, nalu_len);
-                        cout << Util::Bin2Hex(data+l+4, 5) << endl;
+                        cout << "NALU type + 4byte payload peek:[" << Util::Bin2Hex(data+l+4, 5) << endl;
                         video_raw_ptr.SetDts(rtmp_msg.timestamp_calc);
                         video_raw_ptr.SetPts(rtmp_msg.timestamp_calc);
 
                         if (nalu_unit_type == 6)
                         {
                             cout << LMSG << "SEI" << endl;
-                            push_raw = true;
+                            push_raw = false;
 
-                            sei_.assign((const char*)data+l+4, nalu_len);
+                            //sei_.assign((const char*)data+l+4, nalu_len);
                         }
                         else if (nalu_unit_type == 5)
                         {
@@ -1343,17 +1442,34 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
                                 video_raw_ptr.SetBFrame();
                                 video_raw_ptr.SetPts(rtmp_msg.timestamp_calc + compositio_time_offset);
                             }
+                            else
+                            {
+                                if (compositio_time_offset == 0)
+                                {
+                                    cout << LMSG << "B/P => P" << endl;
+                                    video_raw_ptr.SetPFrame();
+                                }
+                                else
+                                {
+                                    cout << LMSG << "B/P => B" << endl;
+                                    video_raw_ptr.SetBFrame();
+                                    video_raw_ptr.SetPts(rtmp_msg.timestamp_calc + compositio_time_offset);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            push_raw = false;
                         }
 
                         if (push_raw)
                         {
                             cout << LMSG << "insert " << video_frame_recv_ << endl;
                             raw_video_queue_.insert(make_pair(video_frame_recv_ + frame_count, video_raw_ptr));
+                            ++frame_count;
                         }
 
                         l += nalu_len + 4;
-
-                        ++frame_count;
                     }
                 }
 

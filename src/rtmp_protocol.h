@@ -71,6 +71,7 @@ struct RtmpMessage
 {
     RtmpMessage()
         :
+        cs_id(0),
         timestamp(0),
         timestamp_delta(0),
         timestamp_calc(0),
@@ -84,7 +85,8 @@ struct RtmpMessage
     {
         ostringstream os;
 
-        os << "timestamp:" << timestamp
+        os << "cs_id:" << cs_id
+           << ",timestamp:" << timestamp
            << ",timestamp_delta:" << timestamp_delta
            << ",timestamp_calc:" << timestamp_calc
            << ",message_length:" << message_length
@@ -96,6 +98,7 @@ struct RtmpMessage
         return os.str();
     }
 
+    uint32_t cs_id;
     uint32_t timestamp;
     uint32_t timestamp_delta;
     uint32_t timestamp_calc;
@@ -179,9 +182,22 @@ public:
     int SendUserControlMessage(const uint16_t& event, const uint32_t& data);
     int SendConnect(const string& url);
     int SendCreateStream();
-    int SendPublish();
+    int SendReleaseStream();
+    int SendFCPublish();
+    int SendCheckBw();
+    int SendPublish(const double& stream_id);
     int SendAudio(const RtmpMessage& audio);
     int SendVideo(const RtmpMessage& video);
+
+    void SetApp(const string& app)
+    {
+        app_ = app;
+    }
+
+    void SetStreamName(const string& name)
+    {
+        stream_name_ = name;
+    }
 
     int ConnectForwardServer(const string& ip, const uint16_t& port);
 
@@ -310,10 +326,29 @@ public:
     }
 
 private:
+    double GetTransactionId()
+    {
+        transaction_id_ += 1.0;
+
+        return transaction_id_;
+    }
+
+    string DumpIdCommand()
+    {
+        ostringstream os;
+        for (const auto& kv : id_command_)
+        {
+            os << kv.first << "=>" << kv.second << ",";
+        }
+
+        return os.str();
+    }
+
+private:
     int OnRtmpMessage(RtmpMessage& rtmp_msg);
     int OnNewRtmpPlayer(RtmpProtocol* protocol);
     int OnNewFlvPlayer(HttpFlvProtocol* protocol);
-    int SendRtmpMessage(const uint8_t& message_type_id, const uint8_t* data, const size_t& len);
+    int SendRtmpMessage(const uint32_t cs_id, const uint32_t& message_stream_id, const uint8_t& message_type_id, const uint8_t* data, const size_t& len);
     int SendMediaData(const RtmpMessage& media);
 
 private:
@@ -332,6 +367,8 @@ private:
     string app_;
     string tc_url_;
     string stream_name_;
+
+    double transaction_id_;
 
     map<uint64_t, Payload> video_queue_;
     map<uint64_t, Payload> audio_queue_;
@@ -371,6 +408,8 @@ private:
     string sei_;
 
     string last_send_command_;
+
+    map<double, string> id_command_;
 
     bool can_publish_;
 

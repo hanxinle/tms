@@ -1,3 +1,4 @@
+#include "io_buffer.h"
 #include "rtmp_protocol.h"
 #include "fd.h"
 #include "stream_mgr.h"
@@ -19,6 +20,8 @@ int StreamMgr::HandleRead(IoBuffer& io_buffer, Fd& socket)
     while (rtmp_protocol->Parse(io_buffer) == kSuccess)
     {
     }
+
+    cout << LMSG << "io_buffer.Size():" << io_buffer.Size() << endl;
 }
 
 int StreamMgr::HandleClose(IoBuffer& io_buffer, Fd& socket)

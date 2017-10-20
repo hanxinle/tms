@@ -176,7 +176,7 @@ namespace socket_util
 
         if (ip.empty())
         {
-            return -1;
+            return Connect(fd, host, port);
         }
 
         cout << LMSG << "host:" << host << ",ip:" << ip << endl;

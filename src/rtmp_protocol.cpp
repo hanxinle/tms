@@ -19,7 +19,8 @@
 
 #define CDN "ws.upstream.huya.com"
 //#define CDN "al.direct.huya.com"
-//#define CDN "36.248.20.97"
+//#define CDN "112.90.174.121"
+#define CDN_PORT 1935
 
 using namespace std;
 using namespace socket_util;
@@ -76,6 +77,14 @@ RtmpProtocol::RtmpProtocol(Epoller* epoller, Fd* fd, StreamMgr* stream_mgr)
     video_continuity_counter_(0)
 {
     cout << LMSG << endl;
+
+    adts_header_[0] = 0;
+    adts_header_[1] = 0;
+    adts_header_[2] = 0;
+    adts_header_[3] = 0;
+    adts_header_[4] = 0;
+    adts_header_[5] = 0;
+    adts_header_[6] = 0;
 }
 
 RtmpProtocol::~RtmpProtocol()
@@ -570,12 +579,12 @@ void RtmpProtocol::UpdateM3U8()
     667.ts?wsApp=HLS&wsMonitor=-1
     */
 
-    if (ts_queue_.size() <= 5)
+    if (ts_queue_.size() <= 3)
     {
         return;
     }
 
-    while (ts_queue_.size() > 5)
+    while (ts_queue_.size() > 12)
     {
         ts_queue_.erase(ts_queue_.begin());
     }
@@ -591,20 +600,23 @@ void RtmpProtocol::UpdateM3U8()
         }
     }
 
+    auto riter = ts_queue_.rbegin();
+
+    uint32_t new_ts_seq = riter->first;
+
     ostringstream os;
 
     os << "#EXTM3U\n"
        << "#EXT-X-VERSION:3\n"
        << "#EXT-X-ALLOW-CACHE:NO\n"
        << "#EXT-X-TARGETDURATION:" << duration << "\n"
-       << "#EXT-X-MEDIA-SEQUENCE:" << ts_queue_.begin()->first << "\n"
-       << "\n";
-
-    for (const auto& ts : ts_queue_)
-    {
-        os << "#EXTINF:" << (ts.second.duration) << "\n";
-        os << ts.first << ".ts\n";
-    }
+       << "#EXT-X-MEDIA-SEQUENCE:" << new_ts_seq << "\n"
+       << "#EXTINF:" << ts_queue_[new_ts_seq - 2].duration << "\n"
+       << (new_ts_seq - 2) << ".ts\n"
+       << "#EXTINF:" << ts_queue_[new_ts_seq - 1].duration << "\n"
+       << (new_ts_seq - 1) << ".ts\n"
+       << "#EXTINF:" << ts_queue_[new_ts_seq].duration << "\n"
+       << new_ts_seq << ".ts\n";
     
     os << "\n";
 
@@ -650,6 +662,8 @@ void RtmpProtocol::PacketTs()
     // PAT
     {
         BitStream bs;
+
+        // ts header
         bs.WriteBytes(1, 0x47);  // sync_byte
         bs.WriteBits(1, 0);      // transport_error_indicator
         bs.WriteBits(1, 1);      // payload_unit_start_indicator 
@@ -659,13 +673,15 @@ void RtmpProtocol::PacketTs()
         bs.WriteBits(2, 1);
         bs.WriteBits(4, 0);
 
-        bs.WriteBytes(2, 0x0000);
+        // table id
+        bs.WriteBytes(2, 0x0000); // XXX:标准是1个字节,但实现看起来都是2个字节
         bs.WriteBits(1, 1);
         bs.WriteBits(1, 0);
         bs.WriteBits(2, 0x03);
 
         uint16_t length = 13;
-        bs.WriteBits(12, length);
+        bs.WriteBits(12, length); // 后面数据长度,不包括这个字节
+
         bs.WriteBits(16, 0x0001);
         bs.WriteBits(2, 0x03);
         bs.WriteBits(5, 0);
@@ -676,6 +692,7 @@ void RtmpProtocol::PacketTs()
         bs.WriteBits(16, 0x0001);
         bs.WriteBits(3, 0x07);
         bs.WriteBits(13, pmt_pid_);
+        // CRC32从table_id开始(包括table_id), 这里+5是因为上面的table_id用了2个字节,标准是1个字节
         uint32_t crc32 = crc_32_.GetCrc32(bs.GetData() + 5, bs.SizeInBytes() - 5);
         bs.WriteBytes(4, crc32);
 
@@ -694,6 +711,8 @@ void RtmpProtocol::PacketTs()
     // PMT
     {
         BitStream bs;
+
+        // ts header
         bs.WriteBytes(1, 0x47);  // sync_byte
         bs.WriteBits(1, 0);      // transport_error_indicator
         bs.WriteBits(1, 1);      // payload_unit_start_indicator 
@@ -719,17 +738,17 @@ void RtmpProtocol::PacketTs()
         bs.WriteBits(8, 0);
         bs.WriteBits(8, 0);
         bs.WriteBits(3, 0x07);
-        bs.WriteBits(13, video_pid_);
+        bs.WriteBits(13, video_pid_); // PCR所在的PID,指定为视频pid
         bs.WriteBits(4, 0x0F);
         bs.WriteBits(12, 0);
 
-        bs.WriteBits(8, 0x1b);
+        bs.WriteBits(8, 0x1b); // 0x1b h264
         bs.WriteBits(3, 0x07);
         bs.WriteBits(13, video_pid_);
         bs.WriteBits(4, 0x0F);
         bs.WriteBits(12, 0x0000);
 
-        bs.WriteBits(8, 0x0f);
+        bs.WriteBits(8, 0x0f); // 0x0f aac
         bs.WriteBits(3, 0x07);
         bs.WriteBits(13, audio_pid_);
         bs.WriteBits(4, 0x0F);
@@ -813,9 +832,9 @@ void RtmpProtocol::PacketTs()
         while (i < payload.GetLen())
         {
             uint32_t header_size = ts_header_size;
-            uint8_t adaptation_field_control = 1;
+            uint8_t adaptation_field_control = 1; // 1:无自适应区 2.只有自适应区 3.同时有负载和自适应区
             uint8_t adaption_stuffing_bytes = 0;
-            uint8_t payload_unit_start_indicator = 0;
+            uint8_t payload_unit_start_indicator = 0; // 帧首包标识
 
             if (i == 0)
             {
@@ -917,18 +936,36 @@ void RtmpProtocol::PacketTs()
 
                 if (is_video)
                 {
-                    ts_bs.WriteBytes(1, 7 + adaption_stuffing_bytes);
-                    ts_bs.WriteBytes(1, 0x10);
+                    if (payload_unit_start_indicator == 1)
+                    {
+                        // 视频而且是帧的首个包才需要PCR
+                        ts_bs.WriteBytes(1, 7 + adaption_stuffing_bytes);
+                        ts_bs.WriteBytes(1, 0x10);
+                    }
+                    else
+                    {
+                        ts_bs.WriteBytes(1, 1 + adaption_stuffing_bytes);
+                        ts_bs.WriteBytes(1, 0x00);
+                    }
 
-                    uint64_t pcr_base = timestamp;
-                    uint16_t pcr_ext = 0;
 
-                    ts_bs.WriteBits(33, pcr_base);
-                    ts_bs.WriteBits(6, 0x00);
-                    ts_bs.WriteBits(9, pcr_ext);
+                    if (payload_unit_start_indicator == 1)
+                    {
+                        uint64_t pcr_base = timestamp;
+                        uint16_t pcr_ext = 0;
+
+                        ts_bs.WriteBits(33, pcr_base);
+                        ts_bs.WriteBits(6, 0x00);
+                        ts_bs.WriteBits(9, pcr_ext);
+                    }
+                    else
+                    {
+                        header_size -= 6;
+                    }
                 }
                 else
                 {
+                    // 音频不需要PCR
                     ts_bs.WriteBytes(1, 1 + adaption_stuffing_bytes);
                     // audio no pcr
                     ts_bs.WriteBytes(1, 0x00);
@@ -958,31 +995,44 @@ void RtmpProtocol::PacketTs()
 
                 if (is_video)
                 {
+                    // 视频的PES长度这里随便填,无所谓
                     ts_bs.WriteBytes(2, (uint64_t)payload.GetLen());
                 }
                 else
                 {
+                    // 音频的一定是音频负载长度+3(PES后面3个flag)+5(只有DTS)+7(adts头长度)
                     ts_bs.WriteBytes(2, (uint64_t)payload.GetLen() + 3 + 5 + 7);
                 }
 
                 ts_bs.WriteBytes(1, 0x80);
 
+                uint32_t pts = payload.GetPts() * 90;
+                uint32_t dts = payload.GetDts() * 90;
+
                 if (is_video)
                 {
-                    ts_bs.WriteBytes(1, 0xc0);
-                    ts_bs.WriteBytes(1, 10);
+                    //if (pts != dts)
+                    {
+                        // 都要有PTS
+                        ts_bs.WriteBytes(1, 0xc0);
+                        ts_bs.WriteBytes(1, 10);
+                    }
+                    //else
+                    //{
+                    //    ts_bs.WriteBytes(1, 0x80);
+                    //    ts_bs.WriteBytes(1, 5);
+                    //}
                 }
                 else
                 {
+                    // 音频只需要PTS即可
                     ts_bs.WriteBytes(1, 0x80);
                     ts_bs.WriteBytes(1, 5);
                 }
 
-                uint32_t timestamp = payload.GetPts() * 90;
-
-                uint16_t t_32_30 = (timestamp & 0xC0000000) >> 29;
-                uint16_t t_29_15 = (timestamp & 0x3FFF8000) >> 15;
-                uint16_t t_14_0  = (timestamp & 0x00007FFF);
+                uint16_t t_32_30 = (pts & 0xC0000000) >> 29;
+                uint16_t t_29_15 = (pts & 0x3FFF8000) >> 15;
+                uint16_t t_14_0  = (pts & 0x00007FFF);
 
                 // pts
                 ts_bs.WriteBits(4, 0x02);
@@ -993,22 +1043,29 @@ void RtmpProtocol::PacketTs()
                 ts_bs.WriteBits(15, t_14_0);
                 ts_bs.WriteBits(1, 1);
 
-                timestamp = payload.GetDts() * 90;
-
-                t_32_30 = (timestamp & 0xC0000000) >> 29;
-                t_29_15 = (timestamp & 0x3FFF8000) >> 15;
-                t_14_0  = (timestamp & 0x00007FFF);
+                t_32_30 = (dts & 0xC0000000) >> 29;
+                t_29_15 = (dts & 0x3FFF8000) >> 15;
+                t_14_0  = (dts & 0x00007FFF);
 
                 if (is_video)
                 {
-                    // dts
-                    ts_bs.WriteBits(4, 0x02);
-                    ts_bs.WriteBits(3, t_32_30);
-                    ts_bs.WriteBits(1, 1);
-                    ts_bs.WriteBits(15, t_29_15);
-                    ts_bs.WriteBits(1, 1);
-                    ts_bs.WriteBits(15, t_14_0);
-                    ts_bs.WriteBits(1, 1);
+                    // XXX:DTS跟PTS一样的话要不要打还未知
+                    //if (dts != pts)
+
+                    {
+                        // dts
+                        ts_bs.WriteBits(4, 0x02);
+                        ts_bs.WriteBits(3, t_32_30);
+                        ts_bs.WriteBits(1, 1);
+                        ts_bs.WriteBits(15, t_29_15);
+                        ts_bs.WriteBits(1, 1);
+                        ts_bs.WriteBits(15, t_14_0);
+                        ts_bs.WriteBits(1, 1);
+                    }
+                    //else
+                    //{
+                    //    header_size -= 5;
+                    //}
                 }
 
                 if (is_video)
@@ -1016,7 +1073,7 @@ void RtmpProtocol::PacketTs()
                     // split nalu
                     ts_bs.WriteBytes(4, 0x00000001);
                     ts_bs.WriteBytes(1, 0x09); // 分隔符
-                    ts_bs.WriteBytes(1, 0xBC); // 这个随便填
+                    ts_bs.WriteBytes(1, 0x10); // 这个随便填
                     header_size += 6;
                 }
             }
@@ -1064,10 +1121,30 @@ void RtmpProtocol::PacketTs()
 
             if (i == 0 && ! is_video && aac_header_.size() > 2)
             {
+                //adts_header_[3] |= ((AdtsLen & 0x1800) >> 11);           //frame length：value   高2bits
+                //adts_header_[4] = (uint8_t)((AdtsLen & 0x7f8) >> 3);     //frame length:value    中间8bits 
+                //adts_header_[5] = (uint8_t)((AdtsLen & 0x7) << 5);       //frame length:value    低3bits
+
+                //adts_header_[5] |= 0x1f;                                 //buffer fullness:0x7ff 高5bits 
+                //adts_header_[6] = 0xfc;
+                //
                 // 有卡顿声音的头
-                adts_header_[3] |=(uint8_t)(((payload.GetLen() + 7) & 0x1800) >> 11);           //frame length：value   高2bits
-                adts_header_[4] = (uint8_t)(((payload.GetLen() + 7) & 0x7f8) >> 3);     //frame length:value    中间8bits 
-                adts_header_[5] |= (uint8_t)(((payload.GetLen() + 7) & 0x7) << 5);       //frame length:value    低3bits
+                uint16_t adts_len = (uint16_t)payload.GetLen() + 7;
+                cout << LMSG << "adts_len:" << adts_len << endl;
+                adts_header_[3] &= 0xFC;
+                adts_header_[3] |=(uint8_t)((adts_len & 0x1800) >> 11);           //frame length：value   高2bits
+                adts_header_[4] = (uint8_t)((adts_len & 0x7f8) >> 3);     //frame length:value    中间8bits 
+                adts_header_[5] &= 0x1F;
+                adts_header_[5] |= ((uint8_t)((adts_len & 0x07) << 5) & 0xe0);       //frame length:value    低3bits
+
+                uint16_t calc_len = ((adts_header_[3] & 0x03) << 11) | ((uint16_t)adts_header_[4] << 3) | ((adts_header_[5] & 0xE0) >> 5);
+
+                uint64_t tmp = adts_len << 13;
+                cout << LMSG << Util::Bin2Hex((const uint8_t*)&tmp, sizeof(tmp)) << endl;
+
+                cout << LMSG << Util::Bin2Hex(adts_header_, 7) << endl;
+                cout << LMSG << "calc_len:" << calc_len << endl;
+                assert(adts_len == calc_len);
 
                 ts_bs.WriteData(7, adts_header_);
             }
@@ -1415,7 +1492,8 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
 
                     if (video_queue_.empty())
                     {   
-                        ConnectForwardServer(CDN, 1935);
+                        // 转推到其他rtmp服务器
+                        //ConnectForwardServer(CDN, CDN_PORT);
                     }
                 }
             }
@@ -1484,6 +1562,7 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
                         {
                             cout << LMSG << "IDR" << endl;
                             video_raw_ptr.SetIFrame();
+                            video_raw_ptr.SetPts(rtmp_msg.timestamp_calc + compositio_time_offset);
                         }
                         else if (nalu_unit_type == 1)
                         {
@@ -1491,6 +1570,7 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
                             {
                                 cout << LMSG << "P" << endl;
                                 video_raw_ptr.SetPFrame();
+                                video_raw_ptr.SetPts(rtmp_msg.timestamp_calc + compositio_time_offset);
                             }
                             else if (nal_ref_idc == 0)
                             {
@@ -1504,6 +1584,7 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
                                 {
                                     cout << LMSG << "B/P => P" << endl;
                                     video_raw_ptr.SetPFrame();
+                                    video_raw_ptr.SetPts(rtmp_msg.timestamp_calc + compositio_time_offset);
                                 }
                                 else
                                 {
@@ -2369,7 +2450,7 @@ int RtmpProtocol::SendMediaData(const RtmpMessage& media)
                     header.WriteU24(media.timestamp_calc);
                     header.WriteU24(media.message_length);
                     header.WriteU8(media.message_type_id);
-                    header.WriteU32(1);
+                    header.WriteU32(0x01000000);
                 }
 
                 uint8_t* buf = NULL;

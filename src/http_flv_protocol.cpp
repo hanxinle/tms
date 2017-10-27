@@ -83,6 +83,15 @@ int HttpFlvProtocol::Parse(IoBuffer& io_buffer)
                         else
                         {
                             cout << LMSG << "can't find media source, app_:" << app_ << ",stream_name_:" << stream_name_ << endl;
+
+							ostringstream os; 
+
+                            os << "HTTP/1.1 404 Not Found\r\n"
+                               << "Server: trs\r\n"
+                               << "Connection: close\r\n"
+                               << "\r\n";
+
+                            GetTcpSocket()->Send((const uint8_t*)os.str().data(), os.str().size());
                         }
                     }
 

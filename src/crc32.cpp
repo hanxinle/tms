@@ -12,10 +12,10 @@ uint32_t CRC32::GetCrc32(const uint8_t* data, int len)
 
     for (size_t i = 0; i != sizeof(crc32_table)/sizeof(uint32_t); ++i)
     {
-        cout << LMSG << "i:" << i << ":" << std::hex << crc32_table[i] << std::dec << endl;
+        //cout << LMSG << "i:" << i << ":" << std::hex << crc32_table[i] << std::dec << endl;
     }
 
-    cout << LMSG << "i_crc:" << i_crc << endl;
+    //cout << LMSG << "i_crc:" << i_crc << endl;
 
     return i_crc;
 }

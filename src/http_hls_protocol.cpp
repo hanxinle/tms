@@ -69,7 +69,7 @@ int HttpHlsProtocol::Parse(IoBuffer& io_buffer)
                             cout << LMSG << "rtmp_src_:" << rtmp_src_ << endl;
                             if (type_ == "ts")
                             {
-                                string ts = rtmp_src_->GetTs(Util::Str2Num<uint64_t>(ts_));
+                                const string& ts = rtmp_src_->GetTs(Util::Str2Num<uint64_t>(ts_));
                                 
                                 if (! ts.empty())
                                 {

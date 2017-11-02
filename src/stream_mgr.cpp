@@ -17,11 +17,15 @@ int StreamMgr::HandleRead(IoBuffer& io_buffer, Fd& socket)
 {
     RtmpProtocol* rtmp_protocol = GetOrCreateProtocol(socket);
 
-    while (rtmp_protocol->Parse(io_buffer) == kSuccess)
+    int ret = kClose;
+
+    while ((ret = rtmp_protocol->Parse(io_buffer)) == kSuccess)
     {
     }
 
     cout << LMSG << "io_buffer.Size():" << io_buffer.Size() << endl;
+
+    return ret;
 }
 
 int StreamMgr::HandleClose(IoBuffer& io_buffer, Fd& socket)
@@ -105,6 +109,25 @@ RtmpProtocol* StreamMgr::GetRtmpProtocolByAppStream(const string& app, const str
     }
 
     return iter_stream->second;
+}
+
+bool StreamMgr::IsAppStreamExist(const string& app, const string& stream_name)
+{
+    auto iter_app = app_stream_protocol_.find(app);
+
+    if (iter_app == app_stream_protocol_.end())
+    {
+        return false;
+    }
+
+    auto iter_stream = iter_app->second.find(stream_name);
+
+    if (iter_stream == iter_app->second.end())
+    {
+        return false;
+    }
+
+    return true;
 }
 
 int StreamMgr::HandleTimerInSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)

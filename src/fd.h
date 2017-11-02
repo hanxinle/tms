@@ -21,7 +21,7 @@ public:
 
     virtual ~Fd()
     {
-        cout << LMSG << endl;
+        cout << LMSG << "remove " << fd_ << " in epoller and close it" << endl;
         epoller_->RemoveSocket(this);
         close(fd_);
     }

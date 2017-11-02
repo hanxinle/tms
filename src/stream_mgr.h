@@ -31,6 +31,7 @@ public:
 
     bool RegisterStream(const string& app, const string& stream_name, RtmpProtocol* rtmp_protocol);
     RtmpProtocol* GetRtmpProtocolByAppStream(const string& app, const string& stream_name);
+    bool IsAppStreamExist(const string& app, const string& stream_name);
 
 private:
     Epoller* epoller_;

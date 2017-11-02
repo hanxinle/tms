@@ -282,13 +282,13 @@ public:
         return m3u8_;
     }
 
-    string GetTs(const uint64_t& ts)
+    const string& GetTs(const uint64_t& ts) const
     {
         auto iter = ts_queue_.find(ts);
 
         if (iter == ts_queue_.end())
         {
-            return "";
+            return invalid_ts_;
         }
 
         return iter->second.buffer;
@@ -320,6 +320,34 @@ public:
         if (video_continuity_counter_ == 0x10)
         {
             video_continuity_counter_ = 0x00;
+        }
+
+        return ret;
+    }
+
+    uint16_t GetPatContinuityCounter()
+    {
+        uint16_t ret = pat_continuity_counter_;
+
+        ++pat_continuity_counter_;
+
+        if (pat_continuity_counter_ == 0x10)
+        {
+            pat_continuity_counter_ = 0x00;
+        }
+
+        return ret;
+    }
+
+    uint16_t GetPmtContinuityCounter()
+    {
+        uint16_t ret = pmt_continuity_counter_;
+
+        ++pmt_continuity_counter_;
+
+        if (pmt_continuity_counter_ == 0x10)
+        {
+            pmt_continuity_counter_ = 0x00;
         }
 
         return ret;
@@ -405,7 +433,8 @@ private:
 
     string sps_;
     string pps_;
-    string sei_;
+
+    string invalid_ts_;
 
     string last_send_command_;
 
@@ -430,6 +459,8 @@ private:
     uint32_t audio_pid_;
     uint32_t pmt_pid_;
 
+    uint8_t pat_continuity_counter_;
+    uint8_t pmt_continuity_counter_;
     uint8_t audio_continuity_counter_;
     uint8_t video_continuity_counter_;
 

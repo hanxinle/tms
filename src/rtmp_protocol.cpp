@@ -73,6 +73,8 @@ RtmpProtocol::RtmpProtocol(Epoller* epoller, Fd* fd, StreamMgr* stream_mgr)
     video_pid_(0x100),
     audio_pid_(0x101),
     pmt_pid_(0xABC),
+    pat_continuity_counter_(0),
+    pmt_continuity_counter_(0),
     audio_continuity_counter_(0),
     video_continuity_counter_(0)
 {
@@ -334,11 +336,6 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
 
             if (io_buffer.Size() >= chunk_header_len + message_header_len)
             {
-                if (rtmp_msg.len == 0)
-                {
-                    rtmp_msg.msg = (uint8_t*)malloc(rtmp_msg.message_length);
-                }
-
                 uint32_t read_len = rtmp_msg.message_length - rtmp_msg.len;
                 if (read_len > in_chunk_size_)
                 {
@@ -347,6 +344,11 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
 
                 if (io_buffer.Size() >= chunk_header_len + message_header_len + read_len)
                 {
+                    if (rtmp_msg.len == 0)
+                    {
+                        rtmp_msg.msg = (uint8_t*)malloc(rtmp_msg.message_length);
+                    }
+
                     io_buffer.Skip(chunk_header_len + message_header_len);
                     io_buffer.ReadAndCopy(rtmp_msg.msg + rtmp_msg.len, read_len);
 
@@ -394,7 +396,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
                          << endl;
 #endif
 
-            OnRtmpMessage(rtmp_msg);
+            int ret = OnRtmpMessage(rtmp_msg);
 
             if (rtmp_msg.message_type_id == 8)
             {
@@ -410,7 +412,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
             rtmp_msg.msg = NULL;
             rtmp_msg.len = 0;
 
-            return kSuccess;
+            return ret;
         }
     }
     else
@@ -572,21 +574,16 @@ void RtmpProtocol::UpdateM3U8()
     #EXT-X-MEDIA-SEQUENCE:665
     
     #EXTINF:3.977
-    665.ts?wsApp=HLS&wsMonitor=-1
+    665.ts
     #EXTINF:3.952
-    666.ts?wsApp=HLS&wsMonitor=-1
+    666.ts
     #EXTINF:3.387
-    667.ts?wsApp=HLS&wsMonitor=-1
+    667.ts
     */
 
     if (ts_queue_.size() <= 3)
     {
         return;
-    }
-
-    while (ts_queue_.size() > 12)
-    {
-        ts_queue_.erase(ts_queue_.begin());
     }
 
     uint64_t duration = 0;
@@ -671,7 +668,7 @@ void RtmpProtocol::PacketTs()
         bs.WriteBits(13, 0);    // pid
         bs.WriteBits(2, 0);              // transport_scrambling_control
         bs.WriteBits(2, 1);
-        bs.WriteBits(4, 0);
+        bs.WriteBits(4, GetPatContinuityCounter());
 
         // table id
         bs.WriteBytes(2, 0x0000); // XXX:标准是1个字节,但实现看起来都是2个字节
@@ -720,7 +717,7 @@ void RtmpProtocol::PacketTs()
         bs.WriteBits(13, pmt_pid_);    // pid
         bs.WriteBits(2, 0);              // transport_scrambling_control
         bs.WriteBits(2, 1);
-        bs.WriteBits(4, 0);
+        bs.WriteBits(4, GetPmtContinuityCounter());
 
         // TODO:文档这里都是8bit,但实现得是16bit
         bs.WriteBytes(2, 0x0002);
@@ -996,7 +993,8 @@ void RtmpProtocol::PacketTs()
                 if (is_video)
                 {
                     // 视频的PES长度这里随便填,无所谓
-                    ts_bs.WriteBytes(2, (uint64_t)payload.GetLen());
+                    //ts_bs.WriteBytes(2, (uint64_t)payload.GetLen());
+                    ts_bs.WriteBytes(2, 0x0000);
                 }
                 else
                 {
@@ -1186,6 +1184,8 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
             cout << LMSG << "chunk_size:" << in_chunk_size_ << "->" << chunk_size << endl;
 
             in_chunk_size_ = chunk_size;
+
+            return kSuccess;
         }
         break;
 
@@ -1199,6 +1199,8 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
             cout << LMSG << "ack_window_size:" << ack_window_size << endl;
 
             SendUserControlMessage(0, 0);
+
+            return kSuccess;
         }
         break;
 
@@ -1214,6 +1216,8 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
 
 
             cout << LMSG << "user control message, event:" << event << ",data:" << data << endl;
+
+            return kSuccess;
         }
         break;
 
@@ -1315,6 +1319,7 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
             else
             {
                 cout << LMSG << "impossible?" << endl;
+                assert(false);
             }
 
             if (push)
@@ -1335,13 +1340,10 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
                 raw_audio_queue_.insert(make_pair(audio_frame_recv_, audio_raw_ptr));
 
                 // XXX:可以放到定时器,满了就以后肯定都是满了,不用每次都判断
-                if ((audio_fps_ != 0 && audio_queue_.size() > 20 * audio_fps_) || audio_queue_.size() >= 800)
+                if (((audio_fps_ != 0 && audio_queue_.size() > 20 * audio_fps_) || audio_queue_.size() >= 800) && ts_queue_.size() > 10)
                 {
                     audio_queue_.erase(audio_queue_.begin());
-                }
 
-                if ((audio_fps_ != 0 && raw_audio_queue_.size() > 20 * audio_fps_) || raw_audio_queue_.size() >= 800)
-                {
                     raw_audio_queue_.erase(raw_audio_queue_.begin());
                 }
 
@@ -1366,6 +1368,8 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
                     player->SendFlvMedia(kAudio, true, rtmp_msg.timestamp_calc, rtmp_msg.msg, rtmp_msg.len);
                 }
             }
+
+            return kSuccess;
         }
 
         break;
@@ -1553,10 +1557,16 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
 
                         if (nalu_unit_type == 6)
                         {
-                            cout << LMSG << "SEI" << endl;
+                            cout << LMSG << "SEI [" << Util::Bin2Hex(data + l + 4, nalu_len) << "]" << endl;
                             push_raw = false;
-
-                            //sei_.assign((const char*)data+l+4, nalu_len);
+                        }
+                        else if (nalu_unit_type == 7)
+                        {
+                            cout << LMSG << "SPS [" << Util::Bin2Hex(data + l + 4, nalu_len) << "]" << endl;
+                        }
+                        else if (nalu_unit_type == 8)
+                        {
+                            cout << LMSG << "PPS [" << Util::Bin2Hex(data + l + 4, nalu_len) << "]" << endl;
                         }
                         else if (nalu_unit_type == 5)
                         {
@@ -1608,6 +1618,8 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
 
                         l += nalu_len + 4;
                     }
+
+                    assert(l == raw_len);
                 }
 
 
@@ -1643,13 +1655,16 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
                 video_queue_.insert(make_pair(video_frame_recv_, video_payload));
                 //
                 // XXX:可以放到定时器,满了就以后肯定都是满了,不用每次都判断
-                if ((video_fps_ != 0 && video_queue_.size() > 20 * video_fps_) || video_queue_.size() >= 800)
+                if (((video_fps_ != 0 && video_queue_.size() > 20 * video_fps_) || video_queue_.size() >= 800) && ts_queue_.size() > 10)
                 {
                     video_queue_.erase(video_queue_.begin());
-                }
 
-                if ((video_fps_ != 0 && raw_video_queue_.size() > 20 * video_fps_) || raw_video_queue_.size() >= 800)
-                {
+                    if (raw_video_queue_.begin()->second.IsIFrame())
+                    {
+                        cout << LMSG << "erase " << ts_queue_.begin()->first << ".ts" << endl;
+                        ts_queue_.erase(ts_queue_.begin());
+                    }
+
                     raw_video_queue_.erase(raw_video_queue_.begin());
                 }
 
@@ -1675,6 +1690,7 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
                 }
             }
 
+            return kSuccess;
         }
         break;
 
@@ -1755,8 +1771,11 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
                                                 if (i == 3 && pos != string::npos)
                                                 {
                                                     stream_name_ = tc_url_.substr(pos + 1);
-                                                    cout << "stream_name_:" << stream_name_ << endl;
-                                                    stream_mgr_->RegisterStream(app_, stream_name_, this);
+                                                    cout << LMSG << "stream_name_:" << stream_name_ << endl;
+                                                    if (stream_mgr_->RegisterStream(app_, stream_name_, this) == false)
+                                                    {
+                                                        return kError;
+                                                    }
                                                 }
 
                                                 if (pos == string::npos)
@@ -1841,16 +1860,16 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
                                 }
                                 else
                                 {
+                                    uint8_t* data = NULL;
+                                    int len = output.Read(data, output.Size());
+
+                                    if (data != NULL && len > 0)
+                                    {
+                                        SendRtmpMessage(rtmp_msg.cs_id, rtmp_msg.message_stream_id, kAmf0Command, data, len);
+                                    }
+
                                     SetRtmpSrc(rtmp_publisher);
                                     rtmp_publisher->AddRtmpPlayer(this);
-                                }
-
-                                uint8_t* data = NULL;
-                                int len = output.Read(data, output.Size());
-
-                                if (data != NULL && len > 0)
-                                {
-                                    SendRtmpMessage(rtmp_msg.cs_id, rtmp_msg.message_stream_id, kAmf0Command, data, len);
                                 }
                             }
                         }
@@ -1873,7 +1892,11 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
                                 if (amf_command[3]->GetString(stream_name_))
                                 {
                                     cout << LMSG << "stream_name:" << stream_name_ << endl;
-                                    stream_mgr_->RegisterStream(app_, stream_name_, this);
+
+                                    if (stream_mgr_->RegisterStream(app_, stream_name_, this) == false)
+                                    {
+                                        return kError;
+                                    }
                                 }
                             }
 
@@ -2016,6 +2039,8 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
                     assert(false);
                 }
             }
+
+            return kSuccess;
         }
         break;
 
@@ -2042,14 +2067,19 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
                     cout << LMSG << "v NULL" << endl;
                 }
             }
+
+            return kSuccess;
         }
         break;
 
         default: 
         {
+            return kError;
         }
         break;
     }
+
+    return kError;
 }
 
 int RtmpProtocol::OnNewRtmpPlayer(RtmpProtocol* protocol)
@@ -2057,8 +2087,16 @@ int RtmpProtocol::OnNewRtmpPlayer(RtmpProtocol* protocol)
     cout << LMSG << endl;
 
     SendRtmpMessage(6, 1, kMetaData, (const uint8_t*)metadata_.data(), metadata_.size());
-    protocol->SendRtmpMessage(4, 1, kAudio, (const uint8_t*)aac_header_.data(), aac_header_.size());
-    protocol->SendRtmpMessage(6, 1, kVideo, (const uint8_t*)avc_header_.data(), avc_header_.size());
+
+    if (! aac_header_.empty())
+    {
+        protocol->SendRtmpMessage(4, 1, kAudio, (const uint8_t*)aac_header_.data(), aac_header_.size());
+    }
+
+    if (! avc_header_.empty())
+    {
+        protocol->SendRtmpMessage(6, 1, kVideo, (const uint8_t*)avc_header_.data(), avc_header_.size());
+    }
 
     auto iter_key_video = video_queue_.find(last_key_video_frame_);
 
@@ -2103,6 +2141,7 @@ int RtmpProtocol::OnNewFlvPlayer(HttpFlvProtocol* protocol)
     cout << LMSG << endl;
 
     protocol->SendFlvHeader();
+
     protocol->SendFlvMedia(kMetaData,false, 0, (const uint8_t*)metadata_.data(), metadata_.size());
     protocol->SendFlvMedia(kAudio, false, 0, (const uint8_t*)aac_header_.data(), aac_header_.size());
     protocol->SendFlvMedia(kVideo, true, 0, (const uint8_t*)avc_header_.data(), avc_header_.size());
@@ -2162,9 +2201,25 @@ int RtmpProtocol::OnStop()
 int RtmpProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)
 {
     cout << LMSG << "rtmp_forwards_.size():" << rtmp_forwards_.size() << ", rtmp_player_.size():" << rtmp_player_.size() << endl;
+
     if (! raw_video_queue_.empty())
     {
-        cout << LMSG << "video queue " << raw_video_queue_.begin()->first << "-" << raw_video_queue_.rbegin()->first << endl;
+        cout << LMSG << "raw video queue:" << raw_video_queue_.size() << " [" << raw_video_queue_.begin()->first << "-" << raw_video_queue_.rbegin()->first << "]" << endl;
+    }
+
+    if (! video_queue_.empty())
+    {
+        cout << LMSG << "video queue:" << video_queue_.size() << " [" << video_queue_.begin()->first << "-" << video_queue_.rbegin()->first << "]" << endl;
+    }
+
+    if (! raw_audio_queue_.empty())
+    {
+        cout << LMSG << "raw audio queue:" << raw_audio_queue_.size() << " [" << raw_audio_queue_.begin()->first << "-" << raw_audio_queue_.rbegin()->first << "]" << endl;
+    }
+
+    if (! audio_queue_.empty())
+    {
+        cout << LMSG << "audio queue:" << audio_queue_.size() << " [" << audio_queue_.begin()->first << "-" << audio_queue_.rbegin()->first << "]" << endl;
     }
 
     if (last_calc_fps_ms_ == 0)
@@ -2409,7 +2464,7 @@ int RtmpProtocol::SendMediaData(const RtmpMessage& media)
 
         if (audio_frame_send_ % 46 == 0)
         {
-            cout << LMSG << "send audio:" << audio_frame_send_<< ",timestamp_calc:" << media.timestamp_calc
+            cout << LMSG << "send audio:" << audio_frame_send_ << ",timestamp_calc:" << media.timestamp_calc
                  << ",last_audio_timestamp_:" << last_audio_timestamp_ << ", last_audio_timestamp_delta_:" 
                  << last_audio_timestamp_delta_ << ",timestamp_delta:" << timestamp_delta << endl;
         }

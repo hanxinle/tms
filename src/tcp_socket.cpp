@@ -35,6 +35,8 @@ int TcpSocket::OnRead()
         {
             cout << LMSG << "accept " << client_ip << ":" << client_port << endl;
 
+            NoCloseWait(client_fd);
+
             TcpSocket* tcp_socket = new TcpSocket(epoller_, client_fd, handler_);
             SetNonBlock(client_fd);
             tcp_socket->SetConnected();
@@ -55,7 +57,13 @@ int TcpSocket::OnRead()
                 {
                     if (handler_ != NULL)
                     {
-                        handler_->HandleRead(read_buffer_, *this);
+                        int ret = handler_->HandleRead(read_buffer_, *this);
+
+                        if (ret == kClose || ret == kError)
+                        {
+                            handler_->HandleClose(read_buffer_, *this);
+                            return kClose;
+                        }
                     }
                 }
                 else if (bytes == 0)

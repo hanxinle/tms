@@ -119,6 +119,20 @@ namespace socket_util
         return ret;
     }
 
+    inline int NoCloseWait(const int& fd)
+    {
+        linger st_linger;
+        st_linger.l_onoff = 1;  //在close socket调用后, 但是还有数据没发送完毕的时候容许逗留
+        st_linger.l_linger = 0; //容许逗留的时间为0秒
+        int ret = setsockopt(fd, SOL_SOCKET, SO_LINGER, &st_linger, sizeof(st_linger));
+        if (ret < 0)
+        {
+            cout << LMSG << "setsockopt err:" << strerror(errno) << endl;
+        }
+
+        return ret;
+    }
+
     inline string GetIpByHost(const string& host)
     {
         string ret;

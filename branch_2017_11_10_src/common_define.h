@@ -21,16 +21,13 @@ enum FrameType
 
 enum VideoCodec
 {
-    kAVC = 1,
-    kHEVC = 2,
-    kVP8 = 3,
-    kVP9 = 4,
+    kAVC = 7,
+    kHEVC = 12,
 };
 
 enum AudioCodec
 {
-    kAAC = 1,
-    kOPUS = 2,
+    kAAC = 0x0F,
 };
 
 #define  LMSG  "["<<__FILE__<<"]#"<<__func__<<":"<<__LINE__<<" "

@@ -90,6 +90,8 @@ public:
     uint32_t GetPts() { return pts_; }
     uint32_t GetDts() { return dts_; }
 
+    uint8_t GetFrameType() { return frame_type_; }
+
     void Reset(uint8_t* ptr, const uint64_t& len)
     {
         if (ref_ptr_ != NULL)
@@ -122,9 +124,8 @@ public:
     {
         if (this != &other)
         {
-            ref_ptr_->AddRefCount();
-
             this->ref_ptr_ = other.ref_ptr_;
+            ref_ptr_->AddRefCount();
             this->len_ = other.len_;
             this->pts_ = other.pts_;
             this->dts_ = other.dts_;
@@ -136,9 +137,8 @@ public:
     {
         if (this != &other)
         {
-            ref_ptr_->AddRefCount();
-
             this->ref_ptr_ = other.ref_ptr_;
+            ref_ptr_->AddRefCount();
             this->len_ = other.len_;
             this->pts_ = other.pts_;
             this->dts_ = other.dts_;

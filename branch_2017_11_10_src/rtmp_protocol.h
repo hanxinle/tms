@@ -17,6 +17,7 @@ using std::string;
 using std::ostringstream;
 using std::set;
 
+class AmfCommand;
 class Epoller;
 class Fd;
 class HttpFlvProtocol;
@@ -372,6 +373,23 @@ private:
     }
 
 private:
+    int OnConnectCommand(AmfCommand& amf_command);
+    int OnCreateStreamCommand(RtmpMessage& rtmp_msg, AmfCommand& amf_command);
+    int OnPlayCommand(RtmpMessage& rtmp_msg, AmfCommand& amf_command);
+    int OnPublishCommand(RtmpMessage& rtmp_msg, AmfCommand& amf_command);
+    int OnResultCommand(AmfCommand& amf_command);
+    int OnStatusCommand(AmfCommand& amf_command);
+
+    int OnAmf0Message(RtmpMessage& rtmp_msg);
+    int OnAudio(RtmpMessage& rtmp_msg);
+    int OnSetChunkSize(RtmpMessage& rtmp_msg);
+    int OnUserControlMessage(RtmpMessage& rtmp_msg);
+    int OnVideo(RtmpMessage& rtmp_msg);
+    int OnWindowAcknowledgementSize(RtmpMessage& rtmp_msg);
+    int OnMetaData(RtmpMessage& rtmp_msg);
+
+    int ParseAvcHeader(RtmpMessage& rtmp_msg);
+
     int OnRtmpMessage(RtmpMessage& rtmp_msg);
     int OnNewRtmpPlayer(RtmpProtocol* protocol);
     int OnNewFlvPlayer(HttpFlvProtocol* protocol);

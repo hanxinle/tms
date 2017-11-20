@@ -9,6 +9,7 @@ class Epoller;
 class Fd;
 class IoBuffer;
 class HttpFlvMgr;
+class Payload;
 class RtmpProtocol;
 class StreamMgr;
 class TcpSocket;
@@ -24,8 +25,12 @@ public:
     int Parse(IoBuffer& io_buffer);
 
     int SendFlvHeader();
-    int SendFlvMedia(const uint8_t& type, const bool& is_key, const uint32_t& timestamp, const uint8_t* data, const size_t& len);
-    int SendPreTagSize();
+
+    int SendFlvAudio(const Payload& payload);
+    int SendFlvAudioHeader(const string& audio_header);
+    int SendFlvMetaData(const string& metadata);
+    int SendFlvVideo(const Payload& payload);
+    int SendFlvVideoHeader(const string& video_header);
 
     int OnStop();
 

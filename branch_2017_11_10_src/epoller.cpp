@@ -6,8 +6,11 @@
 #include "common_define.h"
 #include "epoller.h"
 #include "fd.h"
+#include "trace_tool.h"
 
 using namespace std;
+
+extern double malloc_size;
 
 static string Event2Str(const uint32_t& events)
 {
@@ -168,6 +171,8 @@ int Epoller::WaitIoEvent(const uint32_t& timeout_ms)
     {
         cout << "epoll_wait err:" << strerror(errno) << endl;
     }
+
+    cout << LMSG << "malloc_size:" << (malloc_size/1024.0) << " MB" << endl;
 
     HandleEvent(socket_event);
 

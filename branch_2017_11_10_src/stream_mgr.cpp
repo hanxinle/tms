@@ -23,8 +23,6 @@ int StreamMgr::HandleRead(IoBuffer& io_buffer, Fd& socket)
     {
     }
 
-    cout << LMSG << "io_buffer.Size():" << io_buffer.Size() << endl;
-
     return ret;
 }
 

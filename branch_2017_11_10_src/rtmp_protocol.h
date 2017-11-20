@@ -11,6 +11,7 @@
 #include "crc32.h"
 #include "ref_ptr.h"
 #include "socket_util.h"
+#include "trace_tool.h"
 
 using std::map;
 using std::string;
@@ -36,6 +37,7 @@ enum HandShakeStatus
 enum RtmpMessageType
 {
     kSetChunkSize = 1,
+    kAcknowledgement = 3,
     kUserControlMessage = 4,
     kWindowAcknowledgementSize = 5,
     kSetPeerBandwidth = 6,
@@ -383,6 +385,7 @@ private:
     int OnAmf0Message(RtmpMessage& rtmp_msg);
     int OnAudio(RtmpMessage& rtmp_msg);
     int OnSetChunkSize(RtmpMessage& rtmp_msg);
+    int OnAcknowledgement(RtmpMessage& rtmp_msg);
     int OnUserControlMessage(RtmpMessage& rtmp_msg);
     int OnVideo(RtmpMessage& rtmp_msg);
     int OnWindowAcknowledgementSize(RtmpMessage& rtmp_msg);
@@ -394,7 +397,8 @@ private:
     int OnNewRtmpPlayer(RtmpProtocol* protocol);
     int OnNewFlvPlayer(HttpFlvProtocol* protocol);
     int SendRtmpMessage(const uint32_t cs_id, const uint32_t& message_stream_id, const uint8_t& message_type_id, const uint8_t* data, const size_t& len);
-    int SendMediaData(const RtmpMessage& media);
+    int SendMediaData(const Payload& media);
+    int SendData(const RtmpMessage& cur_info, const Payload& paylod = Payload());
 
 private:
     Epoller* epoller_;
@@ -408,6 +412,7 @@ private:
     uint32_t out_chunk_size_;
 
     map<uint32_t, RtmpMessage> csid_head_;
+    map<uint32_t, RtmpMessage> csid_pre_info_;
 
     string app_;
     string tc_url_;
@@ -425,6 +430,8 @@ private:
 
     uint64_t video_frame_recv_;
     uint64_t audio_frame_recv_;
+
+    uint64_t video_key_frame_count_;
 
     uint64_t last_key_video_frame_;
     uint64_t last_key_audio_frame_;

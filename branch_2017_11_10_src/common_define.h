@@ -19,6 +19,13 @@ enum FrameType
     kPframe = 3,
 };
 
+enum PayloadType
+{
+    kUnknownPayload = -1,
+    kVideoPayload = 1,
+    kAudioPayload = 2,
+};
+
 enum VideoCodec
 {
     kAVC = 7,

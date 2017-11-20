@@ -61,6 +61,7 @@ int TcpSocket::OnRead()
 
                         if (ret == kClose || ret == kError)
                         {
+                            cout << LMSG << "read error:" << ret << endl;
                             handler_->HandleClose(read_buffer_, *this);
                             return kClose;
                         }

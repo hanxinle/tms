@@ -5,8 +5,8 @@ LIB_DIR        +=
 # ==========================================================
 CC             = gcc
 CXX 		   = g++
-CFLAGS         = -g -Wno-deprecated -W -O2
-CXXFLAGS       = -g -std=c++0x -O2
+CFLAGS         = -g -Wno-deprecated -W -O2 -pg
+CXXFLAGS       = -g -std=c++0x -O2 -pg
 # ==========================================================
 SOURCES += $(wildcard ./*.cpp)
 OBJECTS += $(patsubst %.cpp,%.o, $(patsubst %.c,%.o, $(SOURCES)))

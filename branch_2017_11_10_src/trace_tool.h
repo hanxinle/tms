@@ -6,6 +6,7 @@
 //#define malloc TraceMalloc
 //#define free TraceFree
 //#define realloc TraceRealloc
+//#define TRACE_MALLOC
 
 void* TraceMalloc(size_t size);
 void TraceFree(void* ptr);

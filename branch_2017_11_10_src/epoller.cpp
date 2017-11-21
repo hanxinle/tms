@@ -172,7 +172,9 @@ int Epoller::WaitIoEvent(const uint32_t& timeout_ms)
         cout << "epoll_wait err:" << strerror(errno) << endl;
     }
 
+#ifdef TRACE_MALLOC
     cout << LMSG << "malloc_size:" << (malloc_size/1024.0) << " MB" << endl;
+#endif
 
     HandleEvent(socket_event);
 

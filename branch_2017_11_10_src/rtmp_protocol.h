@@ -116,12 +116,14 @@ struct TsMedia
 {
     TsMedia()
         :
-        duration(0)
+        duration(0),
+        first_dts(0)
     {
     }
 
     double duration;
-    string buffer;
+    double first_dts;
+    string ts_data;
 };
 
 class RtmpProtocol
@@ -293,11 +295,13 @@ public:
             return invalid_ts_;
         }
 
-        return iter->second.buffer;
+        return iter->second.ts_data;
     }
 
     void UpdateM3U8();
-    void PacketTs();
+    void PacketTs(const Payload& payload);
+    string& PacketTsPmt();
+    string& PacketTsPat();
 
     uint16_t GetAudioContinuityCounter()
     {
@@ -475,6 +479,9 @@ private:
     uint8_t last_message_type_id_;
 
     string m3u8_;
+    string ts_pat_;
+    string ts_pmt_;
+
     uint64_t ts_seq_;
     uint8_t ts_couter_;
     uint32_t video_pid_;

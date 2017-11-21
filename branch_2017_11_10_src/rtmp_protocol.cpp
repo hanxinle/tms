@@ -222,9 +222,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
                 }
             }
 
-#ifdef DEBUG
-            cout << LMSG << "fmt:" << (uint16_t)fmt << ",cs_id:" << cs_id << ",io_buffer.Size():" << io_buffer.Size() << endl;
-#endif
+            //VERBOSE << LMSG << "fmt:" << (uint16_t)fmt << ",cs_id:" << cs_id << ",io_buffer.Size():" << io_buffer.Size() << endl;
 
             if (fmt == 0)
             {
@@ -267,9 +265,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
                     rtmp_msg.message_type_id = message_type_id;
                     rtmp_msg.message_stream_id = be32toh(message_stream_id);
 
-#ifdef DEBUG
-                    cout << LMSG << "fmt_0|" << rtmp_msg.ToString() << ",in_chunk_size_:" << in_chunk_size_ << endl;
-#endif
+                    //VERBOSE << LMSG << "fmt_0|" << rtmp_msg.ToString() << ",in_chunk_size_:" << in_chunk_size_ << endl;
                 }
                 else
                 {
@@ -295,9 +291,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
                     rtmp_msg.message_length = message_length;
                     rtmp_msg.message_type_id = message_type_id;
 
-#ifdef DEBUG
-                    cout << LMSG << "fmt_1|" << rtmp_msg.ToString() << ",in_chunk_size_:" << in_chunk_size_ << endl;
-#endif
+                    //VERBOSE << LMSG << "fmt_1|" << rtmp_msg.ToString() << ",in_chunk_size_:" << in_chunk_size_ << endl;
                 }
                 else
                 {
@@ -317,9 +311,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
 
                     rtmp_msg.timestamp_delta = timestamp_delta;
 
-#ifdef DEBUG
-                    cout << LMSG << "fmt_2|" << rtmp_msg.ToString() << ",in_chunk_size_:" << in_chunk_size_ << endl;
-#endif
+                    //VERBOSE << LMSG << "fmt_2|" << rtmp_msg.ToString() << ",in_chunk_size_:" << in_chunk_size_ << endl;
                 }
                 else
                 {
@@ -330,9 +322,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
             {
                 RtmpMessage& rtmp_msg = csid_head_[cs_id];
 
-#ifdef DEBUG
-                cout << LMSG << "fmt_3|" << rtmp_msg.ToString() << ",in_chunk_size_:" << in_chunk_size_ << endl;
-#endif
+                //VERBOSE << LMSG << "fmt_3|" << rtmp_msg.ToString() << ",in_chunk_size_:" << in_chunk_size_ << endl;
             }
 
             if (io_buffer.Size() >= chunk_header_len + message_header_len)
@@ -362,10 +352,8 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
                     }
                     else
                     {
-#ifdef DEBUG
-                        cout << LMSG << "enough chunk data, no enough messge data,message_length:" << rtmp_msg.message_length 
-                                     << ",cur_len:" << rtmp_msg.len << ",io_buffer.Size():" << io_buffer.Size() << endl;
-#endif
+                        //VERBOSE << LMSG << "enough chunk data, no enough messge data,message_length:" << rtmp_msg.message_length 
+                                     //<< ",cur_len:" << rtmp_msg.len << ",io_buffer.Size():" << io_buffer.Size() << endl;
 
                         // 这里也要返回success
                         return kSuccess;
@@ -373,9 +361,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
                 }
                 else
                 {
-#ifdef DEBUG
-                    cout << LMSG << "no enough chunk data, io_buffer.Size():" << io_buffer.Size() << endl;
-#endif
+                    //VERBOSE << LMSG << "no enough chunk data, io_buffer.Size():" << io_buffer.Size() << endl;
                     return kNoEnoughData;
                 }
             }
@@ -390,12 +376,10 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
             RtmpMessage& rtmp_msg = csid_head_[cs_id];
             rtmp_msg.cs_id = cs_id;
 
-#ifdef DEBUG
-            cout << LMSG << "message done|typeid:" << (uint16_t)rtmp_msg.message_type_id << endl;
-            cout << LMSG << ",audio_queue_.size():" << audio_queue_.size()
-                         << ",video_queue_.size():" << video_queue_.size()
-                         << endl;
-#endif
+            //VERBOSE << LMSG << "message done|typeid:" << (uint16_t)rtmp_msg.message_type_id << endl;
+            //VERBOSE << LMSG << ",audio_queue_.size():" << audio_queue_.size()
+                         //<< ",video_queue_.size():" << video_queue_.size()
+                         //<< endl;
 
             int ret = OnRtmpMessage(rtmp_msg);
 
@@ -616,547 +600,463 @@ void RtmpProtocol::UpdateM3U8()
     cout << LMSG << "\n" << TRACE << "\n" << m3u8_ << TRACE << endl;
 }
 
-void RtmpProtocol::PacketTs()
+void RtmpProtocol::PacketTs(const Payload& payload)
 {
-    cout << LMSG << "last_key_video_frame_:" << last_key_video_frame_ << ",last_key_audio_frame_:" << last_key_audio_frame_
-         << ",audio_queue_.size():" << audio_queue_.size() << ",video_queue_.size():" << video_queue_.size()
-         << endl;
-
-    auto iter_v_begin = video_queue_.find(last_key_video_frame_);
-    auto iter_a_begin = audio_queue_.find(last_key_audio_frame_);
-
-    if (iter_a_begin == audio_queue_.end())
+    if (ts_queue_.count(ts_seq_) == 0)
     {
-        cout << LMSG << "no any audio frame" << endl;
+        ts_queue_[ts_seq_].ts_data.reserve(1024*64);
+
+        ts_queue_[ts_seq_].ts_data.append(PacketTsPat());
+        ts_queue_[ts_seq_].ts_data.append(PacketTsPmt());
+        ts_queue_[ts_seq_].first_dts = payload.GetDts();
     }
 
-    if (iter_v_begin == video_queue_.end())
-    {
-        cout << LMSG << "no any video frame" << endl;
+    ts_queue_[ts_seq_].duration = (payload.GetDts() - ts_queue_[ts_seq_].first_dts) / 1000.0;
 
-        if (! video_queue_.empty())
-        {
-            cout << LMSG << "first video:" << video_queue_.begin()->first << endl;
-        }
+    const uint8_t* data = payload.GetRawData();
+
+    bool is_video = payload.IsVideo();
+
+    uint8_t ts_header_size = 4;
+    uint8_t adaptation_size = 8;
+    uint8_t pes_header_size = 19;
+
+    if (! is_video)
+    {
+        adaptation_size = 2;
+        pes_header_size = 14;
     }
 
-    TsMedia& ts_media = ts_queue_[ts_seq_];
-
-
+    int i = 0;
+    while (i < payload.GetRawLen())
     {
-        auto v_end = video_queue_.rbegin();
-        ts_media.duration = (v_end->second.GetDts() - iter_v_begin->second.GetDts())/ 1000.0;
-    }
+        uint32_t header_size = ts_header_size;
+        uint8_t adaptation_field_control = 1; // 1:无自适应区 2.只有自适应区 3.同时有负载和自适应区
+        uint8_t adaption_stuffing_bytes = 0;
+        uint8_t payload_unit_start_indicator = 0; // 帧首包标识
 
-    cout << LMSG << "new ts:" << ts_seq_ << ".ts" << ",duration:" << ts_media.duration << endl;
-
-    // PAT
-    {
-        BitStream bs;
-
-        // ts header
-        bs.WriteBytes(1, 0x47);  // sync_byte
-        bs.WriteBits(1, 0);      // transport_error_indicator
-        bs.WriteBits(1, 1);      // payload_unit_start_indicator 
-        bs.WriteBits(1, 0);      // transport_priority
-        bs.WriteBits(13, 0);    // pid
-        bs.WriteBits(2, 0);              // transport_scrambling_control
-        bs.WriteBits(2, 1);
-        bs.WriteBits(4, GetPatContinuityCounter());
-
-        // table id
-        bs.WriteBytes(2, 0x0000); // XXX:标准是1个字节,但实现看起来都是2个字节
-        bs.WriteBits(1, 1);
-        bs.WriteBits(1, 0);
-        bs.WriteBits(2, 0x03);
-
-        uint16_t length = 13;
-        bs.WriteBits(12, length); // 后面数据长度,不包括这个字节
-
-        bs.WriteBits(16, 0x0001);
-        bs.WriteBits(2, 0x03);
-        bs.WriteBits(5, 0);
-        bs.WriteBits(1, 1);
-        bs.WriteBits(8, 0);
-        bs.WriteBits(8, 0);
-
-        bs.WriteBits(16, 0x0001);
-        bs.WriteBits(3, 0x07);
-        bs.WriteBits(13, pmt_pid_);
-        // CRC32从table_id开始(包括table_id), 这里+5是因为上面的table_id用了2个字节,标准是1个字节
-        uint32_t crc32 = crc_32_.GetCrc32(bs.GetData() + 5, bs.SizeInBytes() - 5);
-        bs.WriteBytes(4, crc32);
-
-        cout << LMSG << "crc32:" << crc32 << endl;
-
-        int left_bytes = 188 - bs.SizeInBytes();
-
-        for (int i = 0; i < left_bytes; ++i)
+        if (i == 0)
         {
-            bs.WriteBytes(1, 0xFF);
-        }
+            header_size += pes_header_size;
+            payload_unit_start_indicator = 1;
 
-        ts_media.buffer.append((const char*)bs.GetData(), bs.SizeInBytes());
-    }
-
-    // PMT
-    {
-        BitStream bs;
-
-        // ts header
-        bs.WriteBytes(1, 0x47);  // sync_byte
-        bs.WriteBits(1, 0);      // transport_error_indicator
-        bs.WriteBits(1, 1);      // payload_unit_start_indicator 
-        bs.WriteBits(1, 0);      // transport_priority
-        bs.WriteBits(13, pmt_pid_);    // pid
-        bs.WriteBits(2, 0);              // transport_scrambling_control
-        bs.WriteBits(2, 1);
-        bs.WriteBits(4, GetPmtContinuityCounter());
-
-        // TODO:文档这里都是8bit,但实现得是16bit
-        bs.WriteBytes(2, 0x0002);
-        bs.WriteBits(1, 1);
-        bs.WriteBits(1, 0);
-        bs.WriteBits(2, 0x03);
-
-        uint16_t length = 23;
-
-        bs.WriteBits(12, length);
-        bs.WriteBits(16, 0x0001);
-        bs.WriteBits(2, 0x03);
-        bs.WriteBits(5, 0);
-        bs.WriteBits(1, 1);
-        bs.WriteBits(8, 0);
-        bs.WriteBits(8, 0);
-        bs.WriteBits(3, 0x07);
-        bs.WriteBits(13, video_pid_); // PCR所在的PID,指定为视频pid
-        bs.WriteBits(4, 0x0F);
-        bs.WriteBits(12, 0);
-
-        bs.WriteBits(8, 0x1b); // 0x1b h264
-        bs.WriteBits(3, 0x07);
-        bs.WriteBits(13, video_pid_);
-        bs.WriteBits(4, 0x0F);
-        bs.WriteBits(12, 0x0000);
-
-        bs.WriteBits(8, 0x0f); // 0x0f aac
-        bs.WriteBits(3, 0x07);
-        bs.WriteBits(13, audio_pid_);
-        bs.WriteBits(4, 0x0F);
-        bs.WriteBits(12, 0x0000);
-
-        // 这里要是5,不能是4,ts header后面多出来的一个字节不知道是啥
-        uint32_t crc32 = crc_32_.GetCrc32(bs.GetData() + 5, bs.SizeInBytes() - 5);
-        bs.WriteBytes(4, crc32);
-
-        cout << LMSG << "crc32:" << crc32 << endl;
-
-        int left_bytes = 188 - bs.SizeInBytes();
-
-        for (int i = 0; i < left_bytes; ++i)
-        {
-            bs.WriteBytes(1, 0xFF);
-        }
-
-        ts_media.buffer.append((const char*)bs.GetData(), bs.SizeInBytes());
-    }
-
-    uint32_t video_count = 0;
-    uint32_t audio_count = 0;
-    uint32_t frame_key = 0;
-
-    while (iter_v_begin != video_queue_.end() || iter_a_begin != audio_queue_.end())
-    {
-        Payload payload;
-        bool is_video = false;
-        if (iter_v_begin == video_queue_.end())
-        {
-            payload = iter_a_begin->second;
-            frame_key = iter_a_begin->first;
-            ++iter_a_begin;
-            ++audio_count;
-        }
-        else if (iter_a_begin == audio_queue_.end())
-        {
-            payload = iter_v_begin->second;
-            frame_key = iter_v_begin->first;
-            is_video = true;
-            ++video_count;
-            ++iter_v_begin;
-        }
-        else
-        {
-            if (iter_v_begin->second.GetDts() > iter_a_begin->second.GetDts())
+            if (is_video)
             {
-                payload = iter_a_begin->second;
-                frame_key = iter_a_begin->first;
-                ++iter_a_begin;
-                ++audio_count;
+                header_size += adaptation_size;
+                adaptation_field_control = 3;
             }
             else
             {
-                payload = iter_v_begin->second;
-                frame_key = iter_v_begin->first;
-                is_video = true;
-                ++video_count;
-                ++iter_v_begin;
+                adaptation_field_control = 1;
             }
-        }
 
-        int i = 0;
-        const uint8_t* data = payload.GetRawData();
-
-        string buffer;
-
-        uint8_t ts_header_size = 4;
-        uint8_t adaptation_size = 8;
-        uint8_t pes_header_size = 19;
-
-        if (! is_video)
-        {
-            adaptation_size = 2;
-            pes_header_size = 14;
-        }
-
-        cout << LMSG << "is video:" << is_video << endl;
-
-        while (i < payload.GetRawLen())
-        {
-            uint32_t header_size = ts_header_size;
-            uint8_t adaptation_field_control = 1; // 1:无自适应区 2.只有自适应区 3.同时有负载和自适应区
-            uint8_t adaption_stuffing_bytes = 0;
-            uint8_t payload_unit_start_indicator = 0; // 帧首包标识
-
-            if (i == 0)
+            //　音频负载通常小于188,这里要做下处理
+            if (payload.GetRawLen() + ts_header_size + adaptation_size + pes_header_size < 188)
             {
-                header_size += pes_header_size;
-                payload_unit_start_indicator = 1;
-
                 if (is_video)
+                {
+                    adaption_stuffing_bytes = 188 - (payload.GetRawLen() + ts_header_size + adaptation_size + pes_header_size + 6/*00 00 00 01 09 BC*/);
+                }
+                else
+                {
+                    adaption_stuffing_bytes = 188 - (payload.GetRawLen() + ts_header_size + adaptation_size + pes_header_size);
+                }
+
+                if (! is_video)
                 {
                     header_size += adaptation_size;
                     adaptation_field_control = 3;
                 }
-                else
+
+                header_size += adaption_stuffing_bytes;
+            }
+        }
+        else
+        {
+            uint32_t left = payload.GetRawLen() - i;
+            
+            if (left + ts_header_size + adaptation_size <= 188)
+            {
+                header_size += adaptation_size;
+                if (left + ts_header_size + adaptation_size == 188)
                 {
+                    header_size -= adaptation_size;
                     adaptation_field_control = 1;
                 }
-
-                //　音频负载通常小于188,这里要做下处理
-                if (payload.GetRawLen() + ts_header_size + adaptation_size + pes_header_size < 188)
+                else
                 {
-                    if (is_video)
-                    {
-                        adaption_stuffing_bytes = 188 - (payload.GetRawLen() + ts_header_size + adaptation_size + pes_header_size + 6/*00 00 00 01 09 BC*/);
-                    }
-                    else
-                    {
-                        adaption_stuffing_bytes = 188 - (payload.GetRawLen() + ts_header_size + adaptation_size + pes_header_size);
-                    }
-
-                    if (! is_video)
-                    {
-                        header_size += adaptation_size;
-                        adaptation_field_control = 3;
-                    }
-
+                    adaptation_field_control = 3;
+                    adaption_stuffing_bytes = 188 - (left + ts_header_size + adaptation_size);
                     header_size += adaption_stuffing_bytes;
                 }
             }
-            else
+            else if (left + ts_header_size <= 188)
             {
-                uint32_t left = payload.GetRawLen() - i;
-                
-                if (left + ts_header_size + adaptation_size <= 188)
-                {
-                    header_size += adaptation_size;
-                    if (left + ts_header_size + adaptation_size == 188)
-                    {
-                        header_size -= adaptation_size;
-                        adaptation_field_control = 1;
-                    }
-                    else
-                    {
-                        adaptation_field_control = 3;
-                        adaption_stuffing_bytes = 188 - (left + ts_header_size + adaptation_size);
-                        header_size += adaption_stuffing_bytes;
-                    }
-                }
-                else if (left + ts_header_size <= 188)
-                {
-                    adaptation_field_control = 1;
-                }
-                else
-                {
-                    adaptation_field_control = 1;
-                }
-            }
-
-            BitStream ts_bs;
-
-            // ts header
-            ts_bs.WriteBytes(1, 0x47);  // sync_byte
-            ts_bs.WriteBits(1, 0);      // transport_error_indicator
-            ts_bs.WriteBits(1, payload_unit_start_indicator);      // payload_unit_start_indicator 
-            ts_bs.WriteBits(1, 0);      // transport_priority
-            if (is_video)
-            {
-                ts_bs.WriteBits(13, video_pid_);    // pid
+                adaptation_field_control = 1;
             }
             else
             {
-                ts_bs.WriteBits(13, audio_pid_);    // pid
+                adaptation_field_control = 1;
             }
-            ts_bs.WriteBits(2, 0);              // transport_scrambling_control
-            ts_bs.WriteBits(2, adaptation_field_control);
+        }
+
+        BitStream ts_bs;
+
+        // ts header
+        ts_bs.WriteBytes(1, 0x47);  // sync_byte
+        ts_bs.WriteBits(1, 0);      // transport_error_indicator
+        ts_bs.WriteBits(1, payload_unit_start_indicator);      // payload_unit_start_indicator 
+        ts_bs.WriteBits(1, 0);      // transport_priority
+        if (is_video)
+        {
+            ts_bs.WriteBits(13, video_pid_);    // pid
+        }
+        else
+        {
+            ts_bs.WriteBits(13, audio_pid_);    // pid
+        }
+        ts_bs.WriteBits(2, 0);              // transport_scrambling_control
+        ts_bs.WriteBits(2, adaptation_field_control);
+
+        if (is_video)
+        {
+            ts_bs.WriteBits(4, GetVideoContinuityCounter());
+        }
+        else
+        {
+            ts_bs.WriteBits(4, GetAudioContinuityCounter());
+        }
+
+        if (adaptation_field_control == 2 || adaptation_field_control == 3)
+        {
+            // adaption
+            uint64_t timestamp = (uint64_t)payload.GetDts() * 90;
 
             if (is_video)
             {
-                ts_bs.WriteBits(4, GetVideoContinuityCounter());
-            }
-            else
-            {
-                ts_bs.WriteBits(4, GetAudioContinuityCounter());
-            }
-
-            //cout << LMSG << "i:" << i << ",adaptation_field_control:" << (uint16_t)adaptation_field_control << endl;
-            if (adaptation_field_control == 2 || adaptation_field_control == 3)
-            {
-                // adaption
-                uint64_t timestamp = (uint64_t)payload.GetDts() * 90;
-
-                if (is_video)
+                if (payload_unit_start_indicator == 1)
                 {
-                    if (payload_unit_start_indicator == 1)
-                    {
-                        // 视频而且是帧的首个包才需要PCR
-                        ts_bs.WriteBytes(1, 7 + adaption_stuffing_bytes);
-                        ts_bs.WriteBytes(1, 0x10);
-                    }
-                    else
-                    {
-                        ts_bs.WriteBytes(1, 1 + adaption_stuffing_bytes);
-                        ts_bs.WriteBytes(1, 0x00);
-                    }
-
-
-                    if (payload_unit_start_indicator == 1)
-                    {
-                        uint64_t pcr_base = timestamp;
-                        uint16_t pcr_ext = 0;
-
-                        ts_bs.WriteBits(33, pcr_base);
-                        ts_bs.WriteBits(6, 0x00);
-                        ts_bs.WriteBits(9, pcr_ext);
-                    }
-                    else
-                    {
-                        header_size -= 6;
-                    }
+                    // 视频而且是帧的首个包才需要PCR
+                    ts_bs.WriteBytes(1, 7 + adaption_stuffing_bytes);
+                    ts_bs.WriteBytes(1, 0x10);
                 }
                 else
                 {
-                    // 音频不需要PCR
                     ts_bs.WriteBytes(1, 1 + adaption_stuffing_bytes);
-                    // audio no pcr
                     ts_bs.WriteBytes(1, 0x00);
                 }
 
-                if (adaption_stuffing_bytes > 0)
-                {
-                    for (uint8_t i = 0; i != adaption_stuffing_bytes; ++i)
-                    {
-                        ts_bs.WriteBytes(1, 0xFF);
-                    }
-                }
-            }
 
-            if (payload_unit_start_indicator == 1)
-            {
-                // pes
-                ts_bs.WriteBytes(3, (uint32_t)0x000001);
-                if (is_video)
+                if (payload_unit_start_indicator == 1)
                 {
-                    ts_bs.WriteBytes(1, 0xe0);
+                    uint64_t pcr_base = timestamp;
+                    uint16_t pcr_ext = 0;
+
+                    ts_bs.WriteBits(33, pcr_base);
+                    ts_bs.WriteBits(6, 0x00);
+                    ts_bs.WriteBits(9, pcr_ext);
                 }
                 else
                 {
-                    ts_bs.WriteBytes(1, 0xc0);
-                }
-
-                if (is_video)
-                {
-                    // 视频的PES长度这里随便填,无所谓
-                    //ts_bs.WriteBytes(2, (uint64_t)payload.GetLen());
-                    ts_bs.WriteBytes(2, 0x0000);
-                }
-                else
-                {
-                    // 音频的一定是音频负载长度+3(PES后面3个flag)+5(只有DTS)+7(adts头长度)
-                    ts_bs.WriteBytes(2, (uint64_t)payload.GetRawLen() + 3 + 5 + 7);
-                }
-
-                ts_bs.WriteBytes(1, 0x80);
-
-                uint32_t pts = payload.GetPts() * 90;
-                uint32_t dts = payload.GetDts() * 90;
-
-                if (is_video)
-                {
-                    //if (pts != dts)
-                    {
-                        // 都要有PTS
-                        ts_bs.WriteBytes(1, 0xc0);
-                        ts_bs.WriteBytes(1, 10);
-                    }
-                    //else
-                    //{
-                    //    ts_bs.WriteBytes(1, 0x80);
-                    //    ts_bs.WriteBytes(1, 5);
-                    //}
-                }
-                else
-                {
-                    // 音频只需要PTS即可
-                    ts_bs.WriteBytes(1, 0x80);
-                    ts_bs.WriteBytes(1, 5);
-                }
-
-                uint16_t t_32_30 = (pts & 0xC0000000) >> 29;
-                uint16_t t_29_15 = (pts & 0x3FFF8000) >> 15;
-                uint16_t t_14_0  = (pts & 0x00007FFF);
-
-                // pts
-                ts_bs.WriteBits(4, 0x02);
-                ts_bs.WriteBits(3, t_32_30);
-                ts_bs.WriteBits(1, 1);
-                ts_bs.WriteBits(15, t_29_15);
-                ts_bs.WriteBits(1, 1);
-                ts_bs.WriteBits(15, t_14_0);
-                ts_bs.WriteBits(1, 1);
-
-                t_32_30 = (dts & 0xC0000000) >> 29;
-                t_29_15 = (dts & 0x3FFF8000) >> 15;
-                t_14_0  = (dts & 0x00007FFF);
-
-                if (is_video)
-                {
-                    // XXX:DTS跟PTS一样的话要不要打还未知
-                    //if (dts != pts)
-
-                    {
-                        // dts
-                        ts_bs.WriteBits(4, 0x02);
-                        ts_bs.WriteBits(3, t_32_30);
-                        ts_bs.WriteBits(1, 1);
-                        ts_bs.WriteBits(15, t_29_15);
-                        ts_bs.WriteBits(1, 1);
-                        ts_bs.WriteBits(15, t_14_0);
-                        ts_bs.WriteBits(1, 1);
-                    }
-                    //else
-                    //{
-                    //    header_size -= 5;
-                    //}
-                }
-
-                if (is_video)
-                {
-                    // split nalu
-                    ts_bs.WriteBytes(4, 0x00000001);
-                    ts_bs.WriteBytes(1, 0x09); // 分隔符
-                    ts_bs.WriteBytes(1, 0x10); // 这个随便填
-                    header_size += 6;
+                    header_size -= 6;
                 }
             }
-
-            cout << "header_size:" << header_size << ",ts_bs.SizeInBytes():" << ts_bs.SizeInBytes() << ",is_video:" << is_video << endl;
-            assert(header_size == ts_bs.SizeInBytes());
-
-            // SPS PPS before I frame
-            if (i == 0 && is_video)
+            else
             {
-                if (payload.IsIFrame())
-                {
-                    // nalu type在payload的第一个字节
-                    ts_bs.WriteBytes(4, 0x00000001);
-                    ts_bs.WriteData(sps_.size(), (const uint8_t*)sps_.data());
-
-                    ts_bs.WriteBytes(4, 0x00000001);
-                    ts_bs.WriteData(pps_.size(), (const uint8_t*)pps_.data());
-
-                    ts_bs.WriteBytes(4, 0x00000001);
-                    //ts_bs.WriteBytes(1, 0x65);
-                    cout << LMSG << frame_key << " I frame" << endl;
-                }
-                else if (payload.IsPFrame())
-                {
-                    // P
-                    ts_bs.WriteBytes(4, 0x00000001);
-                    //ts_bs.WriteBytes(1, 0x41);
-
-                    cout << LMSG << "P frame" << endl;
-                }
-                else if (payload.IsBFrame())
-                {
-                    // B
-                    ts_bs.WriteBytes(4, 0x00000001);
-                    //ts_bs.WriteBytes(1, 0x01);
-
-                    cout << LMSG << "B frame" << endl;
-                }
-                else
-                {
-                    cout << LMSG << "Unknown frame:" << (uint16_t)payload.GetFrameType() << endl;
-                }
+                // 音频不需要PCR
+                ts_bs.WriteBytes(1, 1 + adaption_stuffing_bytes);
+                // audio no pcr
+                ts_bs.WriteBytes(1, 0x00);
             }
 
-            if (i == 0 && ! is_video && aac_header_.size() > 2)
+            if (adaption_stuffing_bytes > 0)
             {
-                //adts_header_[3] |= ((AdtsLen & 0x1800) >> 11);           //frame length：value   高2bits
-                //adts_header_[4] = (uint8_t)((AdtsLen & 0x7f8) >> 3);     //frame length:value    中间8bits 
-                //adts_header_[5] = (uint8_t)((AdtsLen & 0x7) << 5);       //frame length:value    低3bits
-
-                //adts_header_[5] |= 0x1f;                                 //buffer fullness:0x7ff 高5bits 
-                //adts_header_[6] = 0xfc;
-                //
-                // 有卡顿声音的头
-                uint16_t adts_len = (uint16_t)payload.GetRawLen() + 7;
-                cout << LMSG << "adts_len:" << adts_len << endl;
-                adts_header_[3] &= 0xFC;
-                adts_header_[3] |=(uint8_t)((adts_len & 0x1800) >> 11);           //frame length：value   高2bits
-                adts_header_[4] = (uint8_t)((adts_len & 0x7f8) >> 3);     //frame length:value    中间8bits 
-                adts_header_[5] &= 0x1F;
-                adts_header_[5] |= ((uint8_t)((adts_len & 0x07) << 5) & 0xe0);       //frame length:value    低3bits
-
-                uint16_t calc_len = ((adts_header_[3] & 0x03) << 11) | ((uint16_t)adts_header_[4] << 3) | ((adts_header_[5] & 0xE0) >> 5);
-
-                uint64_t tmp = adts_len << 13;
-                cout << LMSG << Util::Bin2Hex((const uint8_t*)&tmp, sizeof(tmp)) << endl;
-
-                cout << LMSG << Util::Bin2Hex(adts_header_, 7) << endl;
-                cout << LMSG << "calc_len:" << calc_len << endl;
-                assert(adts_len == calc_len);
-
-                ts_bs.WriteData(7, adts_header_);
+                for (uint8_t i = 0; i != adaption_stuffing_bytes; ++i)
+                {
+                    ts_bs.WriteBytes(1, 0xFF);
+                }
             }
-
-            int bytes_left = 188 - ts_bs.SizeInBytes();
-
-            ts_bs.WriteData(bytes_left, data);
-
-            if (! is_video)
-            {
-                cout << TRACE << endl;
-                cout << Util::Bin2Hex(ts_bs.GetData(), ts_bs.SizeInBytes()) << endl;
-            }
-
-            data += bytes_left;
-            i += bytes_left;
-
-            ts_media.buffer.append((const char*)ts_bs.GetData(), ts_bs.SizeInBytes());
         }
+
+        if (payload_unit_start_indicator == 1)
+        {
+            // pes
+            ts_bs.WriteBytes(3, (uint32_t)0x000001);
+            if (is_video)
+            {
+                ts_bs.WriteBytes(1, 0xe0);
+            }
+            else
+            {
+                ts_bs.WriteBytes(1, 0xc0);
+            }
+
+            if (is_video)
+            {
+                // 视频的PES长度这里随便填,无所谓
+                ts_bs.WriteBytes(2, 0x0000);
+            }
+            else
+            {
+                // 音频的一定是音频负载长度+3(PES后面3个flag)+5(只有DTS)+7(adts头长度)
+                ts_bs.WriteBytes(2, (uint64_t)payload.GetRawLen() + 3 + 5 + 7);
+            }
+
+            ts_bs.WriteBytes(1, 0x80);
+
+            uint32_t pts = payload.GetPts() * 90;
+            uint32_t dts = payload.GetDts() * 90;
+
+            if (is_video)
+            {
+                ts_bs.WriteBytes(1, 0xc0);
+                ts_bs.WriteBytes(1, 10);
+            }
+            else
+            {
+                // 音频只需要PTS即可
+                ts_bs.WriteBytes(1, 0x80);
+                ts_bs.WriteBytes(1, 5);
+            }
+
+            uint16_t t_32_30 = (pts & 0xC0000000) >> 29;
+            uint16_t t_29_15 = (pts & 0x3FFF8000) >> 15;
+            uint16_t t_14_0  = (pts & 0x00007FFF);
+
+            // pts
+            ts_bs.WriteBits(4, 0x02);
+            ts_bs.WriteBits(3, t_32_30);
+            ts_bs.WriteBits(1, 1);
+            ts_bs.WriteBits(15, t_29_15);
+            ts_bs.WriteBits(1, 1);
+            ts_bs.WriteBits(15, t_14_0);
+            ts_bs.WriteBits(1, 1);
+
+            t_32_30 = (dts & 0xC0000000) >> 29;
+            t_29_15 = (dts & 0x3FFF8000) >> 15;
+            t_14_0  = (dts & 0x00007FFF);
+
+            if (is_video)
+            {
+                // XXX:DTS跟PTS一样的话要不要打还未知
+                //if (dts != pts)
+
+                {
+                    // dts
+                    ts_bs.WriteBits(4, 0x02);
+                    ts_bs.WriteBits(3, t_32_30);
+                    ts_bs.WriteBits(1, 1);
+                    ts_bs.WriteBits(15, t_29_15);
+                    ts_bs.WriteBits(1, 1);
+                    ts_bs.WriteBits(15, t_14_0);
+                    ts_bs.WriteBits(1, 1);
+                }
+                //else
+                //{
+                //    header_size -= 5;
+                //}
+            }
+
+            if (is_video)
+            {
+                // split nalu
+                ts_bs.WriteBytes(4, 0x00000001);
+                ts_bs.WriteBytes(1, 0x09); // 分隔符
+                ts_bs.WriteBytes(1, 0x10); // 这个随便填
+                header_size += 6;
+            }
+        }
+
+        //VERBOSE << LMSG << "header_size:" << header_size << ",ts_bs.SizeInBytes():" << ts_bs.SizeInBytes() << ",is_video:" << is_video << endl;
+        assert(header_size == ts_bs.SizeInBytes());
+
+        // SPS PPS before I frame
+        if (i == 0 && is_video)
+        {
+            if (payload.IsIFrame())
+            {
+                // nalu type在payload的第一个字节
+                ts_bs.WriteBytes(4, 0x00000001);
+                ts_bs.WriteData(sps_.size(), (const uint8_t*)sps_.data());
+
+                ts_bs.WriteBytes(4, 0x00000001);
+                ts_bs.WriteData(pps_.size(), (const uint8_t*)pps_.data());
+
+                ts_bs.WriteBytes(4, 0x00000001);
+                //ts_bs.WriteBytes(1, 0x65);
+                //VERBOSE << LMSG << frame_key << " I frame" << endl;
+            }
+            else if (payload.IsPFrame())
+            {
+                // P
+                ts_bs.WriteBytes(4, 0x00000001);
+                //ts_bs.WriteBytes(1, 0x41);
+
+                //VERBOSE << LMSG << "P frame" << endl;
+            }
+            else if (payload.IsBFrame())
+            {
+                // B
+                ts_bs.WriteBytes(4, 0x00000001);
+                //ts_bs.WriteBytes(1, 0x01);
+
+                //VERBOSE << LMSG << "B frame" << endl;
+            }
+            else
+            {
+                //VERBOSE << LMSG << "Unknown frame:" << (uint16_t)payload.GetFrameType() << endl;
+            }
+        }
+
+        if (i == 0 && ! is_video && aac_header_.size() >= 2)
+        {
+            uint16_t adts_len = (uint16_t)payload.GetRawLen() + 7;
+
+            adts_header_[3] &= 0xFC;
+            adts_header_[3] |=(uint8_t)((adts_len & 0x1800) >> 11);         //frame length:value,高2bits
+            adts_header_[4] = (uint8_t)((adts_len & 0x7f8) >> 3);           //frame length:value,中间8bits 
+            adts_header_[5] &= 0x1F;
+            adts_header_[5] |= ((uint8_t)((adts_len & 0x07) << 5) & 0xe0);  //frame length:value,低3bits
+
+            uint16_t calc_len = ((adts_header_[3] & 0x03) << 11) | ((uint16_t)adts_header_[4] << 3) | ((adts_header_[5] & 0xE0) >> 5);
+
+            uint64_t tmp = adts_len << 13;
+
+            assert(adts_len == calc_len);
+
+            ts_bs.WriteData(7, adts_header_);
+        }
+
+        int bytes_left = 188 - ts_bs.SizeInBytes();
+
+        ts_bs.WriteData(bytes_left, data);
+
+        ts_queue_[ts_seq_].ts_data.append((const char*)ts_bs.GetData(), ts_bs.SizeInBytes());
+
+        data += bytes_left;
+        i += bytes_left;
     }
+}
+
+string& RtmpProtocol::PacketTsPat()
+{
+    if (! ts_pat_.empty())
+    {
+        return ts_pat_;
+    }
+
+    BitStream bs;
+
+    // ts header
+    bs.WriteBytes(1, 0x47);  // sync_byte
+    bs.WriteBits(1, 0);      // transport_error_indicator
+    bs.WriteBits(1, 1);      // payload_unit_start_indicator 
+    bs.WriteBits(1, 0);      // transport_priority
+    bs.WriteBits(13, 0);    // pid
+    bs.WriteBits(2, 0);              // transport_scrambling_control
+    bs.WriteBits(2, 1);
+    bs.WriteBits(4, GetPatContinuityCounter());
+
+    // table id
+    bs.WriteBytes(2, 0x0000); // XXX:标准是1个字节,但实现看起来都是2个字节
+    bs.WriteBits(1, 1);
+    bs.WriteBits(1, 0);
+    bs.WriteBits(2, 0x03);
+
+    uint16_t length = 13;
+    bs.WriteBits(12, length); // 后面数据长度,不包括这个字节
+
+    bs.WriteBits(16, 0x0001);
+    bs.WriteBits(2, 0x03);
+    bs.WriteBits(5, 0);
+    bs.WriteBits(1, 1);
+    bs.WriteBits(8, 0);
+    bs.WriteBits(8, 0);
+
+    bs.WriteBits(16, 0x0001);
+    bs.WriteBits(3, 0x07);
+    bs.WriteBits(13, pmt_pid_);
+    // CRC32从table_id开始(包括table_id), 这里+5是因为上面的table_id用了2个字节,标准是1个字节
+    uint32_t crc32 = crc_32_.GetCrc32(bs.GetData() + 5, bs.SizeInBytes() - 5);
+    bs.WriteBytes(4, crc32);
+
+    int left_bytes = 188 - bs.SizeInBytes();
+
+    for (int i = 0; i < left_bytes; ++i)
+    {
+        bs.WriteBytes(1, 0xFF);
+    }
+
+    ts_pat_.assign((const char*)bs.GetData(), bs.SizeInBytes());
+
+    return ts_pat_;
+}
+
+string& RtmpProtocol::PacketTsPmt()
+{
+    if (! ts_pmt_.empty())
+    {
+        return ts_pmt_;
+    }
+
+    BitStream bs;
+
+    // ts header
+    bs.WriteBytes(1, 0x47);  // sync_byte
+    bs.WriteBits(1, 0);      // transport_error_indicator
+    bs.WriteBits(1, 1);      // payload_unit_start_indicator 
+    bs.WriteBits(1, 0);      // transport_priority
+    bs.WriteBits(13, pmt_pid_);    // pid
+    bs.WriteBits(2, 0);              // transport_scrambling_control
+    bs.WriteBits(2, 1);
+    bs.WriteBits(4, GetPmtContinuityCounter());
+
+    // TODO:文档这里都是8bit,但实现得是16bit
+    bs.WriteBytes(2, 0x0002);
+    bs.WriteBits(1, 1);
+    bs.WriteBits(1, 0);
+    bs.WriteBits(2, 0x03);
+
+    uint16_t length = 23;
+
+    bs.WriteBits(12, length);
+    bs.WriteBits(16, 0x0001);
+    bs.WriteBits(2, 0x03);
+    bs.WriteBits(5, 0);
+    bs.WriteBits(1, 1);
+    bs.WriteBits(8, 0);
+    bs.WriteBits(8, 0);
+    bs.WriteBits(3, 0x07);
+    bs.WriteBits(13, video_pid_); // PCR所在的PID,指定为视频pid
+    bs.WriteBits(4, 0x0F);
+    bs.WriteBits(12, 0);
+
+    bs.WriteBits(8, 0x1b); // 0x1b h264
+    bs.WriteBits(3, 0x07);
+    bs.WriteBits(13, video_pid_);
+    bs.WriteBits(4, 0x0F);
+    bs.WriteBits(12, 0x0000);
+
+    bs.WriteBits(8, 0x0f); // 0x0f aac
+    bs.WriteBits(3, 0x07);
+    bs.WriteBits(13, audio_pid_);
+    bs.WriteBits(4, 0x0F);
+    bs.WriteBits(12, 0x0000);
+
+    // 这里要是5,不能是4,ts header后面多出来的一个字节不知道是啥
+    uint32_t crc32 = crc_32_.GetCrc32(bs.GetData() + 5, bs.SizeInBytes() - 5);
+    bs.WriteBytes(4, crc32);
+
+    int left_bytes = 188 - bs.SizeInBytes();
+
+    for (int i = 0; i < left_bytes; ++i)
+    {
+        bs.WriteBytes(1, 0xFF);
+    }
+
+    ts_pmt_.assign((const char*)bs.GetData(), bs.SizeInBytes());
+
+    return ts_pmt_;
 }
 
 int RtmpProtocol::OnSetChunkSize(RtmpMessage& rtmp_msg)
@@ -1327,6 +1227,9 @@ int RtmpProtocol::OnAudio(RtmpMessage& rtmp_msg)
         audio_payload.SetPts(rtmp_msg.timestamp_calc);
 
         audio_queue_.insert(make_pair(audio_frame_recv_, audio_payload));
+
+        PacketTs(audio_payload);
+
         ++audio_frame_recv_;
 
         // XXX:可以放到定时器,满了就以后肯定都是满了,不用每次都判断
@@ -1431,13 +1334,12 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
         bit_buffer.GetBits(4, codec_id);
         bit_buffer.GetBits(8, avc_packet_type);
 
-#ifdef DEBUG
-        cout << LMSG << "video_frame_recv_:" << video_frame_recv_
-             << ",frame_type:" << (int)frame_type 
-             << ",codec_id:" << (int)codec_id
-             << ",avc_packet_type:" << (int)avc_packet_type
-             << endl;
-#endif
+
+        //VERBOSE << LMSG << "video_frame_recv_:" << video_frame_recv_
+        //        << ",frame_type:" << (int)frame_type 
+        //        << ",codec_id:" << (int)codec_id
+        //        << ",avc_packet_type:" << (int)avc_packet_type
+        //        << endl;
 
         if (codec_id == 7)
         {
@@ -1523,7 +1425,6 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
                     if (last_key_video_frame_ != 0)
                     {
                         // 打包ts
-                        PacketTs();
                         UpdateM3U8();
                         ++ts_seq_;
                     }
@@ -1574,6 +1475,8 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
                 {
                     //cout << LMSG << "insert " << video_frame_recv_ << endl;
                     video_queue_.insert(make_pair(video_frame_recv_, video_payload));
+
+                    PacketTs(video_payload);
 
                     ++video_frame_recv_;
 

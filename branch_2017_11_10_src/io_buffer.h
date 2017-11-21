@@ -59,9 +59,7 @@ public:
         {
             ShrinkCapacity(kDefaultSize);
 
-#ifdef DEBUG
-            cout << LMSG << "adjust start_ and end_ to buf_" << endl;
-#endif
+            //VERBOSE << LMSG << "adjust start_ and end_ to buf_" << endl;
         }
 
         return end_ - start_;

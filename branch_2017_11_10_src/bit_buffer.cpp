@@ -23,16 +23,6 @@ BitBuffer::BitBuffer(const uint8_t* data, const size_t& len)
 {
 }
 
-bool BitBuffer::MoreThanBytes(const size_t& bytes)
-{
-    return MoreThanBits(bytes*8);
-}
-
-bool BitBuffer::MoreThanBits(const size_t& bits)
-{
-    return BitsLeft() >= bits;
-}
-
 int BitBuffer::PeekBits(const size_t& bits, uint64_t& result)
 {
     if (! MoreThanBits(bits))

@@ -30,9 +30,8 @@ IoBuffer::~IoBuffer()
 {
     if (buf_ != NULL)
     {
-#ifdef DEBUG
-        cout << LMSG << "capacity_:" << capacity_ << ",Size():" << Size() << ",CapacityLeft():" << CapacityLeft() << ",buf:" << (void*)buf_ << endl;
-#endif
+        //VERBOSE << LMSG << "capacity_:" << capacity_ << ",Size():" << Size() << ",CapacityLeft():" << CapacityLeft() << ",buf:" << (void*)buf_ << endl;
+
         free(buf_);
         buf_ = NULL;
 
@@ -47,17 +46,13 @@ int IoBuffer::ReadFromFdAndWrite(const int& fd)
 {
     MakeSpaceIfNeed(kEnlargeSize);
 
-#ifdef DEBUG
-    cout << LMSG << "IoBuffer capacity:" << CapacityLeft() << endl;
-#endif
+    //VERBOSE << LMSG << "IoBuffer capacity:" << CapacityLeft() << endl;
 
     int bytes = read(fd, end_, CapacityLeft());
 
     if (bytes > 0)
     {
-#ifdef DEBUG
-        cout << LMSG << "read " << bytes << " bytes" << endl;
-#endif
+        //VERBOSE << LMSG << "read " << bytes << " bytes" << endl;
         end_ += bytes;
     }
     else if (bytes == 0)
@@ -187,7 +182,7 @@ int IoBuffer::MakeSpaceIfNeed(const size_t& len)
 
     size_t new_capacity = max(capacity_ + len, capacity_ * 2);
 
-    cout << LMSG << "cur_capacity:" << cur_capacity << ",new_capacity:" << new_capacity << endl;
+    //VERBOSE << LMSG << "cur_capacity:" << cur_capacity << ",new_capacity:" << new_capacity << endl;
 
     buf_ = (uint8_t*)realloc(buf_, new_capacity);
 

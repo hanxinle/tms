@@ -6,8 +6,6 @@ uint32_t CRC32::GetCrc32(const uint8_t* data, int len)
     for(int i = 0; (size_t)i < len; i++ )
 	{
     	i_crc = (i_crc << 8) ^ crc32_table[((i_crc >> 24) ^ data[i]) & 0xff];
-
-        cout << LMSG << crc32_table[((i_crc >> 24) ^ data[i]) & 0xff] << endl;
 	}
 
     for (size_t i = 0; i != sizeof(crc32_table)/sizeof(uint32_t); ++i)

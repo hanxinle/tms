@@ -21,8 +21,19 @@ using namespace any;
 using namespace std;
 using namespace socket_util;
 
+static void sighandler(int sig_no)
+{
+	exit(0);
+} 
+
 int main(int argc, char* argv[])
 {
+	signal(SIGUSR1, sighandler);
+
+    Log::SetLogLevel(kLevelDebug);
+
+    DEBUG << "john debug log" << endl;
+
     signal(SIGPIPE,SIG_IGN);
 
     Int i(1);
@@ -68,7 +79,7 @@ int main(int argc, char* argv[])
     cout << endl;
 
     {
-        BitStream bit_stream(1024);
+        BitStream bit_stream;
         uint8_t buf[5] = {0xBE, 0xA0, 0x11, 0x78, 0xFF};
 
         // 00100001

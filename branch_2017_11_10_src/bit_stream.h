@@ -9,34 +9,38 @@
 class BitStream
 {
 public:
-    BitStream(const size_t& size_in_bytes = 1024)
+    BitStream()
     {
-        buf_ = (uint8_t*)malloc(size_in_bytes);
-        bzero(buf_, size_in_bytes);
-        bit_len_ = size_in_bytes*8;
+        bzero(buf_, sizeof(buf_));
+        bit_len_ = sizeof(buf_)*8;
         cur_pos_ = 0;
-    }
-
-    ~BitStream()
-    {
-        if (buf_ != NULL)
-        {
-            free(buf_);
-        }
     }
 
     template<typename T>
     int WriteBits(const size_t& bits, const T& val)
     {
-#ifdef DEBUG
-        cout << LMSG << (sizeof(T)*8-1) << endl;
-#endif
+#if 1
+        if (cur_pos_ + bits > bit_len_)
+        {
+            cout << LMSG << "write " << bits << " bits will be overflow" << endl;
+            return -1;
+        }
+
+        T mask = 1UL << (bits - 1);
+
+        for (size_t i = 0; i != bits; ++i)
+        {
+            if (val & mask)
+            {
+                buf_[cur_pos_/8] |= (1 << (7-(cur_pos_%8)));
+            }
+
+            mask >>= 1;
+            ++cur_pos_;
+        }
+#else
         T mask = 1UL<<(sizeof(T)*8-1);
         T tmp = val << (sizeof(T)*8-bits);
-
-#ifdef DEBUG
-        cout << LMSG << "tmp:" << (uint64_t)tmp << ",val:" << (uint64_t)val << endl;
-#endif
 
         for (size_t b = 0; b != bits; ++b)
         {
@@ -54,6 +58,7 @@ public:
             tmp <<= 1;
             ++cur_pos_;
         }
+#endif
 
         return 0;
     }
@@ -61,22 +66,29 @@ public:
     template<typename T>
     int WriteBytes(const size_t& bytes, const T& val)
     {
+#if 1
+        const uint8_t* p = (const uint8_t*)&val;
+
+        for (size_t i = 0; i != bytes; ++i)
+        {
+            buf_[cur_pos_/8 + i] = p[bytes-1-i];
+        }
+
+        cur_pos_ += bytes * 8;
+
+        return 0;
+#else
         return WriteBits<T>(bytes*8, val);
+#endif
     }
 
     int WriteData(const size_t& bytes, const uint8_t* data)
     {
-        for (size_t i = 0; i != bytes; ++i)
-        {
-            if (WriteBytes(1, data[i]) != 0)
-            {
-                return -1;
-            }
-        }
+        memcpy(buf_ + cur_pos_/8, data, bytes);
+        cur_pos_ += bytes * 8;
 
         return 0;
     }
-
 
     uint32_t SizeInBytes()
     {
@@ -89,7 +101,7 @@ public:
     }
 
 private:
-    uint8_t* buf_;
+    uint8_t buf_[1024];
     uint32_t bit_len_;
     uint32_t cur_pos_;
 };

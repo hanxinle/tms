@@ -16,8 +16,15 @@ public:
     BitBuffer(const string& data);
     BitBuffer(const uint8_t* data, const size_t& len);
 
-    bool MoreThanBytes(const size_t& bytes);
-    bool MoreThanBits(const size_t& bits);
+    inline bool MoreThanBytes(const size_t& bytes)
+    {
+        return MoreThanBits(bytes*8);
+    }
+
+    inline bool MoreThanBits(const size_t& bits)
+    {
+        return BitsLeft() >= bits;
+    }
 
     template<typename T>
     int GetBytes(const size_t& bytes, T& result)
@@ -41,7 +48,7 @@ public:
         return ret;
     }
 
-    int BitsLeft()
+    inline int BitsLeft()
     {
         if (bit_len_ >= cur_pos_)
         {
@@ -51,7 +58,7 @@ public:
         return 0;
     }
 
-    int BytesLeft()
+    inline int BytesLeft()
     {
         return BitsLeft()/8;
     }

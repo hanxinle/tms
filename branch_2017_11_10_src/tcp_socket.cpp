@@ -145,9 +145,8 @@ int TcpSocket::Send(const uint8_t* data, const size_t& len)
 
         if (ret > 0)
         {
-#ifdef DEBUG
-            cout << LMSG << "direct send " << ret << " bytes" << ",left:" << (len - ret) << " bytes" << endl;
-#endif
+            //VERBOSE << LMSG << "direct send " << ret << " bytes" << ",left:" << (len - ret) << " bytes" << endl;
+
             if (ret < len)
             {
                 write_buffer_.Write(data + ret, len - ret);

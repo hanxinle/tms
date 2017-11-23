@@ -5,3 +5,5 @@ tags*
 trs*
 *.swp
 rtmp_1936
+*.txt
+gmon.out

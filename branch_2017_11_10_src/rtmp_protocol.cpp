@@ -730,7 +730,7 @@ void RtmpProtocol::PacketTs(const Payload& payload)
         if (adaptation_field_control == 2 || adaptation_field_control == 3)
         {
             // adaption
-            uint64_t timestamp = (uint64_t)payload.GetDts() * 90;
+            uint64_t timestamp = payload.GetDts() * 90;
 
             if (is_video)
             {
@@ -804,8 +804,8 @@ void RtmpProtocol::PacketTs(const Payload& payload)
 
             ts_bs.WriteBytes(1, 0x80);
 
-            uint32_t pts = payload.GetPts() * 90;
-            uint32_t dts = payload.GetDts() * 90;
+            uint64_t pts = payload.GetPts() * 90;
+            uint64_t dts = payload.GetDts() * 90;
 
             if (is_video)
             {

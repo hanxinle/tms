@@ -4,20 +4,25 @@
 #include "common_define.h"
 #include "http_hls_protocol.h"
 #include "io_buffer.h"
+#include "local_stream_center.h"
 #include "rtmp_protocol.h"
-#include "stream_mgr.h"
+#include "server_mgr.h"
+#include "rtmp_mgr.h"
 #include "tcp_socket.h"
 #include "util.h"
 
 using namespace std;
 
-HttpHlsProtocol::HttpHlsProtocol(Epoller* epoller, Fd* socket, HttpHlsMgr* http_mgr, StreamMgr* stream_mgr)
+extern LocalStreamCenter g_local_stream_center;
+
+HttpHlsProtocol::HttpHlsProtocol(Epoller* epoller, Fd* socket, HttpHlsMgr* http_mgr, RtmpMgr* rtmp_mgr, ServerMgr* server_mgr)
     :
     epoller_(epoller),
     socket_(socket),
     http_mgr_(http_mgr),
-    stream_mgr_(stream_mgr),
-    rtmp_src_(NULL)
+    rtmp_mgr_(rtmp_mgr),
+    server_mgr_(server_mgr),
+    media_publisher_(NULL)
 {
 }
 
@@ -62,14 +67,13 @@ int HttpHlsProtocol::Parse(IoBuffer& io_buffer)
                     cout << LMSG << "app_:" << app_ << ",stream_name_:" << stream_name_ << ",ts_:" << ts_ << ",type_:" << type_ << endl;
                     if (! app_.empty() && ! stream_name_.empty())
                     {
-                        rtmp_src_ = stream_mgr_->GetRtmpProtocolByAppStream(app_, stream_name_);
+                        media_publisher_ = g_local_stream_center.GetMediaPublisherByAppStream(app_, stream_name_);
 
-                        if (rtmp_src_ != NULL)
+                        if (media_publisher_ != NULL)
                         {
-                            cout << LMSG << "rtmp_src_:" << rtmp_src_ << endl;
                             if (type_ == "ts")
                             {
-                                const string& ts = rtmp_src_->GetTs(Util::Str2Num<uint64_t>(ts_));
+                                const string& ts = media_publisher_->GetMediaMuxer().GetTs(Util::Str2Num<uint64_t>(ts_));
                                 
                                 if (! ts.empty())
                                 {
@@ -99,7 +103,7 @@ int HttpHlsProtocol::Parse(IoBuffer& io_buffer)
                             }
                             else if (type_ == "m3u8")
                             {
-                                string m3u8 = rtmp_src_->GetM3U8();
+                                string m3u8 = media_publisher_->GetMediaMuxer().GetM3U8();
                                 
                                 if (! m3u8.empty())
                                 {

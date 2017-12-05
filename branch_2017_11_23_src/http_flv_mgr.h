@@ -10,12 +10,13 @@ using std::map;
 class Epoller;
 class Fd;
 class HttpFlvProtocol;
-class StreamMgr;
+class ServerMgr;
+class RtmpMgr;
 
 class HttpFlvMgr : public SocketHandle
 {
 public:
-    HttpFlvMgr(Epoller* epoller, StreamMgr* stream_mgr);
+    HttpFlvMgr(Epoller* epoller, RtmpMgr* stream_mgr, ServerMgr* server_mgr);
     ~HttpFlvMgr();
 
     virtual int HandleRead(IoBuffer& io_buffer, Fd& socket);
@@ -29,7 +30,8 @@ private:
 private:
     Epoller* epoller_;
     map<int, HttpFlvProtocol*> fd_protocol_;
-    StreamMgr* stream_mgr_;
+    RtmpMgr* rtmp_mgr_;
+    ServerMgr* server_mgr_;
 };
 
 #endif // __HTTP_FLV_MGR_H__

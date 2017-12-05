@@ -1,5 +1,5 @@
-#ifndef __STREAM_MGR_H__
-#define __STREAM_MGR_H__
+#ifndef __RTMP_MGR_H__
+#define __RTMP_MGR_H__
 
 #include <map>
 #include <string>
@@ -13,12 +13,13 @@ using std::string;
 class Epoller;
 class Fd;
 class RtmpProtocol;
+class ServerMgr;
 
-class StreamMgr : public SocketHandle, public TimerSecondHandle
+class RtmpMgr : public SocketHandle, public TimerSecondHandle
 {
 public:
-    StreamMgr(Epoller* epoller);
-    ~StreamMgr();
+    RtmpMgr(Epoller* epoller, ServerMgr* server_mgr);
+    ~RtmpMgr();
 
     virtual int HandleRead(IoBuffer& io_buffer, Fd& socket);
     virtual int HandleClose(IoBuffer& io_buffer, Fd& socket);
@@ -29,15 +30,10 @@ public:
 
     RtmpProtocol* GetOrCreateProtocol(Fd& socket);
 
-    bool RegisterStream(const string& app, const string& stream_name, RtmpProtocol* rtmp_protocol);
-    RtmpProtocol* GetRtmpProtocolByAppStream(const string& app, const string& stream_name);
-    bool IsAppStreamExist(const string& app, const string& stream_name);
-
 private:
     Epoller* epoller_;
+    ServerMgr* server_mgr_;
     map<int, RtmpProtocol*> fd_protocol_;
-
-    map<string, map<string, RtmpProtocol*>> app_stream_protocol_;
 };
 
-#endif // __STREAM_MGR_H__
+#endif // __RTMP_MGR_H__

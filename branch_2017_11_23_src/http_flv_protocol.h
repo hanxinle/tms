@@ -9,9 +9,12 @@ class Epoller;
 class Fd;
 class IoBuffer;
 class HttpFlvMgr;
+class MediaPublisher;
 class Payload;
 class RtmpProtocol;
-class StreamMgr;
+class ServerProtocol;
+class ServerMgr;
+class RtmpMgr;
 class TcpSocket;
 
 using std::string;
@@ -19,12 +22,13 @@ using std::string;
 class HttpFlvProtocol
 {
 public:
-    HttpFlvProtocol(Epoller* epoller, Fd* socket, HttpFlvMgr* http_mgr, StreamMgr* stream_mgr);
+    HttpFlvProtocol(Epoller* epoller, Fd* socket, HttpFlvMgr* http_mgr, RtmpMgr* rtmp_mgr, ServerMgr* server_mgr);
     ~HttpFlvProtocol();
 
     int Parse(IoBuffer& io_buffer);
 
     int SendFlvHeader();
+    int SendMediaData(const Payload& payload);
 
     int SendFlvAudio(const Payload& payload);
     int SendFlvAudioHeader(const string& audio_header);
@@ -44,8 +48,9 @@ private:
     Epoller* epoller_;
     Fd* socket_;
     HttpFlvMgr* http_mgr_;
-    StreamMgr* stream_mgr_;
-    RtmpProtocol* rtmp_src_;
+    RtmpMgr* rtmp_mgr_;
+    ServerMgr* server_mgr_;
+    MediaPublisher* media_publisher_;
 
     string app_;
     string stream_name_;

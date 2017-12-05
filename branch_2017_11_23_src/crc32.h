@@ -22,8 +22,6 @@ public:
             }
 
             crc32_table[i] = k;
-
-            cout << LMSG << std::hex << k << std::dec << endl;
         }
     }
 

@@ -80,6 +80,34 @@ public:
     {
     }
 
+    uint32_t GetMask() const
+    {
+        uint32_t mask = 0;
+        if (IsAudio())
+        {
+            MaskAudio(mask);
+        }
+        else if (IsVideo())
+        {
+            MaskVideo(mask);
+        }
+
+        if (IsPFrame())
+        {
+            MaskPFrame(mask);
+        }
+        else if (IsIFrame())
+        {
+            MaskIFrame(mask);
+        }
+        else if (IsBFrame())
+        {
+            MaskBFrame(mask);
+        }
+
+        return mask;
+    }
+
     void SetIFrame() { frame_type_ = kIframe; }
     void SetBFrame() { frame_type_ = kBframe; }
     void SetPFrame() { frame_type_ = kPframe; }

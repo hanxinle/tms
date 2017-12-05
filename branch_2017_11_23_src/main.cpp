@@ -5,11 +5,13 @@
 #include "any.h"
 #include "bit_buffer.h"
 #include "bit_stream.h"
+#include "epoller.h"
 #include "http_flv_mgr.h"
 #include "http_hls_mgr.h"
+#include "local_stream_center.h"
 #include "ref_ptr.h"
-#include "stream_mgr.h"
-#include "epoller.h"
+#include "rtmp_mgr.h"
+#include "server_mgr.h"
 #include "socket_util.h"
 #include "tcp_socket.h"
 #include "timer_in_second.h"
@@ -26,8 +28,54 @@ static void sighandler(int sig_no)
 	exit(0);
 } 
 
+LocalStreamCenter g_local_stream_center;
+
 int main(int argc, char* argv[])
 {
+    map<string, string> args_map = Util::ParseArgs(argc, argv);
+
+    uint16_t rtmp_port = 1935;
+    uint16_t http_flv_port = 8787;
+    uint16_t http_hls_port = 8788;
+    uint16_t server_port = 10001;
+
+    auto iter_rtmp_port = args_map.find("rtmp_port");
+    auto iter_http_flv_port = args_map.find("http_flv_port");
+    auto iter_http_hls_port = args_map.find("http_hls_port");
+    auto iter_server_port = args_map.find("server_port");
+
+    if (iter_rtmp_port != args_map.end())
+    {
+        if (! iter_rtmp_port->second.empty())
+        {
+            rtmp_port = Util::Str2Num<uint16_t>(iter_rtmp_port->second);
+        }
+    }
+
+    if (iter_http_flv_port != args_map.end())
+    {
+        if (! iter_http_flv_port->second.empty())
+        {
+            http_flv_port = Util::Str2Num<uint16_t>(iter_http_flv_port->second);
+        }
+    }
+
+    if (iter_http_hls_port != args_map.end())
+    {
+        if (! iter_http_hls_port->second.empty())
+        {
+            http_hls_port = Util::Str2Num<uint16_t>(iter_http_hls_port->second);
+        }
+    }
+
+    if (iter_server_port != args_map.end())
+    {
+        if (! iter_server_port->second.empty())
+        {
+            server_port = Util::Str2Num<uint16_t>(iter_server_port->second);
+        }
+    }
+
 	signal(SIGUSR1, sighandler);
 
     Log::SetLogLevel(kLevelDebug);
@@ -108,50 +156,71 @@ int main(int argc, char* argv[])
 
     Epoller epoller;
 
+    // Init Server Stream Socket
+    int server_stream_fd = CreateNonBlockTcpSocket();
+
+    ReuseAddr(server_stream_fd);
+    Bind(server_stream_fd, "0.0.0.0", server_port);
+    Listen(server_stream_fd);
+    SetNonBlock(server_stream_fd);
+
+    ServerMgr server_mgr(&epoller);
+
+    TcpSocket server_stream_socket(&epoller, server_stream_fd, &server_mgr);
+    server_stream_socket.EnableRead();
+    server_stream_socket.AsServerSocket();
+    // ================================================================
+
+    // Init Server Rtmp Socket
     int server_rtmp_fd = CreateNonBlockTcpSocket();
 
     ReuseAddr(server_rtmp_fd);
-    Bind(server_rtmp_fd, "0.0.0.0", 1935);
+    Bind(server_rtmp_fd, "0.0.0.0", rtmp_port);
     Listen(server_rtmp_fd);
     SetNonBlock(server_rtmp_fd);
 
+    RtmpMgr rtmp_mgr(&epoller, &server_mgr);
+
+    TcpSocket server_rtmp_socket(&epoller, server_rtmp_fd, &rtmp_mgr);
+    server_rtmp_socket.EnableRead();
+    server_rtmp_socket.AsServerSocket();
+    // ================================================================
+
+    // Init Server Flv Socket
     int server_flv_fd = CreateNonBlockTcpSocket();
 
     ReuseAddr(server_flv_fd);
-    Bind(server_flv_fd, "0.0.0.0", 8787);
+    Bind(server_flv_fd, "0.0.0.0", http_flv_port);
     Listen(server_flv_fd);
     SetNonBlock(server_flv_fd);
 
-    int server_hls_fd = CreateNonBlockTcpSocket();
-
-    ReuseAddr(server_hls_fd);
-    Bind(server_hls_fd, "0.0.0.0", 8788);
-    Listen(server_hls_fd);
-    SetNonBlock(server_hls_fd);
-
-    StreamMgr stream_mgr(&epoller);
-
-    TcpSocket server_rtmp_socket(&epoller, server_rtmp_fd, &stream_mgr);
-    server_rtmp_socket.EnableRead();
-    server_rtmp_socket.AsServerSocket();
-
-    HttpFlvMgr http_flv_mgr(&epoller, &stream_mgr);
+    HttpFlvMgr http_flv_mgr(&epoller, &rtmp_mgr, &server_mgr);
 
     TcpSocket server_flv_socket(&epoller, server_flv_fd, &http_flv_mgr);
     server_flv_socket.EnableRead();
     server_flv_socket.AsServerSocket();
+    // ================================================================
 
-    HttpHlsMgr http_hls_mgr(&epoller, &stream_mgr);
+    // Init Server Hls Socket
+    int server_hls_fd = CreateNonBlockTcpSocket();
+
+    ReuseAddr(server_hls_fd);
+    Bind(server_hls_fd, "0.0.0.0", http_hls_port);
+    Listen(server_hls_fd);
+    SetNonBlock(server_hls_fd);
+
+    HttpHlsMgr http_hls_mgr(&epoller, &rtmp_mgr, &server_mgr);
 
     TcpSocket server_hls_socket(&epoller, server_hls_fd, &http_hls_mgr);
     server_hls_socket.EnableRead();
     server_hls_socket.AsServerSocket();
-
+    // ================================================================
 
     TimerInSecond timer_in_second(&epoller);
     TimerInMillSecond timer_in_millsecond(&epoller);
 
-    timer_in_second.AddTimerSecondHandle(&stream_mgr);
+    timer_in_second.AddTimerSecondHandle(&rtmp_mgr);
+    timer_in_second.AddTimerSecondHandle(&server_mgr);
 
     while (true)
     {

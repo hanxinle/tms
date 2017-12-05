@@ -80,7 +80,7 @@ int TcpSocket::OnRead()
                 }
                 else
                 {
-                    if (errno == EAGAIN || errno == EWOULDBLOCK)
+                    if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
                     {
                         break;
                     }

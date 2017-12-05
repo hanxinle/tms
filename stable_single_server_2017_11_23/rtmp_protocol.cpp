@@ -2259,6 +2259,7 @@ int RtmpProtocol::SendRtmpMessage(const uint32_t cs_id, const uint32_t& message_
     rtmp_message.timestamp_delta = 0;
     rtmp_message.message_length = len;
     rtmp_message.message_type_id = message_type_id;
+    rtmp_message.message_stream_id = message_stream_id;
 
     rtmp_message.msg = (uint8_t*)data;
     rtmp_message.len = len;
@@ -2277,10 +2278,11 @@ int RtmpProtocol::SendData(const RtmpMessage& cur_info, const Payload& payload)
     uint32_t& pre_message_length  = pre_info.message_length;
     uint8_t&  pre_message_type_id = pre_info.message_type_id;
 
-    uint32_t cur_timestamp       = cur_info.timestamp;
-    uint32_t cur_timestamp_delta = cur_info.timestamp_delta;
-    uint32_t cur_message_length  = cur_info.message_length;
-    uint8_t  cur_message_type_id = cur_info.message_type_id;
+    uint32_t cur_timestamp         = cur_info.timestamp;
+    uint32_t cur_timestamp_delta   = cur_info.timestamp_delta;
+    uint32_t cur_message_length    = cur_info.message_length;
+    uint32_t cur_message_stream_id = cur_info.message_length;
+    uint8_t  cur_message_type_id   = cur_info.message_type_id;
 
     int chunk_count = 1;
     if (cur_message_length > out_chunk_size_)
@@ -2348,7 +2350,7 @@ int RtmpProtocol::SendData(const RtmpMessage& cur_info, const Payload& payload)
                 header.WriteU24(cur_timestamp_delta);
                 header.WriteU24(cur_message_length);
                 header.WriteU8(cur_message_type_id);
-                header.WriteU32(0x10000000);
+                header.WriteU32(htobe32(cur_message_stream_id));
             }
             else if (fmt == 1)
             {

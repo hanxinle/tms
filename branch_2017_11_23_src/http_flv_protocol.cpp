@@ -4,20 +4,26 @@
 #include "common_define.h"
 #include "http_flv_protocol.h"
 #include "io_buffer.h"
+#include "local_stream_center.h"
 #include "ref_ptr.h"
 #include "rtmp_protocol.h"
-#include "stream_mgr.h"
+#include "server_protocol.h"
+#include "rtmp_mgr.h"
+#include "server_mgr.h"
 #include "tcp_socket.h"
 
 using namespace std;
 
-HttpFlvProtocol::HttpFlvProtocol(Epoller* epoller, Fd* socket, HttpFlvMgr* http_mgr, StreamMgr* stream_mgr)
+extern LocalStreamCenter g_local_stream_center;
+
+HttpFlvProtocol::HttpFlvProtocol(Epoller* epoller, Fd* socket, HttpFlvMgr* http_mgr, RtmpMgr* rtmp_mgr, ServerMgr* server_mgr)
     :
     epoller_(epoller),
     socket_(socket),
     http_mgr_(http_mgr),
-    stream_mgr_(stream_mgr),
-    rtmp_src_(NULL),
+    rtmp_mgr_(rtmp_mgr),
+    media_publisher_(NULL),
+    server_mgr_(server_mgr),
     pre_tag_size_(0)
 {
 }
@@ -71,14 +77,13 @@ int HttpFlvProtocol::Parse(IoBuffer& io_buffer)
                     cout << LMSG << "app_:" << app_ << ",stream_name_:" << stream_name_ << ",type_:" << type_ << endl;
                     if (! app_.empty() && ! stream_name_.empty())
                     {
-                        rtmp_src_ = stream_mgr_->GetRtmpProtocolByAppStream(app_, stream_name_);
+                        media_publisher_ = g_local_stream_center.GetMediaPublisherByAppStream(app_, stream_name_);
 
-                        if (rtmp_src_ != NULL)
+                        if (media_publisher_ != NULL)
                         {
-                            cout << LMSG << "rtmp_src_:" << rtmp_src_ << endl;
                             if (type_ == "flv")
                             {
-                                rtmp_src_->AddFlvPlayer(this);
+                                media_publisher_->AddFlvPlayer(this);
                             }
                         }
                         else
@@ -231,6 +236,20 @@ int HttpFlvProtocol::SendFlvMetaData(const string& metadata)
     pre_tag_size_ = data_size + 11;
 }
 
+int HttpFlvProtocol::SendMediaData(const Payload& payload)
+{
+    if (payload.IsAudio())
+    {
+        return SendFlvAudio(payload);
+    }
+    else if (payload.IsVideo())
+    {
+        return SendFlvVideo(payload);
+    }
+
+    return -1;
+}
+
 int HttpFlvProtocol::SendFlvVideo(const Payload& payload)
 {
     IoBuffer flv_tag;
@@ -354,8 +373,8 @@ int HttpFlvProtocol::SendFlvAudioHeader(const string& audio_header)
 
 int HttpFlvProtocol::OnStop()
 {
-    if (rtmp_src_ != NULL)
+    if (media_publisher_ != NULL)
     {
-        rtmp_src_->RemoveFlvPlayer(this);
+        media_publisher_->RemoveFlvPlayer(this);
     }
 }

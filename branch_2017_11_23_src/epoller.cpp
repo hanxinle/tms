@@ -169,7 +169,10 @@ int Epoller::WaitIoEvent(const uint32_t& timeout_ms)
     }
     else
     {
-        cout << "epoll_wait err:" << strerror(errno) << endl;
+        if (errno != EINTR)
+        {
+            cout << "epoll_wait err:" << strerror(errno) << endl;
+        }
     }
 
 #ifdef TRACE_MALLOC

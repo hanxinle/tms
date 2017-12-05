@@ -30,7 +30,7 @@ public:
 
         if(ptr_ != NULL)
         {
-            //cout << LMSG << "free " << (void*)ptr_ << endl;
+            cout << LMSG << "free " << (void*)ptr_ << endl;
             free(ptr_);
         }
     }

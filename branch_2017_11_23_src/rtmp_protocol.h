@@ -9,7 +9,9 @@
 #include <set>
 
 #include "crc32.h"
+#include "media_publisher.h"
 #include "ref_ptr.h"
+#include "server_protocol.h"
 #include "socket_util.h"
 #include "trace_tool.h"
 
@@ -23,7 +25,7 @@ class Epoller;
 class Fd;
 class HttpFlvProtocol;
 class IoBuffer;
-class StreamMgr;
+class RtmpMgr;
 class TcpSocket;
 
 enum HandShakeStatus
@@ -112,24 +114,10 @@ struct RtmpMessage
     uint32_t len;
 };
 
-struct TsMedia
-{
-    TsMedia()
-        :
-        duration(0),
-        first_dts(0)
-    {
-    }
-
-    double duration;
-    double first_dts;
-    string ts_data;
-};
-
-class RtmpProtocol
+class RtmpProtocol : public MediaPublisher
 {
 public:
-    RtmpProtocol(Epoller* epoller, Fd* socket, StreamMgr* stream_mgr);
+    RtmpProtocol(Epoller* epoller, Fd* socket, RtmpMgr* rtmp_mgr, ServerMgr* server_mgr);
     ~RtmpProtocol();
 
     bool IsServerRole()
@@ -167,9 +155,9 @@ public:
         role_ = role;
     }
 
-    void SetRtmpSrc(RtmpProtocol* src)
+    void SetMediaPublisher(MediaPublisher* media_publisher)
     {
-        rtmp_src_ = src;
+        media_publisher_ = media_publisher;
     }
 
     int Parse(IoBuffer& io_buffer);
@@ -203,7 +191,8 @@ public:
         stream_name_ = name;
     }
 
-    int ConnectForwardServer(const string& ip, const uint16_t& port);
+    int ConnectForwardRtmpServer(const string& ip, const uint16_t& port);
+    int ConnectFollowServer(const string& ip, const uint16_t& port);
 
     static int ParseRtmpUrl(const string& url, RtmpUrl& rtmp_url);
 
@@ -217,147 +206,8 @@ public:
         return can_publish_;
     }
 
-    bool RemoveForward(RtmpProtocol* protocol)
-    {
-        if (rtmp_forwards_.find(protocol) == rtmp_forwards_.end())
-        {
-            return false;
-        }
-
-        rtmp_forwards_.erase(protocol);
-
-        return true;
-    }
-
-    bool AddRtmpPlayer(RtmpProtocol* protocol)
-    {
-        if (rtmp_player_.count(protocol))
-        {
-            return false;
-        }
-
-        rtmp_player_.insert(protocol);
-
-        OnNewRtmpPlayer(protocol);
-
-        return true;
-    }
-
-    bool AddFlvPlayer(HttpFlvProtocol* protocol)
-    {
-        if (flv_player_.count(protocol))
-        {
-            return false;
-        }
-
-        flv_player_.insert(protocol);
-
-        OnNewFlvPlayer(protocol);
-        
-        return true;
-    }
-
-    bool RemoveRtmpPlayer(RtmpProtocol* protocol)
-    {
-        if (rtmp_player_.count(protocol) == 0)
-        {
-            return false;
-        }
-
-        rtmp_player_.erase(protocol);
-
-        return true;
-    }
-
-    bool RemoveFlvPlayer(HttpFlvProtocol* protocol)
-    {
-        if (flv_player_.count(protocol) == 0)
-        {
-            return false;
-        }
-
-        flv_player_.erase(protocol);
-
-        return true;
-    }
-
-    string GetM3U8()
-    {
-        return m3u8_;
-    }
-
-    const string& GetTs(const uint64_t& ts) const
-    {
-        auto iter = ts_queue_.find(ts);
-
-        if (iter == ts_queue_.end())
-        {
-            return invalid_ts_;
-        }
-
-        return iter->second.ts_data;
-    }
-
-    void UpdateM3U8();
-    void PacketTs(const Payload& payload);
-    string& PacketTsPmt();
-    string& PacketTsPat();
-
-    uint16_t GetAudioContinuityCounter()
-    {
-        uint16_t ret = audio_continuity_counter_;
-
-        ++audio_continuity_counter_;
-
-        if (audio_continuity_counter_ == 0x10)
-        {
-            audio_continuity_counter_ = 0x00;
-        }
-
-        return ret;
-    }
-
-    uint16_t GetVideoContinuityCounter()
-    {
-        uint16_t ret = video_continuity_counter_;
-
-        ++video_continuity_counter_;
-
-        if (video_continuity_counter_ == 0x10)
-        {
-            video_continuity_counter_ = 0x00;
-        }
-
-        return ret;
-    }
-
-    uint16_t GetPatContinuityCounter()
-    {
-        uint16_t ret = pat_continuity_counter_;
-
-        ++pat_continuity_counter_;
-
-        if (pat_continuity_counter_ == 0x10)
-        {
-            pat_continuity_counter_ = 0x00;
-        }
-
-        return ret;
-    }
-
-    uint16_t GetPmtContinuityCounter()
-    {
-        uint16_t ret = pmt_continuity_counter_;
-
-        ++pmt_continuity_counter_;
-
-        if (pmt_continuity_counter_ == 0x10)
-        {
-            pmt_continuity_counter_ = 0x00;
-        }
-
-        return ret;
-    }
+    int SendRtmpMessage(const uint32_t cs_id, const uint32_t& message_stream_id, const uint8_t& message_type_id, const uint8_t* data, const size_t& len);
+    int SendMediaData(const Payload& media);
 
 private:
     double GetTransactionId()
@@ -378,7 +228,6 @@ private:
         return os.str();
     }
 
-private:
     int OnConnectCommand(AmfCommand& amf_command);
     int OnCreateStreamCommand(RtmpMessage& rtmp_msg, AmfCommand& amf_command);
     int OnPlayCommand(RtmpMessage& rtmp_msg, AmfCommand& amf_command);
@@ -393,21 +242,19 @@ private:
     int OnUserControlMessage(RtmpMessage& rtmp_msg);
     int OnVideo(RtmpMessage& rtmp_msg);
     int OnWindowAcknowledgementSize(RtmpMessage& rtmp_msg);
+    int OnSetPeerBandwidth(RtmpMessage& rtmp_msg);
     int OnMetaData(RtmpMessage& rtmp_msg);
 
-    int ParseAvcHeader(RtmpMessage& rtmp_msg);
+    int OnVideoHeader(RtmpMessage& rtmp_msg);
 
     int OnRtmpMessage(RtmpMessage& rtmp_msg);
-    int OnNewRtmpPlayer(RtmpProtocol* protocol);
-    int OnNewFlvPlayer(HttpFlvProtocol* protocol);
-    int SendRtmpMessage(const uint32_t cs_id, const uint32_t& message_stream_id, const uint8_t& message_type_id, const uint8_t* data, const size_t& len);
-    int SendMediaData(const Payload& media);
     int SendData(const RtmpMessage& cur_info, const Payload& paylod = Payload());
 
 private:
     Epoller* epoller_;
     Fd* socket_;
-    StreamMgr* stream_mgr_;
+    RtmpMgr* rtmp_mgr_;
+    ServerMgr* server_mgr_;
     HandShakeStatus handshake_status_;
 
     int role_;
@@ -424,43 +271,7 @@ private:
 
     double transaction_id_;
 
-    map<uint64_t, Payload> video_queue_;
-    map<uint64_t, Payload> audio_queue_;
-
-    map<uint64_t, TsMedia> ts_queue_;
-
-    uint32_t video_fps_;
-    uint32_t audio_fps_;
-
-    uint64_t video_frame_recv_;
-    uint64_t audio_frame_recv_;
-
-    uint64_t video_key_frame_count_;
-
-    uint64_t last_key_video_frame_;
-    uint64_t last_key_audio_frame_;
-
-    uint64_t last_calc_fps_ms_;
-    uint64_t last_calc_video_frame_;
-    uint64_t last_calc_audio_frame_;
-
-    set<RtmpProtocol*> rtmp_forwards_;
-    set<RtmpProtocol*> rtmp_player_;
-    set<HttpFlvProtocol*> flv_player_;
-    
-    RtmpProtocol* rtmp_src_;
-
-    string metadata_;
-    string aac_header_;
-    string avc_header_;
-
-    uint8_t adts_header_[7];
-
-    string vps_;
-    string sps_;
-    string pps_;
-
-    string invalid_ts_;
+    MediaPublisher* media_publisher_;
 
     string last_send_command_;
 
@@ -470,6 +281,7 @@ private:
 
     uint64_t video_frame_send_;
     uint64_t audio_frame_send_;
+
     uint32_t last_video_timestamp_;
     uint32_t last_video_timestamp_delta_;
     uint32_t last_audio_timestamp_;
@@ -477,23 +289,6 @@ private:
     uint32_t last_video_message_length_;
     uint32_t last_audio_message_length_;
     uint8_t last_message_type_id_;
-
-    string m3u8_;
-    string ts_pat_;
-    string ts_pmt_;
-
-    uint64_t ts_seq_;
-    uint8_t ts_couter_;
-    uint32_t video_pid_;
-    uint32_t audio_pid_;
-    uint32_t pmt_pid_;
-
-    uint8_t pat_continuity_counter_;
-    uint8_t pmt_continuity_counter_;
-    uint8_t audio_continuity_counter_;
-    uint8_t video_continuity_counter_;
-
-    CRC32 crc_32_;
 };
 
 #endif // __RTMP_PROTOCOL_H__

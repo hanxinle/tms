@@ -4,6 +4,7 @@
 #define CRLF "\r\n"
 
 #include "log.h"
+#include "util.h"
 
 enum RetCode
 {
@@ -50,14 +51,57 @@ enum LogLevel
     kLevelFatal   = 6,
 };
 
-#define  LMSG  "["<<__FILE__<<"]#"<<__func__<<":"<<__LINE__<<" "
+enum ServerProtocolDefine
+{
+    kServerProtocolHeaderSize = 4,
+};
+
+enum ProtocolId
+{
+    kMedia = 1,
+    kSetApp = 2,
+    kSetStreamName = 3,
+};
+
+// mask
+const uint32_t kPayloadTypeMask = 0xC0000000;
+
+const uint32_t kFrameTypeMask = 0x38000000;
+
+// type
+const uint32_t kVideoTypeValue = 0x40000000;
+const uint32_t kAudioTypeValue = 0x80000000;
+const uint32_t kMetaTypeValue = 0xC0000000;
+
+const uint32_t kIFrameTypeValue = 0x08000000;
+const uint32_t kPFrameTypeValue = 0x10000000;
+const uint32_t kBFrameTypeValue = 0x18000000;
+const uint32_t kHeaderFrameTypeValue = 0x20000000;
+
+#define MaskVideo(Mask) Mask|=kVideoTypeValue
+#define MaskAudio(Mask) Mask|=kAudioTypeValue
+#define MaskMeta(Mask) Mask|=kMetaTypeValue
+#define MaskIFrame(Mask)    Mask|=kIFrameTypeValue
+#define MaskPFrame(Mask)    Mask|=kPFrameTypeValue
+#define MaskBFrame(Mask)    Mask|=kBFrameTypeValue
+#define MaskHeaderFrame(Mask) Mask |= kHeaderFrameTypeValue
+
+inline bool IsVideo(const uint32_t& mask)  { return (mask & kPayloadTypeMask) == kVideoTypeValue; }
+inline bool IsAudio(const uint32_t& mask)  { return (mask & kPayloadTypeMask) == kAudioTypeValue; }
+inline bool IsMetaData(const uint32_t& mask)  { return (mask & kPayloadTypeMask) == kMetaTypeValue; }
+inline bool IsIFrame(const uint32_t& mask) { return (mask & kFrameTypeMask)   == kIFrameTypeValue; }
+inline bool IsBFrame(const uint32_t& mask) { return (mask & kFrameTypeMask)   == kBFrameTypeValue; }
+inline bool IsPFrame(const uint32_t& mask) { return (mask & kFrameTypeMask)   == kPFrameTypeValue; }
+inline bool IsHeaderFrame(const uint32_t& mask) { return (mask & kFrameTypeMask)   == kHeaderFrameTypeValue; }
+
+#define  LMSG  Util::GetNowMsStr()<<" ["<<__FILE__<<"]#"<<__func__<<":"<<__LINE__<<" "
 #define  TRACE "============================================================"
 
 //#define VERBOSE Log(kLevelVerbose)
 //#define DEBUG Log(kLevelDebug)
 
-#define VERBOSE cout
-#define DEBUG cout
+#define VERBOSE cout<<LMSG
+#define DEBUG cout<<LMSG
 
 
 #endif // __COMMON_DEFINE_H__

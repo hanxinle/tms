@@ -9,8 +9,11 @@ class Epoller;
 class Fd;
 class IoBuffer;
 class HttpHlsMgr;
+class MediaPublisher;
 class RtmpProtocol;
-class StreamMgr;
+class ServerProtocol;
+class ServerMgr;
+class RtmpMgr;
 class TcpSocket;
 
 using std::string;
@@ -18,7 +21,7 @@ using std::string;
 class HttpHlsProtocol
 {
 public:
-    HttpHlsProtocol(Epoller* epoller, Fd* socket, HttpHlsMgr* http_mgr, StreamMgr* stream_mgr);
+    HttpHlsProtocol(Epoller* epoller, Fd* socket, HttpHlsMgr* http_mgr, RtmpMgr* rtmp_mgr, ServerMgr* server_mgr);
     ~HttpHlsProtocol();
 
     int Parse(IoBuffer& io_buffer);
@@ -35,8 +38,9 @@ private:
     Epoller* epoller_;
     Fd* socket_;
     HttpHlsMgr* http_mgr_;
-    StreamMgr* stream_mgr_;
-    RtmpProtocol* rtmp_src_;
+    RtmpMgr* rtmp_mgr_;
+    ServerMgr* server_mgr_;
+    MediaPublisher* media_publisher_;
 
     string app_;
     string stream_name_;

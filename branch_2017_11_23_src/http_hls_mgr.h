@@ -10,12 +10,13 @@ using std::map;
 class Epoller;
 class Fd;
 class HttpHlsProtocol;
-class StreamMgr;
+class ServerMgr;
+class RtmpMgr;
 
 class HttpHlsMgr : public SocketHandle
 {
 public:
-    HttpHlsMgr(Epoller* epoller, StreamMgr* stream_mgr);
+    HttpHlsMgr(Epoller* epoller, RtmpMgr* stream_mgr, ServerMgr* server_mgr);
     ~HttpHlsMgr();
 
     virtual int HandleRead(IoBuffer& io_buffer, Fd& socket);
@@ -29,7 +30,8 @@ private:
 private:
     Epoller* epoller_;
     map<int, HttpHlsProtocol*> fd_protocol_;
-    StreamMgr* stream_mgr_;
+    RtmpMgr* rtmp_mgr_;
+    ServerMgr* server_mgr_;
 };
 
 #endif // __HTTP_HLS_MGR_H__

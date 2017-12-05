@@ -1497,7 +1497,7 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
                     if (video_queue_.empty())
                     {   
                         // 转推到其他rtmp服务器
-                        //ConnectForwardServer(CDN, CDN_PORT);
+                        ConnectForwardServer(CDN, CDN_PORT);
                     }
                 }
             }

@@ -41,6 +41,11 @@ public:
     int ReadU64(uint64_t& u64);
 
     int Peek(uint8_t*& data, const size_t& begin_pos, const size_t& len);
+    int PeekU8(uint8_t& u8);
+    int PeekU16(uint16_t& u16);
+    int PeekU32(uint32_t& u32);
+    int PeekU64(uint64_t& u64);
+
     int Skip(const size_t& len);
 
     bool Empty()

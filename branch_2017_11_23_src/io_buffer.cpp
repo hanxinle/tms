@@ -61,7 +61,7 @@ int IoBuffer::ReadFromFdAndWrite(const int& fd)
     }
     else
     {
-        if (errno != EAGAIN && errno != EWOULDBLOCK)
+        if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
         {
             cout << LMSG << "read err:" << strerror(errno) << endl;
         }
@@ -78,8 +78,6 @@ int IoBuffer::WriteToFd(const int& fd)
     }
 
     int ret = write(fd, start_, Size());
-
-    cout << LMSG << "write " << ret << " bytes" << endl;
 
     if (ret > 0)
     {
@@ -328,6 +326,88 @@ int IoBuffer::Peek(uint8_t*& data, const size_t& begin_pos, const size_t& len)
     data = start_ + begin_pos;
 
     return len;
+}
+
+int IoBuffer::PeekU8(uint8_t& u8)
+{
+    if (Size() < sizeof(uint8_t))
+    {
+        return -1;
+    }
+
+    const uint8_t* tmp = start_;
+
+    u8 = 0;
+    u8 = *tmp++;
+
+    return sizeof(uint8_t);
+}
+
+int IoBuffer::PeekU16(uint16_t& u16)
+{
+    if (Size() < sizeof(uint16_t))
+    {
+        return -1;
+    }
+
+    const uint8_t* tmp = start_;
+
+    u16 = 0;
+    u16 |= *tmp++;
+    u16 <<= 8;
+    u16 |= *tmp++;
+
+    return sizeof(uint16_t);
+}
+
+int IoBuffer::PeekU32(uint32_t& u32)
+{
+    if (Size() < sizeof(uint32_t))
+    {
+        return -1;
+    }
+
+    const uint8_t* tmp = start_;
+
+    u32 = 0;
+    u32 |= *tmp++;
+    u32 <<= 8;
+    u32 |= *tmp++;
+    u32 <<= 8;
+    u32 |= *tmp++;
+    u32 <<= 8;
+    u32 |= *tmp++;
+
+    return sizeof(uint32_t);
+}
+
+int IoBuffer::PeekU64(uint64_t& u64)
+{
+    if (Size() < sizeof(uint64_t))
+    {
+        return -1;
+    }
+
+    const uint8_t* tmp = start_;
+
+    u64 = 0;
+    u64 |= *tmp++;
+    u64 <<= 8;
+    u64 |= *tmp++;
+    u64 <<= 8;
+    u64 |= *tmp++;
+    u64 <<= 8;
+    u64 |= *tmp++;
+    u64 <<= 8;
+    u64 |= *tmp++;
+    u64 <<= 8;
+    u64 |= *tmp++;
+    u64 <<= 8;
+    u64 |= *tmp++;
+    u64 <<= 8;
+    u64 |= *tmp++;
+
+    return sizeof(uint64_t);
 }
 
 int IoBuffer::Skip(const size_t& len)

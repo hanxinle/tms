@@ -27,6 +27,14 @@ class RtmpProtocol;
 class ServerMgr;
 class TcpSocket;
 
+enum kServerRole
+{
+    kUnknownServerRole = -1,
+    kServerPush = 0,
+    // FIXME: add namespace
+    kPushServer_ = 1,
+};
+
 class ServerProtocol : public MediaPublisher
 {
 public:
@@ -59,16 +67,28 @@ public:
     void SetApp(const string& app)
     {
         app_ = app;
+        media_muxer_.SetApp(app);
     }
 
     void SetStreamName(const string& stream_name)
     {
         stream_name_ = stream_name;
+        media_muxer_.SetStreamName(stream_name);
     }
 
     void SetMediaPublisher(MediaPublisher* media_publisher)
     {
         media_publisher_ = media_publisher;
+    }
+
+    void SetServerPush()
+    {
+        role_ = kServerPush;
+    }
+
+    void SetPushServer()
+    {
+        role_ = kPushServer_;
     }
 
 private:
@@ -83,6 +103,8 @@ private:
 
     string app_;
     string stream_name_;
+
+    int role_;
 };
 
 #endif // __SERVER_PROTOCOL_H__

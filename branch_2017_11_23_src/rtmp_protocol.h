@@ -56,7 +56,7 @@ enum RtmpRole
 {
     // other_server --> me --> client
 
-    kUnknownRole = -1,
+    kUnknownRtmpRole = -1,
     kClientPush  = 0,
     kPushServer  = 1,
     kPullServer  = 2,
@@ -184,11 +184,13 @@ public:
     void SetApp(const string& app)
     {
         app_ = app;
+        media_muxer_.SetApp(app_);
     }
 
-    void SetStreamName(const string& name)
+    void SetStreamName(const string& stream_name)
     {
-        stream_name_ = name;
+        stream_name_ = stream_name;
+        media_muxer_.SetStreamName(stream_name_);
     }
 
     int ConnectForwardRtmpServer(const string& ip, const uint16_t& port);

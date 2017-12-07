@@ -139,6 +139,7 @@ void MediaMuxer::PacketTs(const Payload& payload)
         uint8_t adaptation_field_control = 1; // 1:无自适应区 2.只有自适应区 3.同时有负载和自适应区
         uint8_t adaption_stuffing_bytes = 0;
         uint8_t payload_unit_start_indicator = 0; // 帧首包标识
+        uint8_t extern_data_len = 0;
 
         if (i == 0)
         {
@@ -149,23 +150,28 @@ void MediaMuxer::PacketTs(const Payload& payload)
             {
                 header_size += adaptation_size;
                 adaptation_field_control = 3;
+                extern_data_len = 6; // 添加的nalu分隔符/*00 00 00 01 09 BC*/
             }
             else
             {
                 adaptation_field_control = 1;
+                extern_data_len = 7; // ADTS
             }
 
             //　音频负载通常小于188,这里要做下处理
-            if (payload.GetRawLen() + ts_header_size + adaptation_size + pes_header_size < 188)
+            if (payload.GetRawLen() + ts_header_size + adaptation_size + pes_header_size + extern_data_len < 188)
             {
                 if (is_video)
                 {
-                    adaption_stuffing_bytes = 188 - (payload.GetRawLen() + ts_header_size + adaptation_size + pes_header_size + 6/*00 00 00 01 09 BC*/);
+                    adaption_stuffing_bytes = 188 - (payload.GetRawLen() + ts_header_size + adaptation_size + pes_header_size + extern_data_len/*00 00 00 01 09 BC*/);
                 }
                 else
                 {
-                    adaption_stuffing_bytes = 188 - (payload.GetRawLen() + ts_header_size + adaptation_size + pes_header_size);
+                    adaption_stuffing_bytes = 188 - (payload.GetRawLen() + ts_header_size + adaptation_size + pes_header_size + extern_data_len);
                 }
+
+                cout << LMSG << "payload size:" << payload.GetRawLen() << ", ts_header_size:" << (int)ts_header_size << ", adaptation_size:" << (int)adaptation_size
+                             << ",pes_header_size:" << (int)pes_header_size << ",extern_data_len:" << (int)extern_data_len << endl;
 
                 if (! is_video)
                 {
@@ -435,8 +441,11 @@ void MediaMuxer::PacketTs(const Payload& payload)
 
         int bytes_left = 188 - ts_bs.SizeInBytes();
 
+        assert(bytes_left > 0);
+
         ts_bs.WriteData(bytes_left, data);
 
+        assert(ts_bs.SizeInBytes() == 188);
         ts_queue_[ts_seq_].ts_data.append((const char*)ts_bs.GetData(), ts_bs.SizeInBytes());
 
         data += bytes_left;
@@ -446,9 +455,9 @@ void MediaMuxer::PacketTs(const Payload& payload)
 
 string& MediaMuxer::PacketTsPat()
 {
-    if (! ts_pat_.empty())
+    if (ts_pat_.size() >= 4)
     {
-        ts_pat_[3] = 0x10 | GetPatContinuityCounter();
+        ts_pat_[3] = (char)(0x10 | GetPatContinuityCounter());
         return ts_pat_;
     }
 
@@ -501,9 +510,9 @@ string& MediaMuxer::PacketTsPat()
 
 string& MediaMuxer::PacketTsPmt()
 {
-    if (! ts_pmt_.empty())
+    if (ts_pmt_.size() >= 4)
     {
-        ts_pmt_[3] = 0x10 | GetPmtContinuityCounter();
+        ts_pmt_[3] = (char)(0x10 | GetPmtContinuityCounter());
         return ts_pmt_;
     }
 
@@ -800,7 +809,8 @@ int MediaMuxer::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval
     {
         double duration = (now_in_ms - pre_calc_fps_ms_) / 1000.0;
 
-        cout << LMSG << "[STAT] stream:" << stream_name_ 
+        cout << LMSG << "[STAT] app:" << app_ 
+                     << ",stream:" << stream_name_ 
                      << ",video_fps:" << (video_calc_fps_ / duration)
                      << ",audio_fps:" << (audio_calc_fps_ / duration)
                      << ",interval:" << interval 

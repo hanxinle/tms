@@ -209,7 +209,7 @@ int Amf0::DecodeObject(BitBuffer& bit_buffer, Any*& result)
 
     bool error = false;
 
-    result = new Map();
+    result = new Map(true);
 
     while (bit_buffer.GetBytes(2, key_len) == 0)
     {
@@ -280,7 +280,7 @@ int Amf0::DecodeEcmaArray(BitBuffer& bit_buffer, Any*& result)
 
     cout << LMSG << "element_count:" << element_count << endl;
 
-    result = new Map();
+    result = new Map(true);
 
     for (uint32_t c = 0; c != element_count; ++c)
     {

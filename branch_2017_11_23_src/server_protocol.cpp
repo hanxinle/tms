@@ -13,7 +13,8 @@ ServerProtocol::ServerProtocol(Epoller* epoller, Fd* socket, ServerMgr* server_m
     epoller_(epoller),
     socket_(socket),
     server_mgr_(server_mgr),
-    media_publisher_(NULL)
+    media_publisher_(NULL),
+    role_(kUnknownServerRole)
 {
 }
 
@@ -160,7 +161,9 @@ int ServerProtocol::Parse(IoBuffer& io_buffer)
         size_t str_len = (size_t)len;
         io_buffer.Read(data, str_len);
 
-        app_.assign((const char*)data, str_len);
+        string app((const char*)data, str_len);
+
+        SetApp(app);
 
         cout << LMSG << "str_len:" << str_len << ",app:" << app_ << Util::Bin2Hex(app_) << endl;
     }
@@ -174,7 +177,11 @@ int ServerProtocol::Parse(IoBuffer& io_buffer)
         size_t str_len = (size_t)len;
         io_buffer.Read(data, str_len);
 
-        stream_name_.assign((const char*)data, str_len);
+        string stream_name((const char*)data, str_len);
+
+        SetStreamName(stream_name);
+
+        SetServerPush();
 
         cout << LMSG << "stream_name:" << stream_name_ << endl;
 
@@ -191,7 +198,10 @@ int ServerProtocol::OnStop()
 {
     cout << LMSG << endl;
 
-    g_local_stream_center.UnRegisterStream(app_, stream_name_, this);
+    if (role_ == kServerPush)
+    {
+        g_local_stream_center.UnRegisterStream(app_, stream_name_, this);
+    }
 }
 
 int ServerProtocol::OnConnected()

@@ -38,11 +38,13 @@ int main(int argc, char* argv[])
     uint16_t http_flv_port = 8787;
     uint16_t http_hls_port = 8788;
     uint16_t server_port = 10001;
+    bool daemon = false;
 
     auto iter_rtmp_port = args_map.find("rtmp_port");
     auto iter_http_flv_port = args_map.find("http_flv_port");
     auto iter_http_hls_port = args_map.find("http_hls_port");
     auto iter_server_port = args_map.find("server_port");
+    auto iter_daemon = args_map.find("daemon");
 
     if (iter_rtmp_port != args_map.end())
     {
@@ -74,6 +76,18 @@ int main(int argc, char* argv[])
         {
             server_port = Util::Str2Num<uint16_t>(iter_server_port->second);
         }
+    }
+
+    if (iter_daemon != args_map.end())
+    {
+        int tmp = Util::Str2Num<int>(iter_daemon->second);
+
+        daemon = (! (tmp == 0));
+    }
+
+    if (daemon)
+    {
+        Util::Daemon();
     }
 
 	signal(SIGUSR1, sighandler);

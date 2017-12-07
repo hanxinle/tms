@@ -181,11 +181,23 @@ class Vector : public Any
 {
     friend class Any;
 public:
-    Vector(const vector<Any*>& v)
+    Vector(const vector<Any*>& v, const bool& delete_when_destruct = false)
         :
         Any(kVector),
-        val_(v)
+        val_(v),
+        delete_when_destruct_(delete_when_destruct)
     {
+    }
+
+    ~Vector()
+    {
+        if (delete_when_destruct_)
+        {
+            for (auto& any : val_)
+            {
+                delete any;
+            }
+        }
     }
 
     Any* operator[](const size_t& index)
@@ -205,23 +217,37 @@ public:
 
 private:
     vector<Any*> val_;
+    bool delete_when_destruct_;
 };
 
 class Map : public Any
 {
     friend class Any;
 public:
-    Map(const map<string, Any*>& m)
+    Map(const map<string, Any*>& m, const bool& delete_when_destruct = false)
         :
         Any(kMap),
-        val_(m)
+        val_(m),
+        delete_when_destruct_(delete_when_destruct)
     {
     }
 
-    Map()
+    Map(const bool& delete_when_destruct = false)
         :
-        Any(kMap)
+        Any(kMap),
+        delete_when_destruct_(delete_when_destruct)
     {
+    }
+
+    ~Map()
+    {
+        if (delete_when_destruct_)
+        {
+            for (auto& kv : val_)
+            {
+                delete kv.second;
+            }
+        }
     }
 
     Any* operator[](const string& key)
@@ -246,6 +272,7 @@ public:
 
 private:
     map<string, Any*> val_;
+    bool delete_when_destruct_;
 };
 
 class Null : public Any

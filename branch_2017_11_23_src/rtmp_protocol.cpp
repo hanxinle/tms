@@ -50,7 +50,7 @@ RtmpProtocol::RtmpProtocol(Epoller* epoller, Fd* fd, RtmpMgr* rtmp_mgr, ServerMg
     rtmp_mgr_(rtmp_mgr),
     server_mgr_(server_mgr),
     handshake_status_(kStatus_0),
-    role_(kUnknownRole),
+    role_(kUnknownRtmpRole),
     in_chunk_size_(128),
     out_chunk_size_(128),
     transaction_id_(0.0),
@@ -568,7 +568,6 @@ int RtmpProtocol::OnUserControlMessage(RtmpMessage& rtmp_msg)
     uint32_t data = 0;
     bit_buffer.GetBytes(4, data);
 
-
     cout << LMSG << "user control message, event:" << event << ",data:" << data << endl;
 
     return kSuccess;
@@ -926,14 +925,16 @@ int RtmpProtocol::OnConnectCommand(AmfCommand& amf_command)
             {
                 if (kv.first == "app")
                 {
-                    if (kv.second->GetString(app_))
+                    string app;
+                    if (kv.second->GetString(app))
                     {
-                        auto pos = app_.find("/");
+                        auto pos = app.find("/");
                         if (pos != string::npos)
                         {
-                            app_ = app_.substr(0, pos);
+                            app = app.substr(0, pos);
                         }
-                        cout << LMSG << "app = " << app_ << endl;
+                        cout << LMSG << "app = " << app << endl;
+                        SetApp(app);
                     }
                 }
 
@@ -951,12 +952,17 @@ int RtmpProtocol::OnConnectCommand(AmfCommand& amf_command)
 
                             if (i == 3 && pos != string::npos)
                             {
-                                stream_name_ = tc_url_.substr(pos + 1);
-                                cout << LMSG << "stream_name_:" << stream_name_ << endl;
-                                if (g_local_stream_center.RegisterStream(app_, stream_name_, this) == false)
+                                string stream_name = tc_url_.substr(pos + 1);
+                                cout << LMSG << "stream_name:" << stream_name << endl;
+                                SetStreamName(stream_name);
+
+                                if (role_ == kClientPush || role_ == kPullServer)
                                 {
-                                    cout << LMSG << "error" << endl;
-                                    return kError;
+                                    if (g_local_stream_center.RegisterStream(app_, stream_name_, this) == false)
+                                    {
+                                        cout << LMSG << "error" << endl;
+                                        return kError;
+                                    }
                                 }
                             }
 
@@ -1078,15 +1084,25 @@ int RtmpProtocol::OnPublishCommand(RtmpMessage& rtmp_msg, AmfCommand& amf_comman
 
         if (stream_name_.empty())
         {
-            if (amf_command[3]->GetString(stream_name_))
+            string stream_name;
+            if (amf_command[3]->GetString(stream_name))
             {
-                cout << LMSG << "stream_name:" << stream_name_ << endl;
+                cout << LMSG << "stream_name:" << stream_name << endl;
+
+                SetStreamName(stream_name);
 
                 if (g_local_stream_center.RegisterStream(app_, stream_name_, this) == false)
                 {
                     cout << LMSG << "error" << endl;
                     return kError;
                 }
+            }
+        }
+        else
+        {
+            if (g_local_stream_center.RegisterStream(app_, stream_name_, this) == false)
+            {
+                cout << LMSG << "app:" << app_ << ",stream:" << stream_name_ << " already register" << endl;
             }
         }
 
@@ -1951,6 +1967,8 @@ int RtmpProtocol::ConnectFollowServer(const string& ip, const uint16_t& port)
     Fd* socket = new TcpSocket(epoller_, fd, (SocketHandle*)server_mgr_);
 
     ServerProtocol* server_dst = server_mgr_->GetOrCreateProtocol(*socket);
+
+    server_dst->SetPushServer();
 
     server_dst->SetMediaPublisher(this);
     server_dst->SetApp(app_);

@@ -159,6 +159,7 @@ public:
 
             if (referenct_count == 0)
             {
+                //cout << LMSG << "len:" << len_ << ",ref_ptr_:" << ref_ptr_ << endl;
                 delete ref_ptr_;
             }
         }

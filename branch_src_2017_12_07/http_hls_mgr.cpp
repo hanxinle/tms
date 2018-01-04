@@ -53,7 +53,7 @@ HttpHlsProtocol* HttpHlsMgr::GetOrCreateProtocol(Fd& socket)
     int fd = socket.GetFd();
     if (fd_protocol_.count(fd) == 0)
     {   
-        fd_protocol_[fd] = new HttpHlsProtocol(epoller_, &socket, this, rtmp_mgr_, server_mgr_);
+        fd_protocol_[fd] = new HttpHlsProtocol(epoller_, &socket);
     }   
 
     return fd_protocol_[fd];

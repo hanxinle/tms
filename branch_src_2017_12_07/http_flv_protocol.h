@@ -5,6 +5,8 @@
 
 #include <string>
 
+#include "media_subscriber.h"
+
 class Epoller;
 class Fd;
 class IoBuffer;
@@ -19,24 +21,31 @@ class TcpSocket;
 
 using std::string;
 
-class HttpFlvProtocol
+class HttpFlvProtocol : public MediaSubscriber
 {
 public:
-    HttpFlvProtocol(Epoller* epoller, Fd* socket, HttpFlvMgr* http_mgr, RtmpMgr* rtmp_mgr, ServerMgr* server_mgr);
+    HttpFlvProtocol(Epoller* epoller, Fd* socket);
     ~HttpFlvProtocol();
 
     int Parse(IoBuffer& io_buffer);
 
     int SendFlvHeader();
-    int SendMediaData(const Payload& payload);
 
-    int SendFlvAudio(const Payload& payload);
-    int SendFlvAudioHeader(const string& audio_header);
-    int SendFlvMetaData(const string& metadata);
-    int SendFlvVideo(const Payload& payload);
-    int SendFlvVideoHeader(const string& video_header);
+    virtual int SendMediaData(const Payload& payload);
+    virtual int SendAudioHeader(const string& audio_header);
+    virtual int SendVideoHeader(const string& video_header);
+    virtual int SendMetaData(const string& metadata);
+
+    int SendVideo(const Payload& payload);
+    int SendAudio(const Payload& payload);
 
     int OnStop();
+    virtual int OnPendingArrive();
+
+    int EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
+
+    string GetApp() { return app_; }
+    string GetStream() { return stream_name_; }
 
 private:
     TcpSocket* GetTcpSocket()
@@ -47,9 +56,6 @@ private:
 private:
     Epoller* epoller_;
     Fd* socket_;
-    HttpFlvMgr* http_mgr_;
-    RtmpMgr* rtmp_mgr_;
-    ServerMgr* server_mgr_;
     MediaPublisher* media_publisher_;
 
     string app_;

@@ -2,26 +2,20 @@
 #include <map>
 
 #include "common_define.h"
+#include "global.h"
 #include "http_hls_protocol.h"
 #include "io_buffer.h"
 #include "local_stream_center.h"
 #include "rtmp_protocol.h"
-#include "server_mgr.h"
-#include "rtmp_mgr.h"
 #include "tcp_socket.h"
 #include "util.h"
 
 using namespace std;
 
-extern LocalStreamCenter g_local_stream_center;
-
-HttpHlsProtocol::HttpHlsProtocol(Epoller* epoller, Fd* socket, HttpHlsMgr* http_mgr, RtmpMgr* rtmp_mgr, ServerMgr* server_mgr)
+HttpHlsProtocol::HttpHlsProtocol(Epoller* epoller, Fd* socket)
     :
     epoller_(epoller),
     socket_(socket),
-    http_mgr_(http_mgr),
-    rtmp_mgr_(rtmp_mgr),
-    server_mgr_(server_mgr),
     media_publisher_(NULL)
 {
 }

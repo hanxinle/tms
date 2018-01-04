@@ -3,71 +3,66 @@
 #include "rtmp_protocol.h"
 #include "server_protocol.h"
 
-int MediaPublisher::OnNewRtmpPlayer(RtmpProtocol* protocol)
-{
-    cout << LMSG << endl;
+bool MediaPublisher::AddSubscriber(MediaSubscriber* subscriber)
+{   
+    if (subscriber_.count(subscriber))
+    {   
+        return false;
+    }   
 
-    if (media_muxer_.HasMetaData())
-    {    
-        protocol->SendRtmpMessage(6, 1, kMetaData, (const uint8_t*)media_muxer_.GetMetaData().data(), media_muxer_.GetMetaData().size());
-    }    
+    int ret = OnNewSubscriber(subscriber);
 
-    if (media_muxer_.HasAudioHeader())
-    {    
-        string audio_header;
-        audio_header.append(1, 0xAF);
-        audio_header.append(1, 0x00);
-        audio_header.append(media_muxer_.GetAudioHeader());
+    if (ret == kPending)
+    {
+        wait_header_subscriber_.insert(subscriber);
+    }
+    else if (ret == kSuccess)
+    {
+        subscriber_.insert(subscriber);
+    }
 
-        protocol->SendRtmpMessage(4, 1, kAudio, (const uint8_t*)audio_header.data(), audio_header.size());
-    }    
-
-    if (media_muxer_.HasVideoHeader())
-    {    
-        string video_header;
-        video_header.append(1, 0x17);
-        video_header.append(1, 0x00);
-        video_header.append(1, 0x00);
-        video_header.append(1, 0x00);
-        video_header.append(1, 0x00);
-        video_header.append(media_muxer_.GetVideoHeader());
-
-        protocol->SendRtmpMessage(6, 1, kVideo, (const uint8_t*)video_header.data(), video_header.size());
-    }    
-
-    auto media_fast_out = media_muxer_.GetFastOut();
-
-    for (const auto& payload : media_fast_out)
-    {    
-        protocol->SendMediaData(payload);
-    }    
+    return true;
 }
 
-int MediaPublisher::OnNewFlvPlayer(HttpFlvProtocol* protocol)
+bool MediaPublisher::RemoveSubscriber(MediaSubscriber* subscriber)
+{   
+    if (subscriber_.find(subscriber) == subscriber_.end())
+    {   
+        return false;
+    }   
+
+    subscriber_.erase(subscriber);
+    wait_header_subscriber_.erase(subscriber);
+
+    return true;
+}   
+
+int MediaPublisher::OnNewSubscriber(MediaSubscriber* subscriber)
 {
     cout << LMSG << endl;
 
-    protocol->SendFlvHeader();
-
     if (media_muxer_.HasMetaData())
     {    
-        protocol->SendFlvMetaData(media_muxer_.GetMetaData());
+        subscriber->SendMetaData(media_muxer_.GetMetaData());
     }    
 
-    if (media_muxer_.HasVideoHeader())
+    cout << LMSG << "audio header:" << media_muxer_.HasAudioHeader() << ",video_header:" << media_muxer_.HasVideoHeader() << endl;
+
+    if (! media_muxer_.HasAudioHeader() || ! media_muxer_.HasVideoHeader())
     {
-        protocol->SendFlvVideoHeader(media_muxer_.GetVideoHeader());
+        cout << LMSG << "will pending" << endl;
+        return kPending;
     }
 
-    if (media_muxer_.HasAudioHeader())
-    {
-        protocol->SendFlvAudioHeader(media_muxer_.GetAudioHeader());
-    }
+    subscriber->SendAudioHeader(media_muxer_.GetAudioHeader());
+    subscriber->SendVideoHeader(media_muxer_.GetVideoHeader());
 
     auto media_fast_out = media_muxer_.GetFastOut();
 
     for (const auto& payload : media_fast_out)
-    {
-        protocol->SendMediaData(payload);
-    }
+    {    
+        subscriber->SendMediaData(payload);
+    }    
+
+    return kSuccess;
 }

@@ -433,7 +433,12 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
                     // send s0 + s1 + s2
 
                     io_buffer.Read(buf, 4);
-                    io_buffer.Read(buf, 1528);
+
+                    uint8_t random_echo[1528];
+
+                    int random_echo_ret = io_buffer.ReadAndCopy(random_echo, 1528);
+
+                    cout << Util::Bin2Hex(random_echo, random_echo_ret) << endl;
 
                     // s0
                     uint8_t version = 1;
@@ -441,7 +446,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
 
                     // s1
                     uint32_t server_time = Util::GetNowMs();
-                    io_buffer.WriteU32(server_time);
+                    io_buffer.WriteU32(timestamp);
 
                     uint32_t zero = 0;
                     io_buffer.WriteU32(zero);
@@ -451,7 +456,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
                     // s2
                     io_buffer.WriteU32(timestamp);
                     io_buffer.WriteU32(server_time);
-                    io_buffer.Write(buf, 1528);
+                    io_buffer.Write(random_echo, 1528);
 
                     io_buffer.WriteToFd(socket_->GetFd());
 

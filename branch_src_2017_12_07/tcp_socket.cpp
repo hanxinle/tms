@@ -41,6 +41,8 @@ int TcpSocket::OnRead()
             SetNonBlock(client_fd);
             tcp_socket->SetConnected();
 
+            handler_->HandleAccept(*tcp_socket);
+
             tcp_socket->EnableRead();
         }
     }

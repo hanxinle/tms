@@ -10,6 +10,7 @@
 
 #include "crc32.h"
 #include "media_publisher.h"
+#include "media_subscriber.h"
 #include "ref_ptr.h"
 #include "server_protocol.h"
 #include "socket_util.h"
@@ -114,10 +115,10 @@ struct RtmpMessage
     uint32_t len;
 };
 
-class RtmpProtocol : public MediaPublisher
+class RtmpProtocol : public MediaPublisher, public MediaSubscriber
 {
 public:
-    RtmpProtocol(Epoller* epoller, Fd* socket, RtmpMgr* rtmp_mgr, ServerMgr* server_mgr);
+    RtmpProtocol(Epoller* epoller, Fd* socket);
     ~RtmpProtocol();
 
     bool IsServerRole()
@@ -211,6 +212,10 @@ public:
     int SendRtmpMessage(const uint32_t cs_id, const uint32_t& message_stream_id, const uint8_t& message_type_id, const uint8_t* data, const size_t& len);
     int SendMediaData(const Payload& media);
 
+	virtual int SendVideoHeader(const string& header);
+    virtual int SendAudioHeader(const string& header);
+    virtual int SendMetaData(const string& metadata);
+
 private:
     double GetTransactionId()
     {
@@ -255,8 +260,6 @@ private:
 private:
     Epoller* epoller_;
     Fd* socket_;
-    RtmpMgr* rtmp_mgr_;
-    ServerMgr* server_mgr_;
     HandShakeStatus handshake_status_;
 
     int role_;

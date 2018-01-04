@@ -69,7 +69,7 @@ RtmpProtocol* RtmpMgr::GetOrCreateProtocol(Fd& socket)
     int fd = socket.GetFd();
     if (fd_protocol_.count(fd) == 0)
     {
-        fd_protocol_[fd] = new RtmpProtocol(epoller_, &socket, this, server_mgr_);
+        fd_protocol_[fd] = new RtmpProtocol(epoller_, &socket);
     }
 
     return fd_protocol_[fd];

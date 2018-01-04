@@ -11,6 +11,10 @@ public:
     virtual int HandleClose(IoBuffer& io_buffer, Fd& socket) = 0;
     virtual int HandleError(IoBuffer& io_buffer, Fd& socket) = 0;
     virtual int HandleConnected(Fd& socket) = 0;
+    virtual int HandleAccept(Fd& socket) 
+    {
+        return 0;
+    }
 };
 
 #endif // __SOCKET_HANDLE_H__

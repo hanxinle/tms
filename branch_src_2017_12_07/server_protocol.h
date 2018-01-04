@@ -10,6 +10,7 @@
 
 #include "crc32.h"
 #include "media_publisher.h"
+#include "media_subscriber.h"
 #include "ref_ptr.h"
 #include "socket_util.h"
 #include "trace_tool.h"
@@ -33,17 +34,19 @@ enum kServerRole
     kServerPush = 0,
     // FIXME: add namespace
     kPushServer_ = 1,
+    kPullServer_ = 2,
 };
 
-class ServerProtocol : public MediaPublisher
+class ServerProtocol : public MediaPublisher, public MediaSubscriber
 {
 public:
-    ServerProtocol(Epoller* epoller, Fd* socket, ServerMgr* server_mgr);
+    ServerProtocol(Epoller* epoller, Fd* socket);
     ~ServerProtocol();
 
     int Parse(IoBuffer& io_buffer);
     int OnStop();
     int OnConnected();
+    int OnAccept();
 
     int EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
 
@@ -63,6 +66,7 @@ public:
     int SendMetaData(const string& meta_data);
     int SendStreamName();
     int SendAppName();
+    int SendPullAppStream();
 
     void SetApp(const string& app)
     {
@@ -91,6 +95,11 @@ public:
         role_ = kPushServer_;
     }
 
+    void SetPullServer()
+    {
+        role_ = kPullServer_;
+    }
+
 private:
     int OnNewRtmpPlayer(RtmpProtocol* protocol);
     int OnNewFlvPlayer(HttpFlvProtocol* protocol);
@@ -98,7 +107,6 @@ private:
 private:
     Epoller* epoller_;
     Fd* socket_;
-    ServerMgr* server_mgr_;
     MediaPublisher* media_publisher_;
 
     string app_;

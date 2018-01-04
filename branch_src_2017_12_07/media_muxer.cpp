@@ -2,13 +2,14 @@
 
 #include "bit_buffer.h"
 #include "bit_stream.h"
+#include "media_publisher.h"
 #include "media_muxer.h"
 #include "util.h"
 
 using namespace std;
 using namespace socket_util;
 
-MediaMuxer::MediaMuxer()
+MediaMuxer::MediaMuxer(MediaPublisher* media_publisher)
     :
     video_frame_id_(0),
     audio_frame_id_(0),
@@ -29,7 +30,8 @@ MediaMuxer::MediaMuxer()
     ts_pat_continuity_counter_(0),
     ts_pmt_continuity_counter_(0),
     ts_audio_continuity_counter_(0),
-    ts_video_continuity_counter_(0)
+    ts_video_continuity_counter_(0),
+    media_publisher_(media_publisher)
 {
     cout << LMSG << endl;
 
@@ -650,10 +652,16 @@ int MediaMuxer::OnMetaData(const string& metadata)
 
 int MediaMuxer::OnVideoHeader(const string& video_header)
 {
+    cout << LMSG << endl;
+
+    bool wait_arrive = false;
+
     if (video_header_.empty() && ! video_header.empty() && ! audio_header_.empty())
     {
         cout << LMSG << "forward_toggle_bit_ " << forward_toggle_bit_ << "->" << true << endl;
         forward_toggle_bit_ = true;
+
+        wait_arrive = true;
     }
 
     if (video_header_ == video_header)
@@ -663,6 +671,20 @@ int MediaMuxer::OnVideoHeader(const string& video_header)
     }
 
     video_header_ = video_header;
+
+    if (wait_arrive)
+    {
+        if (media_publisher_ != NULL)
+        {
+            auto wait_subscriber = media_publisher_->GetAndClearWaitHeaderSubscriber();
+
+            for (const auto& subscriber : wait_subscriber)
+            {
+                cout << LMSG << "wait_subscriber -> subscriber" << endl;
+                media_publisher_->AddSubscriber(subscriber);
+            }
+        }
+    }
 
 	BitBuffer bit_buffer(video_header_);
 
@@ -691,10 +713,14 @@ int MediaMuxer::OnVideoHeader(const string& video_header)
 
 int MediaMuxer::OnAudioHeader(const string& audio_header)
 {
+    bool wait_arrive = false;
+
     if (audio_header_.empty() && ! audio_header.empty() && ! video_header_.empty())
     {
         cout << LMSG << "forward_toggle_bit_ " << forward_toggle_bit_ << "->" << true << endl;
         forward_toggle_bit_ = true;
+
+        wait_arrive = true;
     }
 
     if (audio_header_ == audio_header)
@@ -704,6 +730,20 @@ int MediaMuxer::OnAudioHeader(const string& audio_header)
     }
 
     audio_header_ = audio_header;
+
+    if (wait_arrive)
+    {
+        if (media_publisher_ != NULL)
+        {
+            auto wait_subscriber = media_publisher_->GetAndClearWaitHeaderSubscriber();
+
+            for (const auto& subscriber : wait_subscriber)
+            {
+                cout << LMSG << "wait_subscriber -> subscriber" << endl;
+                media_publisher_->AddSubscriber(subscriber);
+            }
+        }
+    }
 
 	uint8_t audio_object_type = 0;
     uint8_t sampling_frequency_index = 0;

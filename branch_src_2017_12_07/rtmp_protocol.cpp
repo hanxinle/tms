@@ -9,6 +9,7 @@
 #include "bit_stream.h"
 #include "common_define.h"
 #include "crc32.h"
+#include "global.h"
 #include "http_flv_protocol.h"
 #include "io_buffer.h"
 #include "local_stream_center.h"
@@ -20,8 +21,8 @@
 #include "util.h"
 
 //#define CDN "ws.upstream.huya.com"
-#define CDN "tx.direct.huya.com"
-//#define CDN "al.direct.huya.com"
+//#define CDN "tx.direct.huya.com"
+#define CDN "al.direct.huya.com"
 //#define CDN "112.90.174.121"
 #define CDN_PORT 1935
 
@@ -43,12 +44,10 @@ static uint32_t s1_len = 4/*time*/ + 4/*zero*/ + 1528/*random*/;
 static uint32_t s2_len = 4/*time*/ + 4/*time2*/ + 1528/*random*/;
 
 
-RtmpProtocol::RtmpProtocol(Epoller* epoller, Fd* fd, RtmpMgr* rtmp_mgr, ServerMgr* server_mgr)
+RtmpProtocol::RtmpProtocol(Epoller* epoller, Fd* fd)
     :
     epoller_(epoller),
     socket_(fd),
-    rtmp_mgr_(rtmp_mgr),
-    server_mgr_(server_mgr),
     handshake_status_(kStatus_0),
     role_(kUnknownRtmpRole),
     in_chunk_size_(128),
@@ -616,6 +615,12 @@ int RtmpProtocol::OnAudio(RtmpMessage& rtmp_msg)
 
                 media_muxer_.OnAudio(audio_payload);
 
+                for (auto& sub : subscriber_)
+                {
+                    sub->SendMediaData(audio_payload);
+                }
+
+                /*
                 for (auto& dst : rtmp_forwards_)
                 {
                     if (dst->CanPublish())
@@ -631,13 +636,14 @@ int RtmpProtocol::OnAudio(RtmpMessage& rtmp_msg)
 
                 for (auto& player : flv_player_)
                 {
-                    player->SendFlvAudio(audio_payload);
+                    player->SendMediaData(audio_payload);
                 }
 
                 for (auto& follow : server_follow_)
                 {
                     follow->SendMediaData(audio_payload);
                 }
+                */
             }
         }
     }
@@ -777,6 +783,12 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
 
                             media_muxer_.OnVideo(video_payload);
 
+                            for (auto& sub : subscriber_)
+                            {
+                                sub->SendMediaData(video_payload);
+                            }
+
+                            /*
                             for (auto& dst : rtmp_forwards_)
                             {
                                 if (dst->CanPublish())
@@ -792,13 +804,14 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
 
                             for (auto& player : flv_player_)
                             {
-                                player->SendFlvVideo(video_payload);
+                                player->SendMediaData(video_payload);
                             }
 
                             for (auto& follow : server_follow_)
                             {
                                 follow->SendMediaData(video_payload);
                             }
+                            */
                         }
 
                         cur_len += nalu_len + 4;
@@ -1062,7 +1075,7 @@ int RtmpProtocol::OnPlayCommand(RtmpMessage& rtmp_msg, AmfCommand& amf_command)
             }
 
             SetMediaPublisher(media_publisher);
-            media_publisher->AddRtmpPlayer(this);
+            media_publisher->AddSubscriber(this);
         }
     }
 
@@ -1227,11 +1240,11 @@ int RtmpProtocol::OnStatusCommand(AmfCommand& amf_command)
 
             if (role_ == kPushServer)
             {
-                media_publisher_->AddForwardRtmpServer(this);
+                media_publisher_->AddSubscriber(this);
             }
             else if (role_ == kClientPull)
             {
-                media_publisher_->AddRtmpPlayer(this);
+                media_publisher_->AddSubscriber(this);
             }
         }
     }
@@ -1367,9 +1380,9 @@ int RtmpProtocol::OnStop()
 
     if (role_ == kClientPush)
     {
-        for (auto& v : rtmp_forwards_)
+        for (auto& sub : subscriber_)
         {
-            v->OnStop();
+            sub->OnStop();
         }
 
         g_local_stream_center.UnRegisterStream(app_, stream_name_, this);
@@ -1379,7 +1392,7 @@ int RtmpProtocol::OnStop()
         if (media_publisher_ != NULL)
         {
             cout << LMSG << "remove forward" << endl;
-            media_publisher_->RemoveForwardRtmpServer(this);
+            media_publisher_->RemoveSubscriber(this);
         }
     }
     else if (role_ == kClientPull)
@@ -1387,7 +1400,7 @@ int RtmpProtocol::OnStop()
         if (media_publisher_ != NULL)
         {
             cout << LMSG << "remove player" << endl;
-            media_publisher_->RemoveRtmpPlayer(this);
+            media_publisher_->RemoveSubscriber(this);
         }
     }
 }
@@ -1396,9 +1409,10 @@ int RtmpProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interv
 {
     if (role_ == kClientPush || role_ == kPullServer)
     {
-        cout << LMSG << "rtmp_forwards_.size():" << rtmp_forwards_.size() << ", rtmp_player_.size():" << rtmp_player_.size() << endl;
         media_muxer_.EveryNSecond(now_in_ms, interval, count);
     }
+
+    cout << LMSG << "subscriber:" << subscriber_.size() << endl;
 }
 
 int RtmpProtocol::SendRtmpMessage(const uint32_t cs_id, const uint32_t& message_stream_id, const uint8_t& message_type_id, const uint8_t* data, const size_t& len)
@@ -1605,6 +1619,39 @@ int RtmpProtocol::SendMediaData(const Payload& payload)
     rtmp_message.len = payload.GetAllLen();
 
     return SendData(rtmp_message, payload);
+}
+
+int RtmpProtocol::SendVideoHeader(const string& header)
+{
+    string video_header;
+
+    video_header.append(1, 0x17);
+    video_header.append(1, 0x00);
+    video_header.append(1, 0x00);
+    video_header.append(1, 0x00);
+    video_header.append(1, 0x00);
+    video_header.append(header);
+
+    SendRtmpMessage(6, 1, kVideo, (const uint8_t*)video_header.data(), video_header.size());
+
+    return 0;
+}
+
+int RtmpProtocol::SendAudioHeader(const string& header)
+{
+	string audio_header;
+    audio_header.append(1, 0xAF);
+    audio_header.append(1, 0x00);
+    audio_header.append(header);
+
+    SendRtmpMessage(4, 1, kAudio, (const uint8_t*)audio_header.data(), audio_header.size());
+
+    return 0;
+}
+
+int RtmpProtocol::SendMetaData(const string& metadata)
+{
+    return 0;
 }
 
 int RtmpProtocol::HandShakeStatus0()
@@ -1919,9 +1966,9 @@ int RtmpProtocol::ConnectForwardRtmpServer(const string& ip, const uint16_t& por
         return -1;
     }
 
-    Fd* socket = new TcpSocket(epoller_, fd, (SocketHandle*)rtmp_mgr_);
+    Fd* socket = new TcpSocket(epoller_, fd, (SocketHandle*)g_rtmp_mgr);
 
-    RtmpProtocol* rtmp_forward = rtmp_mgr_->GetOrCreateProtocol(*socket);
+    RtmpProtocol* rtmp_forward = g_rtmp_mgr->GetOrCreateProtocol(*socket);
 
     rtmp_forward->SetApp(app_);
     rtmp_forward->SetStreamName(stream_name_);
@@ -1964,9 +2011,9 @@ int RtmpProtocol::ConnectFollowServer(const string& ip, const uint16_t& port)
         return -1;
     }
 
-    Fd* socket = new TcpSocket(epoller_, fd, (SocketHandle*)server_mgr_);
+    Fd* socket = new TcpSocket(epoller_, fd, (SocketHandle*)g_server_mgr);
 
-    ServerProtocol* server_dst = server_mgr_->GetOrCreateProtocol(*socket);
+    ServerProtocol* server_dst = g_server_mgr->GetOrCreateProtocol(*socket);
 
     server_dst->SetPushServer();
 

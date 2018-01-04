@@ -1,18 +1,18 @@
 #include "fd.h"
+#include "global.h"
+#include "http_flv_mgr.h"
 #include "http_flv_protocol.h"
 #include "io_buffer.h"
 #include "local_stream_center.h"
 #include "rtmp_protocol.h"
 #include "server_mgr.h"
 #include "server_protocol.h"
+#include "tcp_socket.h"
 
-extern LocalStreamCenter g_local_stream_center;
-
-ServerProtocol::ServerProtocol(Epoller* epoller, Fd* socket, ServerMgr* server_mgr)
+ServerProtocol::ServerProtocol(Epoller* epoller, Fd* socket)
     :
     epoller_(epoller),
     socket_(socket),
-    server_mgr_(server_mgr),
     media_publisher_(NULL),
     role_(kUnknownServerRole)
 {
@@ -106,15 +106,10 @@ int ServerProtocol::Parse(IoBuffer& io_buffer)
             {
                 media_muxer_.OnAudio(payload);
 
-				for (auto& player : rtmp_player_)
+				for (auto& sub : subscriber_)
                 {    
-                    player->SendMediaData(payload);
+                    sub->SendMediaData(payload);
                 }    
-
-                for (auto& player : flv_player_)
-                {    
-                    player->SendFlvAudio(payload);
-                }
             }
         }
         else if (IsVideo(mask))
@@ -131,15 +126,10 @@ int ServerProtocol::Parse(IoBuffer& io_buffer)
             {
                 media_muxer_.OnVideo(payload);
 
-				for (auto& player : rtmp_player_)
+				for (auto& sub : subscriber_)
                 {    
-                    player->SendMediaData(payload);
+                    sub->SendMediaData(payload);
                 }    
-
-                for (auto& player : flv_player_)
-                {    
-                    player->SendFlvVideo(payload);
-                }
             }
         }
         else if (IsMetaData(mask))
@@ -190,6 +180,64 @@ int ServerProtocol::Parse(IoBuffer& io_buffer)
             g_local_stream_center.RegisterStream(app_, stream_name_, this);
         }
     }
+    else if (protocol_id == kPullAppStream)
+    {
+        uint8_t* data = NULL;
+        
+        uint16_t len = 0;
+        io_buffer.ReadU16(len);
+
+        size_t str_len = (size_t)len;
+        io_buffer.Read(data, str_len);
+
+        string app((const char*)data, str_len);
+        SetApp(app);
+
+        io_buffer.ReadU16(len);
+        str_len = (size_t)len;
+        io_buffer.Read(data, str_len);
+        string stream_name((const char*)data, str_len);
+        SetStreamName(stream_name);
+
+        // XXX: 触发slave register stream
+        SendAppName();
+        // XXX: 触发slave register stream
+        SendStreamName();
+
+        cout << LMSG << "app:" << app << ",stream_name:" << stream_name << endl;
+
+        SetServerPush();
+
+        media_publisher_ = g_local_stream_center.GetMediaPublisherByAppStream(app_, stream_name_);
+
+        cout << LMSG "get " << app_ << ":" << stream_name_ << " media_publisher_:" << media_publisher_ << endl;
+
+        if (media_publisher_ != NULL)
+        {
+            media_publisher_->AddSubscriber(this);
+
+            if (media_publisher_->GetMediaMuxer().HasMetaData())
+            {
+                SendMetaData(media_publisher_->GetMediaMuxer().GetMetaData());
+            } 
+            if (media_publisher_->GetMediaMuxer().HasVideoHeader())
+            {
+                SendVideoHeader(media_publisher_->GetMediaMuxer().GetVideoHeader());
+            }
+
+            if (media_publisher_->GetMediaMuxer().HasAudioHeader())
+            {
+                SendAudioHeader(media_publisher_->GetMediaMuxer().GetAudioHeader());
+            }
+
+            auto fast_out  = media_publisher_->GetMediaMuxer().GetFastOut();
+            
+            for (const auto& payload : fast_out)
+            {
+                SendMediaData(payload);
+            }
+        }
+    }
 
     return kSuccess;
 }
@@ -204,38 +252,54 @@ int ServerProtocol::OnStop()
     }
 }
 
+int ServerProtocol::OnAccept()
+{
+    cout << LMSG << endl;
+}
+
 int ServerProtocol::OnConnected()
 {
     cout << LMSG << endl;
 
-    if (media_publisher_ != NULL)
+	GetTcpSocket()->SetConnected();
+    GetTcpSocket()->EnableRead();
+    GetTcpSocket()->DisableWrite();
+
+    if (role_ == kPushServer_)
     {
-        media_publisher_->AddFollowServer(this);
-
-        SendAppName();
-        SendStreamName();
-
-        if (media_publisher_->GetMediaMuxer().HasMetaData())
+        if (media_publisher_ != NULL)
         {
-            SendMetaData(media_publisher_->GetMediaMuxer().GetMetaData());
-        }
+            media_publisher_->AddSubscriber(this);
 
-        if (media_publisher_->GetMediaMuxer().HasVideoHeader())
-        {
-            SendVideoHeader(media_publisher_->GetMediaMuxer().GetVideoHeader());
-        }
+            SendAppName();
+            SendStreamName();
 
-        if (media_publisher_->GetMediaMuxer().HasAudioHeader())
-        {
-            SendAudioHeader(media_publisher_->GetMediaMuxer().GetAudioHeader());
-        }
+            if (media_publisher_->GetMediaMuxer().HasMetaData())
+            {
+                SendMetaData(media_publisher_->GetMediaMuxer().GetMetaData());
+            }
 
-        auto fast_out  = media_publisher_->GetMediaMuxer().GetFastOut();
-        
-        for (const auto& payload : fast_out)
-        {
-            SendMediaData(payload);
+            if (media_publisher_->GetMediaMuxer().HasVideoHeader())
+            {
+                SendVideoHeader(media_publisher_->GetMediaMuxer().GetVideoHeader());
+            }
+
+            if (media_publisher_->GetMediaMuxer().HasAudioHeader())
+            {
+                SendAudioHeader(media_publisher_->GetMediaMuxer().GetAudioHeader());
+            }
+
+            auto fast_out  = media_publisher_->GetMediaMuxer().GetFastOut();
+            
+            for (const auto& payload : fast_out)
+            {
+                SendMediaData(payload);
+            }
         }
+    }
+    else if (role_ == kPullServer_)
+    {
+        SendPullAppStream();
     }
 }
 
@@ -377,6 +441,27 @@ int ServerProtocol::SendStreamName()
     return 0;
 }
 
+int ServerProtocol::SendPullAppStream()
+{
+    cout << LMSG << "app_:" << app_ << ",stream_name:" << stream_name_ << endl;
+    IoBuffer header;
+
+    header.WriteU32(sizeof(uint32_t) + sizeof(uint16_t) + app_.size() + sizeof(uint16_t) + stream_name_.size());
+    header.WriteU32(kPullAppStream);
+    header.WriteU16(app_.size());
+    header.Write(app_);
+    header.WriteU16(stream_name_.size());
+    header.Write(stream_name_);
+
+    uint8_t* data = NULL;
+
+    int size = header.Read(data, header.Size());
+
+    socket_->Send(data, size);
+
+    return 0;
+}
+
 int ServerProtocol::OnNewRtmpPlayer(RtmpProtocol* protocol)
 {
     cout << LMSG << endl;
@@ -425,17 +510,17 @@ int ServerProtocol::OnNewFlvPlayer(HttpFlvProtocol* protocol)
 
     if (media_muxer_.HasMetaData())
     {
-        protocol->SendFlvMetaData(media_muxer_.GetMetaData());
+        protocol->SendMetaData(media_muxer_.GetMetaData());
     }
 
     if (media_muxer_.HasVideoHeader())
     {
-        protocol->SendFlvVideoHeader(media_muxer_.GetVideoHeader());
+        protocol->SendVideoHeader(media_muxer_.GetVideoHeader());
     }
 
     if (media_muxer_.HasAudioHeader())
     {
-        protocol->SendFlvAudioHeader(media_muxer_.GetAudioHeader());
+        protocol->SendAudioHeader(media_muxer_.GetAudioHeader());
     }
 
     auto media_fast_out = media_muxer_.GetFastOut();

@@ -27,8 +27,11 @@ public:
     virtual int HandleClose(IoBuffer& io_buffer, Fd& socket);
     virtual int HandleError(IoBuffer& io_buffer, Fd& socket);
     virtual int HandleConnected(Fd& socket);
+    virtual int HandleAccept(Fd& socket);
 
     virtual int HandleTimerInSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
+
+    int ConnectServer(const string& app, const string& stream, const string& ip, const uint16_t& port);
 
 private:
     Epoller* epoller_;

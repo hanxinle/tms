@@ -5,6 +5,8 @@
 
 #include <string>
 
+#include "media_subscriber.h"
+
 class Epoller;
 class Fd;
 class IoBuffer;
@@ -18,10 +20,10 @@ class TcpSocket;
 
 using std::string;
 
-class HttpHlsProtocol
+class HttpHlsProtocol : public MediaSubscriber
 {
 public:
-    HttpHlsProtocol(Epoller* epoller, Fd* socket, HttpHlsMgr* http_mgr, RtmpMgr* rtmp_mgr, ServerMgr* server_mgr);
+    HttpHlsProtocol(Epoller* epoller, Fd* socket);
     ~HttpHlsProtocol();
 
     int Parse(IoBuffer& io_buffer);
@@ -37,9 +39,6 @@ private:
 private:
     Epoller* epoller_;
     Fd* socket_;
-    HttpHlsMgr* http_mgr_;
-    RtmpMgr* rtmp_mgr_;
-    ServerMgr* server_mgr_;
     MediaPublisher* media_publisher_;
 
     string app_;

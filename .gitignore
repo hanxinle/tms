@@ -7,3 +7,4 @@ trs*
 rtmp_1936
 *.txt
 gmon.out
+*.log

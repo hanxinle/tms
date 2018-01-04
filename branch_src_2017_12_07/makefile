@@ -1,10 +1,11 @@
 # =========================================================
-INCLUDE_DIR    += -I. -I./include/
+INCLUDE_DIR    += -I. -I./include/ -I../rpc
 
 LIB_DIR        +=
 # ==========================================================
 CC             = gcc
 CXX 		   = g++
+#CXX 		   = clang
 CFLAGS         = -g -Wno-deprecated -W -O2 -pg
 CXXFLAGS       = -g -std=c++0x -O2 -pg
 # ==========================================================

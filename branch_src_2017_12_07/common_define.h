@@ -12,6 +12,7 @@ enum RetCode
     kSuccess = 0,
     kClose = 1,
     kNoEnoughData = 2,
+    kPending = 3,
 };
 
 enum FrameType
@@ -61,6 +62,7 @@ enum ProtocolId
     kMedia = 1,
     kSetApp = 2,
     kSetStreamName = 3,
+    kPullAppStream = 4,
 };
 
 // mask

@@ -21,10 +21,12 @@ using std::string;
 using std::set;
 using std::vector;
 
+class MediaPublisher;
+
 class MediaMuxer
 {
 public:
-    MediaMuxer();
+    MediaMuxer(MediaPublisher* media_publisher);
     ~MediaMuxer();
 
     int EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
@@ -225,6 +227,8 @@ private:
     uint8_t ts_video_continuity_counter_;
 
     CRC32 crc_32_;
+
+    MediaPublisher* media_publisher_;
 };
 
 #endif // __MEDIA_MUXER_H__

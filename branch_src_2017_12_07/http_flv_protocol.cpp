@@ -2,9 +2,12 @@
 #include <map>
 
 #include "common_define.h"
+#include "global.h"
+#include "http_flv_mgr.h"
 #include "http_flv_protocol.h"
 #include "io_buffer.h"
 #include "local_stream_center.h"
+#include "media_center_mgr.h"
 #include "ref_ptr.h"
 #include "rtmp_protocol.h"
 #include "server_protocol.h"
@@ -14,16 +17,12 @@
 
 using namespace std;
 
-extern LocalStreamCenter g_local_stream_center;
-
-HttpFlvProtocol::HttpFlvProtocol(Epoller* epoller, Fd* socket, HttpFlvMgr* http_mgr, RtmpMgr* rtmp_mgr, ServerMgr* server_mgr)
+HttpFlvProtocol::HttpFlvProtocol(Epoller* epoller, Fd* socket)
     :
+    MediaSubscriber(),
     epoller_(epoller),
     socket_(socket),
-    http_mgr_(http_mgr),
-    rtmp_mgr_(rtmp_mgr),
     media_publisher_(NULL),
-    server_mgr_(server_mgr),
     pre_tag_size_(0)
 {
 }
@@ -72,8 +71,6 @@ int HttpFlvProtocol::Parse(IoBuffer& io_buffer)
                                            "Connection: keep-alive\r\n"
                                            "\r\n";
 
-					GetTcpSocket()->Send((const uint8_t*)http_response.data(), http_response.size());
-
                     cout << LMSG << "app_:" << app_ << ",stream_name_:" << stream_name_ << ",type_:" << type_ << endl;
                     if (! app_.empty() && ! stream_name_.empty())
                     {
@@ -83,21 +80,17 @@ int HttpFlvProtocol::Parse(IoBuffer& io_buffer)
                         {
                             if (type_ == "flv")
                             {
-                                media_publisher_->AddFlvPlayer(this);
+					            GetTcpSocket()->Send((const uint8_t*)http_response.data(), http_response.size());
+                                SendFlvHeader();
+                                media_publisher_->AddSubscriber(this);
                             }
                         }
                         else
                         {
-                            cout << LMSG << "can't find media source, app_:" << app_ << ",stream_name_:" << stream_name_ << endl;
+                            g_media_center_mgr->GetAppStreamMasterNode(app_, stream_name_);
+                            expired_time_ms_ = Util::GetNowMs() + 10000;
 
-							ostringstream os; 
-
-                            os << "HTTP/1.1 404 Not Found\r\n"
-                               << "Server: trs\r\n"
-                               << "Connection: close\r\n"
-                               << "\r\n";
-
-                            GetTcpSocket()->Send((const uint8_t*)os.str().data(), os.str().size());
+                            g_local_stream_center.AddAppStreamPendingSubscriber(app_, stream_name_, this);
                         }
                     }
 
@@ -212,7 +205,7 @@ int HttpFlvProtocol::SendFlvHeader()
     socket_->Send(data, len);
 }
 
-int HttpFlvProtocol::SendFlvMetaData(const string& metadata)
+int HttpFlvProtocol::SendMetaData(const string& metadata)
 {
     IoBuffer flv_tag;
 
@@ -240,17 +233,17 @@ int HttpFlvProtocol::SendMediaData(const Payload& payload)
 {
     if (payload.IsAudio())
     {
-        return SendFlvAudio(payload);
+        return SendAudio(payload);
     }
     else if (payload.IsVideo())
     {
-        return SendFlvVideo(payload);
+        return SendVideo(payload);
     }
 
     return -1;
 }
 
-int HttpFlvProtocol::SendFlvVideo(const Payload& payload)
+int HttpFlvProtocol::SendVideo(const Payload& payload)
 {
     IoBuffer flv_tag;
 
@@ -292,7 +285,7 @@ int HttpFlvProtocol::SendFlvVideo(const Payload& payload)
     pre_tag_size_ = data_size + 11;
 }
 
-int HttpFlvProtocol::SendFlvAudio(const Payload& payload)
+int HttpFlvProtocol::SendAudio(const Payload& payload)
 {
     IoBuffer flv_tag;
 
@@ -316,7 +309,7 @@ int HttpFlvProtocol::SendFlvAudio(const Payload& payload)
     pre_tag_size_ = data_size + 11;
 }
 
-int HttpFlvProtocol::SendFlvVideoHeader(const string& video_header)
+int HttpFlvProtocol::SendVideoHeader(const string& video_header)
 {
     IoBuffer flv_tag;
 
@@ -344,7 +337,7 @@ int HttpFlvProtocol::SendFlvVideoHeader(const string& video_header)
     pre_tag_size_ = data_size + 11;
 }
 
-int HttpFlvProtocol::SendFlvAudioHeader(const string& audio_header)
+int HttpFlvProtocol::SendAudioHeader(const string& audio_header)
 {
     IoBuffer flv_tag;
 
@@ -375,6 +368,67 @@ int HttpFlvProtocol::OnStop()
 {
     if (media_publisher_ != NULL)
     {
-        media_publisher_->RemoveFlvPlayer(this);
+        media_publisher_->RemoveSubscriber(this);
     }
+}
+
+int HttpFlvProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)
+{
+    if (expired_time_ms_ != 0)
+    {
+
+        if (now_in_ms > expired_time_ms_)
+        {
+            cout << LMSG << "expired, can't find media source, app_:" << app_ << ",stream_name_:" << stream_name_ << endl;
+
+            OnPendingArrive();
+        }
+    }    
+}
+
+int HttpFlvProtocol::OnPendingArrive()
+{
+    cout << LMSG << "pending done" << endl;
+
+    if (! app_.empty() && ! stream_name_.empty())
+    {
+        media_publisher_ = g_local_stream_center.GetMediaPublisherByAppStream(app_, stream_name_);
+
+        cout << LMSG << endl;
+
+        if (media_publisher_ != NULL)
+        {
+            cout << LMSG << endl;
+            if (type_ == "flv")
+            {
+                cout << LMSG << endl;
+
+	            string http_response = "HTTP/1.1 200 OK\r\n"
+                                       "Server: trs\r\n"
+                                       "Content-Type: flv-application/octet-stream\r\n"
+                                       "Connection: keep-alive\r\n"
+                                       "\r\n";
+
+	            GetTcpSocket()->Send((const uint8_t*)http_response.data(), http_response.size());
+                SendFlvHeader();
+                media_publisher_->AddSubscriber(this);
+            }
+        }
+        else
+        {
+            cout << LMSG << "can't find media source, app_:" << app_ << ",stream_name_:" << stream_name_ << endl;
+
+			ostringstream os; 
+
+            os << "HTTP/1.1 404 Not Found\r\n"
+               << "Server: trs\r\n"
+               << "Connection: close\r\n"
+               << "\r\n";
+
+            GetTcpSocket()->Send((const uint8_t*)os.str().data(), os.str().size());
+        }
+    }
+
+
+    return kSuccess;
 }

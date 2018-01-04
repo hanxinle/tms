@@ -2,10 +2,12 @@
 #define __HTTP_FLV_MGR_H__
 
 #include <map>
+#include <set>
 
 #include "socket_handle.h"
 
 using std::map;
+using std::set;
 
 class Epoller;
 class Fd;

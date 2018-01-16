@@ -78,6 +78,8 @@ int MediaNodeProtocol::Parse(IoBuffer& io_buffer)
         }
         break;
     }
+
+    return kError;
 }
 
 int MediaNodeProtocol::OnStop()

@@ -38,7 +38,7 @@ public:
 
     void SetStreamName(const string& name)
     {
-        stream_name_ = name;
+        stream_ = name;
     }
 
     string GetM3U8()
@@ -173,7 +173,7 @@ public:
 
 private:
     string app_;
-    string stream_name_;
+    string stream_;
 
     map<uint64_t, Payload> video_queue_;
     map<uint64_t, Payload> audio_queue_;

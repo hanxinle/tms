@@ -29,7 +29,7 @@ public:
     template<typename T>
     int GetBytes(const size_t& bytes, T& result)
     {
-        uint64_t tmp;
+        uint64_t tmp = 0;
         int ret = GetBits(bytes*8, tmp);
 
         result = (T)tmp;
@@ -48,7 +48,7 @@ public:
         return ret;
     }
 
-    inline int BitsLeft()
+    inline size_t BitsLeft()
     {
         if (bit_len_ >= cur_pos_)
         {
@@ -58,7 +58,7 @@ public:
         return 0;
     }
 
-    inline int BytesLeft()
+    inline size_t BytesLeft()
     {
         return BitsLeft()/8;
     }

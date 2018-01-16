@@ -74,10 +74,10 @@ public:
         media_muxer_.SetApp(app);
     }
 
-    void SetStreamName(const string& stream_name)
+    void SetStreamName(const string& stream)
     {
-        stream_name_ = stream_name;
-        media_muxer_.SetStreamName(stream_name);
+        stream_ = stream;
+        media_muxer_.SetStreamName(stream);
     }
 
     void SetMediaPublisher(MediaPublisher* media_publisher)
@@ -110,7 +110,7 @@ private:
     MediaPublisher* media_publisher_;
 
     string app_;
-    string stream_name_;
+    string stream_;
 
     int role_;
 };

@@ -46,7 +46,10 @@ int TimerInSecond::OnRead()
     uint64_t num_expired = 0;
 
     int bytes = read(fd_, &num_expired, sizeof(uint64_t));
+    UNUSED(bytes);
     //cout << LMSG << "read " << bytes << " bytes, num_expired:" << num_expired << endl;
+
+    return kSuccess;
 }
 
 int TimerInSecond::RunEverySecond()
@@ -63,4 +66,6 @@ int TimerInSecond::RunEverySecond()
 
     ++count_;
     now_in_ms_ = now_ms;
+
+    return kSuccess;
 }

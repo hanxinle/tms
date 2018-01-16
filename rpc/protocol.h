@@ -249,6 +249,8 @@ namespace protocol
             IF(deserialize.Read(req_time));
             IF(deserialize.Read(type));
             IF(deserialize.Read(node_number));
+
+            return 0;
         }
 
         void Dump(ostringstream& os) const
@@ -306,20 +308,20 @@ namespace protocol
 
     struct StreamInfo
     {
-        string stream_name;
+        string stream;
         string app;
         NodeInfo publish_node;
 
         void Write(Serialize& serialize) const
         {
-            serialize.Write(stream_name);
+            serialize.Write(stream);
             serialize.Write(app);
             publish_node.Write(serialize);
         }
 
         int Read(Deserialize& deserialize)
         {
-            IF(deserialize.Read(stream_name))
+            IF(deserialize.Read(stream))
             IF(deserialize.Read(app))
             IF(publish_node.Read(deserialize))
 
@@ -330,7 +332,7 @@ namespace protocol
         void Dump(ostringstream& os) const
         {
             os << "StreamInfo: {";
-            os << "stream_name:" << stream_name
+            os << "stream:" << stream
                << ",app:" << app
                << ",";
 

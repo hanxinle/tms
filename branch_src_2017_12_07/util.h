@@ -4,11 +4,13 @@
 #include <map>
 #include <sstream>
 #include <string>
+#include <vector>
 
 using std::istringstream;
 using std::ostringstream;
 using std::map;
 using std::string;
+using std::vector;
 
 class Util
 {
@@ -43,6 +45,8 @@ public:
 
         return ret;
     }
+
+    static vector<string> SepStr(const string& input, const string& sep);
 };
 
 #endif // __UTIL_H__

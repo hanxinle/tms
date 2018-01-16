@@ -50,8 +50,6 @@ int TcpSocket::OnRead()
     {
         if (connect_status_ == kConnected)
         {
-            uint8_t buf[1024*64];
-
             while (true)
             {
                 int bytes = read_buffer_.ReadFromFdAndWrite(fd_);
@@ -99,6 +97,8 @@ int TcpSocket::OnRead()
             }
         }
     }
+
+    return kSuccess;
 }
 
 int TcpSocket::OnWrite()
@@ -149,7 +149,7 @@ int TcpSocket::Send(const uint8_t* data, const size_t& len)
         {
             //VERBOSE << LMSG << "direct send " << ret << " bytes" << ",left:" << (len - ret) << " bytes" << endl;
 
-            if (ret < len)
+            if (ret < (int)len)
             {
                 write_buffer_.Write(data + ret, len - ret);
                 EnableWrite();
@@ -171,8 +171,7 @@ int TcpSocket::Send(const uint8_t* data, const size_t& len)
     }
     else
     {
-        write_buffer_.Write(data, len);
-        return len;
+        ret = write_buffer_.Write(data, len);
     }
 
     // avoid warning

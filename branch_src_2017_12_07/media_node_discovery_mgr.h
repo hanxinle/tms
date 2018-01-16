@@ -35,21 +35,9 @@ public:
 
     int SendAll(const Rpc& rpc);
 
-    void SetMediaCenterMgr(MediaCenterMgr* media_center_mgr)
-    {
-        media_center_mgr_ = media_center_mgr;
-    }
-
-    MediaCenterMgr* GetMediaCenterMgr()
-    {
-        return media_center_mgr_;
-    }
-
 private:
     Epoller* epoller_;
     map<int, MediaNodeDiscoveryProtocol*> fd_protocol_;
-
-    MediaCenterMgr* media_center_mgr_;
 };
 
 #endif // __MEDIA_NODE_DISCOVERY_MGR_H__

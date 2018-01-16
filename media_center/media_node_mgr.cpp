@@ -70,26 +70,26 @@ int MediaNodeMgr::HandleTimerInSecond(const uint64_t& now_in_ms, const uint32_t&
 
 bool MediaNodeMgr::InsertNodeAppStream(const NodeInfo& node_info, const StreamInfo& stream_info, const uint16_t& role)
 {
-    auto iter = node_app_stream_[node_info][stream_info.app].find(stream_info.stream_name);
+    auto iter = node_app_stream_[node_info][stream_info.app].find(stream_info.stream);
 
     if (iter != node_app_stream_[node_info][stream_info.app].end())
     {
         return false;
     }
 
-    node_app_stream_[node_info][stream_info.app].insert(stream_info.stream_name);
-    app_stream_node_[stream_info.app][stream_info.stream_name].insert(node_info);
+    node_app_stream_[node_info][stream_info.app].insert(stream_info.stream);
+    app_stream_node_[stream_info.app][stream_info.stream].insert(node_info);
 
     if (role == MASTER)
     {
-        app_stream_master_[stream_info.app][stream_info.stream_name] = node_info;
+        app_stream_master_[stream_info.app][stream_info.stream] = node_info;
     }
 
     ostringstream os;
 
     node_info.Dump(os);
 
-    cout << LMSG << "insert " << os.str() << ",app:" << stream_info.app << ",stream_name:" << stream_info.stream_name << endl;
+    cout << LMSG << "insert " << os.str() << ",app:" << stream_info.app << ",stream:" << stream_info.stream << endl;
 
     return true;
 }

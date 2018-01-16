@@ -26,6 +26,9 @@ public:
 
     int Send(const uint8_t* data, const size_t& len)
     {
+        UNUSED(data);
+        UNUSED(len);
+
         return 0;
     }
 

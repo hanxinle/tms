@@ -3,6 +3,7 @@
 
 #include <iostream>
 
+#include "admin_mgr.h"
 #include "any.h"
 #include "bit_buffer.h"
 #include "bit_stream.h"
@@ -28,6 +29,7 @@ using namespace socket_util;
 
 static void sighandler(int sig_no)
 {
+    cout << LMSG << "sig:" << sig_no << endl;
 	exit(0);
 } 
 
@@ -50,6 +52,7 @@ int main(int argc, char* argv[])
     uint16_t http_hls_port = 8788;
     string server_ip       = "";
     uint16_t server_port   = 10001;
+    uint16_t admin_port    = 11000;
     bool daemon            = false;
 
     auto iter_server_ip     = args_map.find("server_ip");
@@ -57,6 +60,7 @@ int main(int argc, char* argv[])
     auto iter_http_flv_port = args_map.find("http_flv_port");
     auto iter_http_hls_port = args_map.find("http_hls_port");
     auto iter_server_port   = args_map.find("server_port");
+    auto iter_admin_port    = args_map.find("admin_port");
     auto iter_daemon        = args_map.find("daemon");
 
     if (iter_server_ip == args_map.end())
@@ -96,6 +100,14 @@ int main(int argc, char* argv[])
         if (! iter_server_port->second.empty())
         {
             server_port = Util::Str2Num<uint16_t>(iter_server_port->second);
+        }
+    }
+
+    if (iter_admin_port != args_map.end())
+    {
+        if (! iter_admin_port->second.empty())
+        {
+            admin_port = Util::Str2Num<uint16_t>(iter_admin_port->second);
         }
     }
 
@@ -195,6 +207,20 @@ int main(int argc, char* argv[])
     server_hls_socket.EnableRead();
     server_hls_socket.AsServerSocket();
 
+    // === Init Admin Socket ===
+    int admin_fd = CreateNonBlockTcpSocket();
+
+    ReuseAddr(admin_fd);
+    Bind(admin_fd, "0.0.0.0", admin_port);
+    Listen(admin_fd);
+    SetNonBlock(admin_fd);
+
+    AdminMgr admin_mgr(&epoller);
+
+    TcpSocket admin_socket(&epoller, admin_fd, &admin_mgr);
+    admin_socket.EnableRead();
+    admin_socket.AsServerSocket();
+
     // === Init Media Center ===
     MediaCenterMgr media_center_mgr(&epoller);
     timer_in_second.AddTimerSecondHandle(&media_center_mgr);
@@ -204,7 +230,6 @@ int main(int argc, char* argv[])
     MediaNodeDiscoveryMgr media_node_discovery_mgr(&epoller);
     g_media_node_discovery_mgr = &media_node_discovery_mgr;
     media_node_discovery_mgr.ConnectNodeDiscovery("127.0.0.1", 16001);
-    media_node_discovery_mgr.SetMediaCenterMgr(&media_center_mgr);
 
     timer_in_second.AddTimerSecondHandle(&media_node_discovery_mgr);
 

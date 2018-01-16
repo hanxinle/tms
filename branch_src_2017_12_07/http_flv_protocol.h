@@ -45,7 +45,7 @@ public:
     int EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
 
     string GetApp() { return app_; }
-    string GetStream() { return stream_name_; }
+    string GetStream() { return stream_; }
 
 private:
     TcpSocket* GetTcpSocket()
@@ -59,7 +59,7 @@ private:
     MediaPublisher* media_publisher_;
 
     string app_;
-    string stream_name_;
+    string stream_;
     string type_;
 
     uint32_t pre_tag_size_;

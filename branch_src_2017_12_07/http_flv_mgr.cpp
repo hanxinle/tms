@@ -20,33 +20,48 @@ int HttpFlvMgr::HandleRead(IoBuffer& io_buffer, Fd& socket)
 {
 	HttpFlvProtocol* http_protocol = GetOrCreateProtocol(socket);
 
-    while (http_protocol->Parse(io_buffer) == kSuccess)
+    int ret = kClose;
+
+    while ((ret = http_protocol->Parse(io_buffer)) == kSuccess)
     {   
     }
+
+    return ret;
 }
 
 int HttpFlvMgr::HandleClose(IoBuffer& io_buffer, Fd& socket)
 {
+    UNUSED(io_buffer);
+
 	HttpFlvProtocol* http_protocol = GetOrCreateProtocol(socket);
 
     http_protocol->OnStop();
 
     delete http_protocol;
     fd_protocol_.erase(socket.GetFd());
+
+    return kSuccess;
 }
 
 int HttpFlvMgr::HandleError(IoBuffer& io_buffer, Fd& socket)
 {
+    UNUSED(io_buffer);
+
 	HttpFlvProtocol* http_protocol = GetOrCreateProtocol(socket);
 
     http_protocol->OnStop();
 
     delete http_protocol;
     fd_protocol_.erase(socket.GetFd());
+
+    return kSuccess;
 }
 
 int HttpFlvMgr::HandleConnected(Fd& socket)
 {
+    UNUSED(socket);
+
+    return kSuccess;
 }
 
 HttpFlvProtocol* HttpFlvMgr::GetOrCreateProtocol(Fd& socket)

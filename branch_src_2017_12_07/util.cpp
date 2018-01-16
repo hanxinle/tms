@@ -14,7 +14,6 @@
 
 void Util::Daemon()
 {
-	int i, fd0, fd1, fd2;
 	pid_t pid;
 	struct rlimit rl;
 	struct sigaction sa;
@@ -74,15 +73,19 @@ void Util::Daemon()
 	    rl.rlim_max = 1024;
     }
 
-	for (i = 0; i < rl.rlim_max; i++)
+	for (int i = 0; i < (int)rl.rlim_max; i++)
     {
 	    close(i);
     }
 
 	// Attach file descriptors 0, 1, and 2 to /dev/null.
-	fd0 = open("/dev/null", O_RDWR);
-	fd1 = dup(0);
-	fd2 = dup(0);
+	int fd0 = open("/dev/null", O_RDWR);
+	int fd1 = dup(0);
+	int fd2 = dup(0);
+
+    UNUSED(fd0);
+    UNUSED(fd1);
+    UNUSED(fd2);
 
     /* 我不需要syslog,保留下用法即可
 	// Initialize the log file.
@@ -264,4 +267,26 @@ string Util::GetNowMsStr()
     }
 
     return "";
+}
+
+vector<string> Util::SepStr(const string& input, const string& sep)
+{
+    vector<string> ret;
+
+    size_t pre_pos = 0;
+    while (true)
+    {
+        auto pos = input.find(sep, pre_pos);
+
+        if (pos == string::npos)
+        {
+            ret.push_back(input.substr(pre_pos));
+            break;
+        }
+
+        ret.push_back(input.substr(pre_pos, pos - pre_pos));
+        pre_pos = pos + sep.size();
+    }
+
+    return ret;
 }

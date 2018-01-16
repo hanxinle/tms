@@ -43,22 +43,31 @@ int MediaCenterMgr::HandleRead(IoBuffer& io_buffer, Fd& socket)
 
 int MediaCenterMgr::HandleClose(IoBuffer& io_buffer, Fd& socket)
 {
+    UNUSED(io_buffer);
+
 	MediaCenterProtocol* media_center_protocol = GetOrCreateProtocol(socket);
 
     media_center_protocol->OnStop();
 
     delete media_center_protocol;
     fd_protocol_.erase(socket.GetFd());
+
+    return kSuccess;
 }
+
 
 int MediaCenterMgr::HandleError(IoBuffer& io_buffer, Fd& socket)
 {
+    UNUSED(io_buffer);
+
 	MediaCenterProtocol* media_center_protocol = GetOrCreateProtocol(socket);
 
     media_center_protocol->OnStop();
 
     delete media_center_protocol;
     fd_protocol_.erase(socket.GetFd());
+
+    return kSuccess;
 }
 
 int MediaCenterMgr::HandleConnected(Fd& socket)
@@ -66,6 +75,8 @@ int MediaCenterMgr::HandleConnected(Fd& socket)
 	MediaCenterProtocol* media_center_protocol = GetOrCreateProtocol(socket);
 
     media_center_protocol->OnConnected();
+
+    return kSuccess;
 }
 
 int MediaCenterMgr::HandleTimerInSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)
@@ -74,6 +85,8 @@ int MediaCenterMgr::HandleTimerInSecond(const uint64_t& now_in_ms, const uint32_
     {
         kv.second->EveryNSecond(now_in_ms, interval, count);
     }
+
+    return kSuccess;
 }
 
 int MediaCenterMgr::ConnectMediaCenter(const string& ip, const uint16_t& port)
@@ -99,6 +112,8 @@ int MediaCenterMgr::ConnectMediaCenter(const string& ip, const uint16_t& port)
         ((TcpSocket*)socket)->SetConnected();
         ((TcpSocket*)socket)->EnableRead();
     }
+
+    return kSuccess;
 }
 
 int MediaCenterMgr::GetAppStreamMasterNode(const string& app, const string& stream)

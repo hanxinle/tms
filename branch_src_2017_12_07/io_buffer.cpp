@@ -199,7 +199,7 @@ int IoBuffer::MakeSpaceIfNeed(const size_t& len)
 
 int IoBuffer::ReadAndCopy(uint8_t* data, const size_t& len)
 {
-    int size = Size();
+    size_t size = Size();
 
     if (size == 0)
     {
@@ -221,7 +221,7 @@ int IoBuffer::ReadAndCopy(uint8_t* data, const size_t& len)
 
 int IoBuffer::Read(uint8_t*& data, const size_t& len)
 {
-    int size = Size();
+    size_t size = Size();
 
     if (size == 0)
     {
@@ -317,7 +317,7 @@ int IoBuffer::ReadU64(uint64_t& u64)
 
 int IoBuffer::Peek(uint8_t*& data, const size_t& begin_pos, const size_t& len)
 {
-    if (Size() < begin_pos + len)
+    if (Size() < (begin_pos + len))
     {
         cout << LMSG << "[" << begin_pos << "," << (begin_pos + len) << ") overflow" << endl;
         return -1;

@@ -21,6 +21,8 @@ bool MediaPublisher::AddSubscriber(MediaSubscriber* subscriber)
         subscriber_.insert(subscriber);
     }
 
+    subscriber->SetPublisher(this);
+
     return true;
 }
 
@@ -48,6 +50,7 @@ int MediaPublisher::OnNewSubscriber(MediaSubscriber* subscriber)
 
     cout << LMSG << "audio header:" << media_muxer_.HasAudioHeader() << ",video_header:" << media_muxer_.HasVideoHeader() << endl;
 
+    // 还未收齐音视频头,暂时挂起,收齐后再分发流
     if (! media_muxer_.HasAudioHeader() || ! media_muxer_.HasVideoHeader())
     {
         cout << LMSG << "will pending" << endl;

@@ -12,51 +12,67 @@ LocalStreamCenter::~LocalStreamCenter()
 {
 }
 
-bool LocalStreamCenter::RegisterStream(const string& app, const string& stream_name, MediaPublisher* media_publisher)
+bool LocalStreamCenter::RegisterStream(const string& app, const string& stream, MediaPublisher* media_publisher, const bool& is_master)
 {
-    auto& stream_protocol_ = app_stream_publisher_[app];
-
-    if (stream_protocol_.find(stream_name) != stream_protocol_.end())
+    if (app.empty() || stream.empty())
     {
-        cout << LMSG << "stream_name:" << stream_name << " already registered" << endl;
         return false;
     }
 
-    stream_protocol_.insert(make_pair(stream_name, media_publisher));
-    cout << LMSG << "register app:" << app << ", stream_name:" << stream_name << endl;
+    auto& stream_protocol_ = app_stream_publisher_[app];
 
-    StreamRegisterReq stream_register_req;
-    StreamInfo stream_info;
+    if (stream_protocol_.find(stream) != stream_protocol_.end())
+    {
+        cout << LMSG << "stream:" << stream << " already registered" << endl;
+        return false;
+    }
 
-    stream_info.stream_name = stream_name;
-    stream_info.app = app;
+    stream_protocol_.insert(make_pair(stream, media_publisher));
+    cout << LMSG << "register app:" << app << ", stream:" << stream << endl;
 
-    stream_register_req.stream_infos.push_back(stream_info);
-    stream_register_req.req_time = Util::GetNowMs();
-    stream_register_req.role = MASTER;
-    stream_register_req.node_info = g_node_info;
+    if (is_master)
+    {
+        StreamRegisterReq stream_register_req;
+        StreamInfo stream_info;
 
-    ostringstream os;
+        stream_info.stream = stream;
+        stream_info.app = app;
 
-    stream_register_req.Dump(os);
+        stream_register_req.stream_infos.push_back(stream_info);
+        stream_register_req.req_time = Util::GetNowMs();
+        stream_register_req.role = MASTER;
+        stream_register_req.node_info = g_node_info;
 
-    cout << LMSG << os.str() << endl;
+        ostringstream os;
 
-    g_media_center_mgr->SendAll(stream_register_req);
+        stream_register_req.Dump(os);
 
-    auto pending_subscriber = GetAppStreamPendingSubscriber(app, stream_name);
+        cout << LMSG << os.str() << endl;
 
-    for (auto& pending : pending_subscriber)
+        g_media_center_mgr->SendAll(stream_register_req);
+    }
+
+    auto pending_rtmp_subscriber = GetAndClearAppStreamPendingSubscriberByType(app, stream, kRtmp);
+
+    for (auto& pending : pending_rtmp_subscriber)
     {
         pending->OnPendingArrive();
     }
 
+    auto pending_http_flv_subscriber = GetAndClearAppStreamPendingSubscriberByType(app, stream, kHttpFlv);
+
+    for (auto& pending : pending_http_flv_subscriber)
+    {
+        pending->OnPendingArrive();
+    }
 
     return true;
 }
 
-bool LocalStreamCenter::UnRegisterStream(const string& app, const string& stream_name, MediaPublisher* media_publisher)
+bool LocalStreamCenter::UnRegisterStream(const string& app, const string& stream, MediaPublisher* media_publisher)
 {
+    UNUSED(media_publisher);
+
     auto iter_app = app_stream_publisher_.find(app);
 
     if (iter_app == app_stream_publisher_.end())
@@ -64,7 +80,7 @@ bool LocalStreamCenter::UnRegisterStream(const string& app, const string& stream
         return false;
     }
 
-    auto iter_stream = iter_app->second.find(stream_name);
+    auto iter_stream = iter_app->second.find(stream);
 
     if (iter_stream == iter_app->second.end())
     {
@@ -78,12 +94,12 @@ bool LocalStreamCenter::UnRegisterStream(const string& app, const string& stream
         app_stream_publisher_.erase(iter_app);
     }
 
-    cout << LMSG << "unregister app:" << app << ", stream_name:" << stream_name << endl;
+    cout << LMSG << "unregister app:" << app << ", stream:" << stream << endl;
 
     return true;
 }
 
-MediaPublisher* LocalStreamCenter::GetMediaPublisherByAppStream(const string& app, const string& stream_name)
+MediaPublisher* LocalStreamCenter::GetMediaPublisherByAppStream(const string& app, const string& stream)
 {
     auto iter_app = app_stream_publisher_.find(app);
 
@@ -92,7 +108,7 @@ MediaPublisher* LocalStreamCenter::GetMediaPublisherByAppStream(const string& ap
         return NULL;
     }
 
-    auto iter_stream = iter_app->second.find(stream_name);
+    auto iter_stream = iter_app->second.find(stream);
 
     if (iter_stream == iter_app->second.end())
     {
@@ -102,7 +118,7 @@ MediaPublisher* LocalStreamCenter::GetMediaPublisherByAppStream(const string& ap
     return iter_stream->second;
 }
 
-bool LocalStreamCenter::IsAppStreamExist(const string& app, const string& stream_name)
+bool LocalStreamCenter::IsAppStreamExist(const string& app, const string& stream)
 {
     auto iter_app = app_stream_publisher_.find(app);
 
@@ -111,7 +127,7 @@ bool LocalStreamCenter::IsAppStreamExist(const string& app, const string& stream
         return false;
     }
 
-    auto iter_stream = iter_app->second.find(stream_name);
+    auto iter_stream = iter_app->second.find(stream);
 
     if (iter_stream == iter_app->second.end())
     {
@@ -123,6 +139,7 @@ bool LocalStreamCenter::IsAppStreamExist(const string& app, const string& stream
 
 bool LocalStreamCenter::AddAppStreamPendingSubscriber(const string& app, const string& stream, MediaSubscriber* media_subscriber)
 {
+    cout << LMSG << "app:" << app << ",stream:" << stream << " type:" << (media_subscriber->GetType()) << endl;
     return app_stream_pending_subscriber_[app][stream].insert(media_subscriber).second;
 }
 
@@ -145,6 +162,42 @@ set<MediaSubscriber*> LocalStreamCenter::GetAppStreamPendingSubscriber(const str
     }
 
     ret = iter_stream->second;
+
+    return ret;
+}
+
+set<MediaSubscriber*> LocalStreamCenter::GetAndClearAppStreamPendingSubscriberByType(const string& app, const string& stream, const uint16_t& type)
+{
+    set<MediaSubscriber*> ret;
+
+    auto iter_app = app_stream_pending_subscriber_.find(app);
+
+    if (iter_app == app_stream_pending_subscriber_.end())
+    {
+        return ret;
+    }
+
+    auto iter_stream = iter_app->second.find(stream);
+
+    if (iter_stream == iter_app->second.end())
+    {
+        return ret;
+    }
+
+    auto iter = iter_stream->second.begin();
+
+    while (iter != iter_stream->second.end())
+    {
+        if ((*iter)->GetType() == type)
+        {
+            ret.insert(*iter);
+            iter = iter_stream->second.erase(iter);
+        }
+        else
+        {
+            ++iter;
+        }
+    }
 
     return ret;
 }

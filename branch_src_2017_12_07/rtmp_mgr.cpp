@@ -24,6 +24,11 @@ int RtmpMgr::HandleRead(IoBuffer& io_buffer, Fd& socket)
     {
     }
 
+    if (ret != kNoEnoughData)
+    {
+        cout << LMSG << "ret:" << ret << endl;
+    }
+
     return ret;
 }
 
@@ -40,6 +45,8 @@ int RtmpMgr::HandleClose(IoBuffer& io_buffer, Fd& socket)
 
     delete rtmp_protocol;
     fd_protocol_.erase(socket.GetFd());
+
+    return kSuccess;
 }
 
 int RtmpMgr::HandleError(IoBuffer& io_buffer, Fd& socket)
@@ -55,6 +62,8 @@ int RtmpMgr::HandleError(IoBuffer& io_buffer, Fd& socket)
 
     delete rtmp_protocol;
     fd_protocol_.erase(socket.GetFd());
+
+    return kSuccess;
 }
 
 int RtmpMgr::HandleConnected(Fd& socket)
@@ -62,6 +71,8 @@ int RtmpMgr::HandleConnected(Fd& socket)
     RtmpProtocol* rtmp_protocol = GetOrCreateProtocol(socket);
 
     rtmp_protocol->OnConnected();
+
+    return kSuccess;
 }
 
 RtmpProtocol* RtmpMgr::GetOrCreateProtocol(Fd& socket)
@@ -81,4 +92,6 @@ int RtmpMgr::HandleTimerInSecond(const uint64_t& now_in_ms, const uint32_t& inte
     {
         kv.second->EveryNSecond(now_in_ms, interval, count);
     }
+
+    return kSuccess;
 }

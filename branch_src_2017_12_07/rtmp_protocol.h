@@ -66,10 +66,11 @@ enum RtmpRole
 
 struct RtmpUrl
 {
-    std::string ip;
+    string ip;
     uint16_t port;
-    std::string app;
-    std::string stream_name;
+    string app;
+    string stream;
+    map<string, string> args;
 };
 
 struct RtmpMessage
@@ -84,6 +85,20 @@ struct RtmpMessage
         message_type_id(0),
         message_stream_id(0)
     {
+    }
+
+    RtmpMessage(const RtmpMessage& other)
+    {
+        cs_id = other.cs_id;
+        timestamp = other.timestamp;
+        timestamp_delta = other.timestamp_delta;
+        timestamp_calc = other.timestamp_calc;
+        message_length = other.message_length;
+        message_type_id = other.message_type_id;
+        message_stream_id = other.message_stream_id;
+
+        msg = NULL;
+        len = 0;
     }
 
     string ToString() const
@@ -179,6 +194,7 @@ public:
     int SendFCPublish();
     int SendCheckBw();
     int SendPublish(const double& stream_id);
+    int SendPlay(const double& stream_id);
     int SendAudio(const RtmpMessage& audio);
     int SendVideo(const RtmpMessage& video);
 
@@ -188,10 +204,20 @@ public:
         media_muxer_.SetApp(app_);
     }
 
-    void SetStreamName(const string& stream_name)
+    void SetStreamName(const string& stream)
     {
-        stream_name_ = stream_name;
-        media_muxer_.SetStreamName(stream_name_);
+        stream_ = stream;
+        media_muxer_.SetStreamName(stream_);
+    }
+
+    void SetDomain(const string& domain)
+    {
+        domain_ = domain;
+    }
+
+    void SetArgs(const map<string, string>& args)
+    {
+        args_ = args;
     }
 
     int ConnectForwardRtmpServer(const string& ip, const uint16_t& port);
@@ -254,6 +280,8 @@ private:
 
     int OnVideoHeader(RtmpMessage& rtmp_msg);
 
+    virtual int OnPendingArrive();
+
     int OnRtmpMessage(RtmpMessage& rtmp_msg);
     int SendData(const RtmpMessage& cur_info, const Payload& paylod = Payload());
 
@@ -270,9 +298,13 @@ private:
     map<uint32_t, RtmpMessage> csid_head_;
     map<uint32_t, RtmpMessage> csid_pre_info_;
 
+    RtmpMessage pending_rtmp_msg_;
+
     string app_;
     string tc_url_;
-    string stream_name_;
+    string stream_;
+    string domain_;
+    map<string, string> args_;
 
     double transaction_id_;
 

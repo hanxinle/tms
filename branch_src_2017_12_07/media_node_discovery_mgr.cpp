@@ -9,8 +9,7 @@ using namespace socket_util;
 
 MediaNodeDiscoveryMgr::MediaNodeDiscoveryMgr(Epoller* epoller)
     :
-    epoller_(epoller),
-    media_center_mgr_(NULL)
+    epoller_(epoller)
 {
 }
 
@@ -44,22 +43,30 @@ int MediaNodeDiscoveryMgr::HandleRead(IoBuffer& io_buffer, Fd& socket)
 
 int MediaNodeDiscoveryMgr::HandleClose(IoBuffer& io_buffer, Fd& socket)
 {
+    UNUSED(io_buffer);
+
 	MediaNodeDiscoveryProtocol* media_node_discovery_protocol = GetOrCreateProtocol(socket);
 
     media_node_discovery_protocol->OnStop();
 
     delete media_node_discovery_protocol;
     fd_protocol_.erase(socket.GetFd());
+
+    return kSuccess;
 }
 
 int MediaNodeDiscoveryMgr::HandleError(IoBuffer& io_buffer, Fd& socket)
 {
+    UNUSED(io_buffer);
+
 	MediaNodeDiscoveryProtocol* media_node_discovery_protocol = GetOrCreateProtocol(socket);
 
     media_node_discovery_protocol->OnStop();
 
     delete media_node_discovery_protocol;
     fd_protocol_.erase(socket.GetFd());
+
+    return kSuccess;
 }
 
 int MediaNodeDiscoveryMgr::HandleConnected(Fd& socket)
@@ -67,6 +74,8 @@ int MediaNodeDiscoveryMgr::HandleConnected(Fd& socket)
 	MediaNodeDiscoveryProtocol* media_node_discovery_protocol = GetOrCreateProtocol(socket);
 
     media_node_discovery_protocol->OnConnected();
+
+    return kSuccess;
 }
 
 int MediaNodeDiscoveryMgr::HandleTimerInSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)
@@ -75,6 +84,8 @@ int MediaNodeDiscoveryMgr::HandleTimerInSecond(const uint64_t& now_in_ms, const 
     {
         kv.second->EveryNSecond(now_in_ms, interval, count);
     }
+
+    return kSuccess;
 }
 
 

@@ -342,6 +342,9 @@ int Amf0::DecodeEcmaArray(BitBuffer& bit_buffer, Any*& result)
 
 int Amf0::DecodeNull(BitBuffer& bit_buffer, Any*& result)
 {
+    UNUSED(bit_buffer);
+    UNUSED(result);
+
     return 0;
 }
 
@@ -428,7 +431,7 @@ int Amf0::EncodeString(const string& val, IoBuffer& output)
 
     ret = output.Write(val);
 
-    if (ret != val.size())
+    if (ret != (int)val.size())
     {
         return -1;
     }
@@ -454,7 +457,7 @@ int Amf0::EncodeObject(const map<string, Any*>& val, IoBuffer& output)
         }
 
         ret = output.Write(key);
-        if (ret != key.size())
+        if (ret != (int)key.size())
         {
             return -1;
         }

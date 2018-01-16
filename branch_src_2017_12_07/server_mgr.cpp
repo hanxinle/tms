@@ -41,22 +41,30 @@ int ServerMgr::HandleRead(IoBuffer& io_buffer, Fd& socket)
 
 int ServerMgr::HandleClose(IoBuffer& io_buffer, Fd& socket)
 {
+    UNUSED(io_buffer);
+
 	ServerProtocol* server_protocol = GetOrCreateProtocol(socket);
 
     server_protocol->OnStop();
 
     delete server_protocol;
     fd_protocol_.erase(socket.GetFd());
+
+    return kSuccess;
 }
 
 int ServerMgr::HandleError(IoBuffer& io_buffer, Fd& socket)
 {
+    UNUSED(io_buffer);
+
 	ServerProtocol* server_protocol = GetOrCreateProtocol(socket);
 
     server_protocol->OnStop();
 
     delete server_protocol;
     fd_protocol_.erase(socket.GetFd());
+
+    return kSuccess;
 }
 
 int ServerMgr::HandleConnected(Fd& socket)
@@ -64,6 +72,8 @@ int ServerMgr::HandleConnected(Fd& socket)
 	ServerProtocol* server_protocol = GetOrCreateProtocol(socket);
 
     server_protocol->OnConnected();
+
+    return kSuccess;
 }
 
 int ServerMgr::HandleAccept(Fd& socket)
@@ -72,6 +82,8 @@ int ServerMgr::HandleAccept(Fd& socket)
 	ServerProtocol* server_protocol = GetOrCreateProtocol(socket);
 
     server_protocol->OnAccept();
+
+    return kSuccess;
 }
 
 int ServerMgr::HandleTimerInSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)
@@ -80,6 +92,8 @@ int ServerMgr::HandleTimerInSecond(const uint64_t& now_in_ms, const uint32_t& in
     {
         kv.second->EveryNSecond(now_in_ms, interval, count);
     }
+
+    return kSuccess;
 }
 
 int ServerMgr::ConnectServer(const string& app, const string& stream, const string& ip, const uint16_t& port)
@@ -120,4 +134,6 @@ int ServerMgr::ConnectServer(const string& app, const string& stream, const stri
     }   
     
     cout << LMSG << endl;	
+
+    return kSuccess;
 }

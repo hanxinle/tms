@@ -6,6 +6,8 @@
 #include "log.h"
 #include "util.h"
 
+#define UNUSED(u) (void)u
+
 enum RetCode
 {
     kError = -1,
@@ -50,6 +52,14 @@ enum LogLevel
     kLevelWarning = 4,
     kLevelError   = 5,
     kLevelFatal   = 6,
+};
+
+enum SubscriberType
+{
+    kRtmp = 0,
+    kHttpFlv = 1,
+    kHttpHls = 2,
+    kTcpServer = 3,
 };
 
 enum ServerProtocolDefine

@@ -14,6 +14,7 @@ using namespace std;
 
 HttpHlsProtocol::HttpHlsProtocol(Epoller* epoller, Fd* socket)
     :
+    MediaSubscriber(kHttpHls),
     epoller_(epoller),
     socket_(socket),
     media_publisher_(NULL)
@@ -34,8 +35,6 @@ int HttpHlsProtocol::Parse(IoBuffer& io_buffer)
     int r_pos = -1; // '\r'
     int n_pos = -1; // '\n'
     int m_pos = -1; // ':'
-    int s_pos = -1; // ' '
-    int pos = 0;
 
     bool key_value = false; // false:key, true:value
 
@@ -58,10 +57,10 @@ int HttpHlsProtocol::Parse(IoBuffer& io_buffer)
                 {
                     cout << LMSG << "http done" << endl;
 
-                    cout << LMSG << "app_:" << app_ << ",stream_name_:" << stream_name_ << ",ts_:" << ts_ << ",type_:" << type_ << endl;
-                    if (! app_.empty() && ! stream_name_.empty())
+                    cout << LMSG << "app_:" << app_ << ",stream_:" << stream_ << ",ts_:" << ts_ << ",type_:" << type_ << endl;
+                    if (! app_.empty() && ! stream_.empty())
                     {
-                        media_publisher_ = g_local_stream_center.GetMediaPublisherByAppStream(app_, stream_name_);
+                        media_publisher_ = g_local_stream_center.GetMediaPublisherByAppStream(app_, stream_);
 
                         if (media_publisher_ != NULL)
                         {
@@ -128,8 +127,14 @@ int HttpHlsProtocol::Parse(IoBuffer& io_buffer)
                         }
                         else
                         {
-                            cout << LMSG << "can't find media source, app_:" << app_ << ",stream_name_:" << stream_name_ << endl;
+                            cout << LMSG << "can't find media source, app_:" << app_ << ",stream_:" << stream_ << endl;
 
+                            g_media_center_mgr->GetAppStreamMasterNode(app_, stream_);
+                            expired_time_ms_ = Util::GetNowMs() + 10000;
+
+                            g_local_stream_center.AddAppStreamPendingSubscriber(app_, stream_, this);
+
+                            /*
                             ostringstream os;
 
 					        os << "HTTP/1.1 404 Not Found\r\n"
@@ -138,6 +143,7 @@ int HttpHlsProtocol::Parse(IoBuffer& io_buffer)
                                << "\r\n";
 
 					        GetTcpSocket()->Send((const uint8_t*)os.str().data(), os.str().size());
+                            */
                         }
                     }
 
@@ -178,7 +184,7 @@ int HttpHlsProtocol::Parse(IoBuffer& io_buffer)
                                 }
                                 else if (x_count == 2)
                                 {
-                                    stream_name_ += ch;
+                                    stream_ += ch;
                                 }
                                 else if (x_count == 3 && s_count < 2)
                                 {
@@ -243,4 +249,86 @@ int HttpHlsProtocol::Parse(IoBuffer& io_buffer)
 
 int HttpHlsProtocol::OnStop()
 {
+    return kSuccess;
+}
+
+int HttpHlsProtocol::OnPendingArrive()
+{
+    cout << LMSG << "pending done" << endl;
+
+    cout << LMSG << "app_:" << app_ << ",stream_:" << stream_ << ",ts_:" << ts_ << ",type_:" << type_ << endl;
+
+    if (! app_.empty() && ! stream_.empty())
+    {
+        media_publisher_ = g_local_stream_center.GetMediaPublisherByAppStream(app_, stream_);
+
+        if (media_publisher_ != NULL)
+        {
+            if (type_ == "ts")
+            {
+                const string& ts = media_publisher_->GetMediaMuxer().GetTs(Util::Str2Num<uint64_t>(ts_));
+                
+                if (! ts.empty())
+                {
+                    ostringstream os;
+
+	                os << "HTTP/1.1 200 OK\r\n"
+                       << "Server: trs\r\n"
+                       << "Content-Type: application/x-mpegurl\r\n"
+                       << "Connection: keep-alive\r\n"
+                       << "Content-Length:" << ts.size() << "\r\n"
+                       << "\r\n";
+
+	                GetTcpSocket()->Send((const uint8_t*)os.str().data(), os.str().size());
+                    GetTcpSocket()->Send((const uint8_t*)ts.data(), ts.size());
+                }
+                else
+                {
+                    ostringstream os;
+
+	                os << "HTTP/1.1 404 Not Found\r\n"
+                       << "Server: trs\r\n"
+                       << "Connection: close\r\n"
+                       << "\r\n";
+
+	                GetTcpSocket()->Send((const uint8_t*)os.str().data(), os.str().size());
+                }
+            }
+            else if (type_ == "m3u8")
+            {
+                string m3u8 = media_publisher_->GetMediaMuxer().GetM3U8();
+                
+                ostringstream os;
+
+	            os << "HTTP/1.1 200 OK\r\n"
+                   << "Server: trs\r\n"
+                   << "Content-Type: application/x-mpegurl\r\n"
+                   << "Connection: keep-alive\r\n"
+                   << "Content-Length:" << m3u8.size() << "\r\n"
+                   << "\r\n";
+
+	            GetTcpSocket()->Send((const uint8_t*)os.str().data(), os.str().size());
+
+                if (! m3u8.empty())
+                {
+                    GetTcpSocket()->Send((const uint8_t*)m3u8.data(), m3u8.size());
+                }
+            }
+        }
+        else
+        {
+            cout << LMSG << "can't find media source, app_:" << app_ << ",stream_:" << stream_ << endl;
+
+            ostringstream os;
+
+	        os << "HTTP/1.1 404 Not Found\r\n"
+               << "Server: trs\r\n"
+               << "Connection: close\r\n"
+               << "\r\n";
+
+	        GetTcpSocket()->Send((const uint8_t*)os.str().data(), os.str().size());
+        }
+    }
+
+    return kSuccess;
 }

@@ -14,7 +14,6 @@ MediaNodeDiscoveryProtocol::MediaNodeDiscoveryProtocol(Epoller* epoller, Fd* soc
 
 MediaNodeDiscoveryProtocol::~MediaNodeDiscoveryProtocol()
 {
-    delete socket_;
 }
 
 int MediaNodeDiscoveryProtocol::Parse(IoBuffer& io_buffer)

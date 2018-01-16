@@ -94,7 +94,7 @@ int Epoller::DisableSocket(Fd* fd, const uint32_t& event)
         return -1;
     }
 
-    if (socket_map_[fd] & event == 0)
+    if ((socket_map_[fd] & event) == 0)
     {
         cout << "fd no listen " << event << " event" << endl;
         return -1;
@@ -124,7 +124,6 @@ int Epoller::DisableSocket(Fd* fd, const uint32_t& event)
 int Epoller::RemoveSocket(Fd* fd)
 {
     int op = 0;
-    int final_event = 0;
 
     if (socket_map_.count(fd) == 0)
     {
@@ -157,7 +156,7 @@ int Epoller::WaitIoEvent(const uint32_t& timeout_ms)
     {
         //cout << LMSG << num_events << " event happend" << endl;
 
-        for (size_t n = 0; n != num_events; ++n)
+        for (int n = 0; n != num_events; ++n)
         {
             Fd* fd = (Fd*)events[n].data.ptr;
             socket_event[fd] = events[n].events;

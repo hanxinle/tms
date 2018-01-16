@@ -8,6 +8,7 @@ class MediaSubscriber;
 class RtmpProtocol;
 class ServerProtocol;
 
+// 所有可能是发布者的Protocol都需要继承这个类
 class MediaPublisher
 {
 public:
@@ -43,7 +44,7 @@ protected:
 
 protected:
 	set<MediaSubscriber*> subscriber_;
-    set<MediaSubscriber*> wait_header_subscriber_;
+    set<MediaSubscriber*> wait_header_subscriber_; // 当前进程app/stream所在的流还未收齐音视频头
 
     MediaMuxer media_muxer_;
 };

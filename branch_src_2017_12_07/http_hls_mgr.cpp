@@ -19,33 +19,48 @@ int HttpHlsMgr::HandleRead(IoBuffer& io_buffer, Fd& socket)
 {
 	HttpHlsProtocol* http_protocol = GetOrCreateProtocol(socket);
 
-    while (http_protocol->Parse(io_buffer) == kSuccess)
+    int ret = kClose;
+
+    while ((ret = http_protocol->Parse(io_buffer)) == kSuccess)
     {   
     }
+
+    return ret;
 }
 
 int HttpHlsMgr::HandleClose(IoBuffer& io_buffer, Fd& socket)
 {
+    UNUSED(io_buffer);
+
 	HttpHlsProtocol* http_protocol = GetOrCreateProtocol(socket);
 
     http_protocol->OnStop();
 
     delete http_protocol;
     fd_protocol_.erase(socket.GetFd());
+
+    return kSuccess;
 }
 
 int HttpHlsMgr::HandleError(IoBuffer& io_buffer, Fd& socket)
 {
+    UNUSED(io_buffer);
+
 	HttpHlsProtocol* http_protocol = GetOrCreateProtocol(socket);
 
     http_protocol->OnStop();
 
     delete http_protocol;
     fd_protocol_.erase(socket.GetFd());
+
+    return kSuccess;
 }
 
 int HttpHlsMgr::HandleConnected(Fd& socket)
 {
+    UNUSED(socket);
+
+    return kSuccess;
 }
 
 HttpHlsProtocol* HttpHlsMgr::GetOrCreateProtocol(Fd& socket)

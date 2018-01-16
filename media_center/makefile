@@ -7,7 +7,7 @@ CC             = gcc
 CXX 		   = g++
 #CXX 		   = clang
 CFLAGS         = -g -Wno-deprecated -W -O2 -pg
-CXXFLAGS       = -g -std=c++0x -O2 -pg
+CXXFLAGS       = -g -std=c++0x -O0 -pg
 # ==========================================================
 SOURCES += $(wildcard ./*.cpp)
 OBJECTS += $(patsubst %.cpp,%.o, $(patsubst %.c,%.o, $(SOURCES)))

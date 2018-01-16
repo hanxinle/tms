@@ -58,7 +58,7 @@ int MediaCenterProtocol::Parse(IoBuffer& io_buffer)
             NodeRegisterRsp node_register_rsp;
             node_register_rsp.Read(deserialize);
 
-            OnNodeRegisterRsp(node_register_rsp);
+            return OnNodeRegisterRsp(node_register_rsp);
         }   
         break;
 
@@ -67,7 +67,7 @@ int MediaCenterProtocol::Parse(IoBuffer& io_buffer)
             GetAppStreamMasterNodeRsp get_app_stream_master_node_rsp;
             get_app_stream_master_node_rsp.Read(deserialize);
 
-            OnGetAppStreamMasterNodeRsp(get_app_stream_master_node_rsp);
+            return OnGetAppStreamMasterNodeRsp(get_app_stream_master_node_rsp);
         }
         break;
 
@@ -77,10 +77,13 @@ int MediaCenterProtocol::Parse(IoBuffer& io_buffer)
         }   
         break;
     }
+
+    return kError;
 }
 
 int MediaCenterProtocol::OnStop()
 {
+    return kSuccess;
 }
 
 int MediaCenterProtocol::OnConnected()
@@ -96,6 +99,11 @@ int MediaCenterProtocol::OnConnected()
 
 int MediaCenterProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)
 {
+    UNUSED(now_in_ms);
+    UNUSED(interval);
+    UNUSED(count);
+
+    return kSuccess;
 }
 
 int MediaCenterProtocol::OnNodeRegisterRsp(const NodeRegisterRsp& node_register_rsp)
@@ -106,7 +114,7 @@ int MediaCenterProtocol::OnNodeRegisterRsp(const NodeRegisterRsp& node_register_
 
     cout << LMSG << os.str() << endl;
 
-    return 0;
+    return kSuccess;
 }
 
 int MediaCenterProtocol::OnGetAppStreamMasterNodeRsp(const GetAppStreamMasterNodeRsp& get_app_stream_master_node_rsp)
@@ -129,7 +137,7 @@ int MediaCenterProtocol::OnGetAppStreamMasterNodeRsp(const GetAppStreamMasterNod
         cout << LMSG << "can't find app:" << get_app_stream_master_node_rsp.app << ",stream:" << get_app_stream_master_node_rsp.stream << " master node" << endl;
     }
 
-    return 0;
+    return kSuccess;
 }
 
 int MediaCenterProtocol::Send(const Rpc& rpc)
@@ -139,7 +147,7 @@ int MediaCenterProtocol::Send(const Rpc& rpc)
     rpc.Write(serialize);
 
     const uint8_t* data = serialize.GetBuf();
-    size_t size = serialize.GetSize();
+    int size = serialize.GetSize();
 
     if (GetTcpSocket()->Send(data, size) != size)
     {   

@@ -43,12 +43,12 @@ public:
         return buf_;
     }
 
-    const uint32_t GetSize() const
+    uint32_t GetSize() const
     {
         return size_;
     }
 
-    const uint32_t GetCapacity() const
+    uint32_t GetCapacity() const
     {
         return capacity_;
     }
@@ -218,7 +218,7 @@ private:
     {
         if (size_ + delta > capacity_)
         {
-            int new_capacity = size_ + delta;
+            uint32_t new_capacity = size_ + delta;
 
             if (capacity_ * 2 > new_capacity)
             {

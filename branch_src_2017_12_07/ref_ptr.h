@@ -191,6 +191,8 @@ public:
             this->frame_type_ = other.frame_type_;
             this->payload_type_ = other.payload_type_;
         }
+
+        return *this;
     }
 
     uint8_t* GetAllData() const

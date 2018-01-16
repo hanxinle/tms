@@ -19,13 +19,14 @@ public:
     LocalStreamCenter();
     ~LocalStreamCenter();
 
-	bool RegisterStream(const string& app, const string& stream_name, MediaPublisher* media_publisher);
-    bool UnRegisterStream(const string& app, const string& stream_name, MediaPublisher* media_publisher);
-    MediaPublisher* GetMediaPublisherByAppStream(const string& app, const string& stream_name);
-    bool IsAppStreamExist(const string& app, const string& stream_name);
+	bool RegisterStream(const string& app, const string& stream, MediaPublisher* media_publisher, const bool& is_master);
+    bool UnRegisterStream(const string& app, const string& stream, MediaPublisher* media_publisher);
+    MediaPublisher* GetMediaPublisherByAppStream(const string& app, const string& stream);
+    bool IsAppStreamExist(const string& app, const string& stream);
 
     bool AddAppStreamPendingSubscriber(const string& app, const string& stream, MediaSubscriber* media_subscriber);
     set<MediaSubscriber*> GetAppStreamPendingSubscriber(const string& app, const string& stream);
+    set<MediaSubscriber*> GetAndClearAppStreamPendingSubscriberByType(const string& app, const string& stream, const uint16_t& type);
 
     MediaPublisher* _DebugGetRandomMediaPublisher(string& app, string& stream);
 

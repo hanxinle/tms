@@ -53,7 +53,7 @@ public:
         return Size() == 0;
     }
 
-    int Size()
+    size_t Size()
     {
         if (buf_ == NULL)
         {

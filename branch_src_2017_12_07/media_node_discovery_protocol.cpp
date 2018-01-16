@@ -59,7 +59,7 @@ int MediaNodeDiscoveryProtocol::Parse(IoBuffer& io_buffer)
             NodeRegisterRsp node_register_rsp;
             node_register_rsp.Read(deserialize);
 
-            OnNodeRegisterRsp(node_register_rsp);
+            return OnNodeRegisterRsp(node_register_rsp);
         }   
         break;
 
@@ -68,7 +68,7 @@ int MediaNodeDiscoveryProtocol::Parse(IoBuffer& io_buffer)
             GetNodeListRsp get_node_list_rsp;
             if (get_node_list_rsp.Read(deserialize) == 0)
             {
-                OnGetNodeListRsp(get_node_list_rsp);
+                return OnGetNodeListRsp(get_node_list_rsp);
             }
         }
         break;
@@ -79,10 +79,13 @@ int MediaNodeDiscoveryProtocol::Parse(IoBuffer& io_buffer)
         }   
         break;
     }
+
+    return kError;
 }
 
 int MediaNodeDiscoveryProtocol::OnStop()
 {
+    return kSuccess;
 }
 
 int MediaNodeDiscoveryProtocol::OnConnected()
@@ -107,7 +110,7 @@ int MediaNodeDiscoveryProtocol::Send(const Rpc& rpc)
     rpc.Write(serialize);
 
     const uint8_t* data = serialize.GetBuf();
-    size_t size = serialize.GetSize();
+    int size = serialize.GetSize();
 
     if (GetTcpSocket()->Send(data, size) != size)
     {   
@@ -119,6 +122,11 @@ int MediaNodeDiscoveryProtocol::Send(const Rpc& rpc)
 
 int MediaNodeDiscoveryProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)
 {
+    UNUSED(now_in_ms);
+    UNUSED(interval);
+    UNUSED(count);
+
+    return kSuccess;
 }
 
 int MediaNodeDiscoveryProtocol::OnNodeRegisterRsp(const NodeRegisterRsp& node_register_rsp)
@@ -156,10 +164,7 @@ int MediaNodeDiscoveryProtocol::OnGetNodeListRsp(const GetNodeListRsp& get_node_
 
             cout << LMSG << "media center:" << ip << ":" << node.port[0] << endl;
 
-            if (g_media_node_discovery_mgr->GetMediaCenterMgr() != NULL)
-            {
-                g_media_node_discovery_mgr->GetMediaCenterMgr()->ConnectMediaCenter(ip, node.port[0]);
-            }
+            g_media_center_mgr->ConnectMediaCenter(ip, node.port[0]);
         }
     }
 

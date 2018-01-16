@@ -30,6 +30,8 @@ public:
 
     int OnStop();
 
+    virtual int OnPendingArrive();
+
 private:
     TcpSocket* GetTcpSocket()
     {   
@@ -42,7 +44,7 @@ private:
     MediaPublisher* media_publisher_;
 
     string app_;
-    string stream_name_;
+    string stream_;
     string ts_;
     string type_;
 };

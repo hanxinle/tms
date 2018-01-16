@@ -17,6 +17,7 @@ public:
         epoller_(epoller),
         fd_(fd)
     {
+        cout << "new fd:" << (void*)this << endl;
     }
 
     virtual ~Fd()

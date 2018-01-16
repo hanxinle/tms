@@ -11,6 +11,7 @@
 
 ServerProtocol::ServerProtocol(Epoller* epoller, Fd* socket)
     :
+    MediaSubscriber(kTcpServer),
     epoller_(epoller),
     socket_(socket),
     media_publisher_(NULL),
@@ -20,6 +21,7 @@ ServerProtocol::ServerProtocol(Epoller* epoller, Fd* socket)
 
 ServerProtocol::~ServerProtocol()
 {
+    cout << LMSG << endl;
 }
 
 int ServerProtocol::Parse(IoBuffer& io_buffer)
@@ -167,17 +169,17 @@ int ServerProtocol::Parse(IoBuffer& io_buffer)
         size_t str_len = (size_t)len;
         io_buffer.Read(data, str_len);
 
-        string stream_name((const char*)data, str_len);
+        string stream((const char*)data, str_len);
 
-        SetStreamName(stream_name);
+        SetStreamName(stream);
 
         SetServerPush();
 
-        cout << LMSG << "stream_name:" << stream_name_ << endl;
+        cout << LMSG << "stream:" << stream_ << endl;
 
-        if (app_.empty() == false && stream_name_.empty() == false)
+        if (app_.empty() == false && stream_.empty() == false)
         {
-            g_local_stream_center.RegisterStream(app_, stream_name_, this);
+            g_local_stream_center.RegisterStream(app_, stream_, this, false);
         }
     }
     else if (protocol_id == kPullAppStream)
@@ -196,21 +198,21 @@ int ServerProtocol::Parse(IoBuffer& io_buffer)
         io_buffer.ReadU16(len);
         str_len = (size_t)len;
         io_buffer.Read(data, str_len);
-        string stream_name((const char*)data, str_len);
-        SetStreamName(stream_name);
+        string stream((const char*)data, str_len);
+        SetStreamName(stream);
 
         // XXX: 触发slave register stream
         SendAppName();
         // XXX: 触发slave register stream
         SendStreamName();
 
-        cout << LMSG << "app:" << app << ",stream_name:" << stream_name << endl;
+        cout << LMSG << "app:" << app << ",stream:" << stream << endl;
 
         SetServerPush();
 
-        media_publisher_ = g_local_stream_center.GetMediaPublisherByAppStream(app_, stream_name_);
+        media_publisher_ = g_local_stream_center.GetMediaPublisherByAppStream(app_, stream_);
 
-        cout << LMSG "get " << app_ << ":" << stream_name_ << " media_publisher_:" << media_publisher_ << endl;
+        cout << LMSG "get " << app_ << ":" << stream_ << " media_publisher_:" << media_publisher_ << endl;
 
         if (media_publisher_ != NULL)
         {
@@ -248,13 +250,17 @@ int ServerProtocol::OnStop()
 
     if (role_ == kServerPush)
     {
-        g_local_stream_center.UnRegisterStream(app_, stream_name_, this);
+        g_local_stream_center.UnRegisterStream(app_, stream_, this);
     }
+
+    return kSuccess;
 }
 
 int ServerProtocol::OnAccept()
 {
     cout << LMSG << endl;
+
+    return kSuccess;
 }
 
 int ServerProtocol::OnConnected()
@@ -301,11 +307,15 @@ int ServerProtocol::OnConnected()
     {
         SendPullAppStream();
     }
+
+    return kSuccess;
 }
 
 int ServerProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)
 {
     media_muxer_.EveryNSecond(now_in_ms, interval, count);
+
+    return kSuccess;
 }
 
 int ServerProtocol::SendMediaData(const Payload& payload)
@@ -427,10 +437,10 @@ int ServerProtocol::SendStreamName()
 {
     IoBuffer header;
 
-    header.WriteU32(sizeof(uint32_t) + sizeof(uint16_t) + stream_name_.size());
+    header.WriteU32(sizeof(uint32_t) + sizeof(uint16_t) + stream_.size());
     header.WriteU32(kSetStreamName);
-    header.WriteU16(stream_name_.size());
-    header.Write(stream_name_);
+    header.WriteU16(stream_.size());
+    header.Write(stream_);
 
     uint8_t* data = NULL;
 
@@ -443,15 +453,15 @@ int ServerProtocol::SendStreamName()
 
 int ServerProtocol::SendPullAppStream()
 {
-    cout << LMSG << "app_:" << app_ << ",stream_name:" << stream_name_ << endl;
+    cout << LMSG << "app_:" << app_ << ",stream:" << stream_ << endl;
     IoBuffer header;
 
-    header.WriteU32(sizeof(uint32_t) + sizeof(uint16_t) + app_.size() + sizeof(uint16_t) + stream_name_.size());
+    header.WriteU32(sizeof(uint32_t) + sizeof(uint16_t) + app_.size() + sizeof(uint16_t) + stream_.size());
     header.WriteU32(kPullAppStream);
     header.WriteU16(app_.size());
     header.Write(app_);
-    header.WriteU16(stream_name_.size());
-    header.Write(stream_name_);
+    header.WriteU16(stream_.size());
+    header.Write(stream_);
 
     uint8_t* data = NULL;
 
@@ -500,6 +510,8 @@ int ServerProtocol::OnNewRtmpPlayer(RtmpProtocol* protocol)
     {
         protocol->SendMediaData(payload);
     }
+
+    return kSuccess;
 }
 
 int ServerProtocol::OnNewFlvPlayer(HttpFlvProtocol* protocol)
@@ -529,4 +541,6 @@ int ServerProtocol::OnNewFlvPlayer(HttpFlvProtocol* protocol)
     {
         protocol->SendMediaData(payload);
     }
+
+    return kSuccess;
 }

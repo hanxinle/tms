@@ -18,7 +18,7 @@ public:
     {
     }
 
-    ~MediaPublisher()
+    virtual ~MediaPublisher()
     {
     }
 

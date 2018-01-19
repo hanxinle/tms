@@ -1,5 +1,5 @@
 # =========================================================
-INCLUDE_DIR    += -I. -I./include/ -I../rpc
+INCLUDE_DIR    += -I. -I./include/ -I../rpc -I../common
 
 LIB_DIR        +=
 # ==========================================================
@@ -9,6 +9,7 @@ CFLAGS         = -g -Wno-deprecated -W -O2 -pg
 CXXFLAGS       = -g -std=c++0x -O2 -pg
 # ==========================================================
 SOURCES += $(wildcard ./*.cpp)
+SOURCES += $(wildcard ../common/*.cpp)
 OBJECTS += $(patsubst %.cpp,%.o, $(patsubst %.c,%.o, $(SOURCES)))
 # ==========================================================
 ALL_OBJECTS = $(OBJECTS)

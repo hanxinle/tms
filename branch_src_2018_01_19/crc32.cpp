@@ -3,7 +3,7 @@
 uint32_t CRC32::GetCrc32(const uint8_t* data, int len)
 {
 	uint32_t i_crc = 0xffffffff;
-    for(int i = 0; (size_t)i < len; i++ )
+    for(int i = 0; i < len; i++ )
 	{
     	i_crc = (i_crc << 8) ^ crc32_table[((i_crc >> 24) ^ data[i]) & 0xff];
 	}

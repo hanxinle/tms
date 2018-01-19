@@ -83,7 +83,9 @@ struct RtmpMessage
         timestamp_calc(0),
         message_length(0),
         message_type_id(0),
-        message_stream_id(0)
+        message_stream_id(0),
+        msg(NULL),
+        len(0)
     {
     }
 

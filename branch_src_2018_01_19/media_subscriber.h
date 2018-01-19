@@ -22,7 +22,7 @@ public:
     {
     }
 
-    ~MediaSubscriber()
+    virtual ~MediaSubscriber()
     {
         if (publisher_ != NULL)
         {

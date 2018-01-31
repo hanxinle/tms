@@ -1,6 +1,8 @@
 #ifndef __IO_BUFFER_H__
 #define __IO_BUFFER_H__
 
+#include <assert.h>
+
 #include <iostream>
 #include <string>
 
@@ -19,10 +21,10 @@ class IoBuffer
 {
 public:
     IoBuffer(const size_t& capacity = 0);
-    ~IoBuffer();
+    virtual ~IoBuffer();
 
-    int ReadFromFdAndWrite(const int& fd);
-    int WriteToFd(const int& fd);
+    virtual int ReadFromFdAndWrite(const int& fd);
+    virtual int WriteToFd(const int& fd);
 
     int Write(const string& data);
     int Write(const uint8_t* data, const size_t& len);
@@ -67,6 +69,8 @@ public:
             //VERBOSE << LMSG << "adjust start_ and end_ to buf_" << endl;
         }
 
+        assert(end_ >= start_);
+
         return end_ - start_;
     }
 
@@ -75,7 +79,7 @@ public:
         return capacity_ - (end_ - buf_);
     }
 
-private:
+protected:
     int MakeSpaceIfNeed(const size_t& len);
     void ShrinkCapacity(const size_t& capacity)
     {
@@ -92,7 +96,7 @@ private:
         end_ = buf_;
     }
 
-private:
+protected:
     uint8_t *buf_;
     uint64_t capacity_;
 

@@ -171,6 +171,8 @@ int IoBuffer::WriteFake(const size_t& len)
 
 int IoBuffer::MakeSpaceIfNeed(const size_t& len)
 {
+    assert(end_ >= start_);
+
     size_t cur_capacity = CapacityLeft();
     size_t start_pos = start_ - buf_;
     size_t end_pos = end_ - buf_;
@@ -182,7 +184,7 @@ int IoBuffer::MakeSpaceIfNeed(const size_t& len)
 
     size_t new_capacity = max(capacity_ + len, capacity_ * 2);
 
-    //VERBOSE << LMSG << "cur_capacity:" << cur_capacity << ",new_capacity:" << new_capacity << endl;
+    cout << LMSG << "cur_capacity:" << cur_capacity << ",new_capacity:" << new_capacity << endl;
 
     buf_ = (uint8_t*)realloc(buf_, new_capacity);
 
@@ -193,6 +195,8 @@ int IoBuffer::MakeSpaceIfNeed(const size_t& len)
 
     start_ = buf_ + start_pos;
     end_ = buf_ + end_pos;
+
+    assert(end_ >= start_);
 
     capacity_ = new_capacity;
 

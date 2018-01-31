@@ -17,6 +17,16 @@ enum RetCode
     kPending = 3,
 };
 
+enum ConnectStatus
+{
+	kDisconnected = -1, 
+    kConnecting = 0,
+    kConnected = 1,
+    kHandshakeing = 2,
+    kHandshaked = 3,
+    kDisconnecting = 4,
+};
+
 enum FrameType
 {
     kUnknownFrame= -1, 
@@ -65,6 +75,11 @@ enum SubscriberType
 enum ServerProtocolDefine
 {
     kServerProtocolHeaderSize = 4,
+};
+
+enum WebSocketProtocolDefine
+{
+    kWebSocketProtocolHeaderSize = 2,
 };
 
 enum ProtocolId

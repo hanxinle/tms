@@ -4,11 +4,9 @@
 #include "rtmp_mgr.h"
 #include "server_mgr.h"
 
-HttpFlvMgr::HttpFlvMgr(Epoller* epoller, RtmpMgr* rtmp_mgr, ServerMgr* server_mgr)
+HttpFlvMgr::HttpFlvMgr(Epoller* epoller)
     :
-    epoller_(epoller),
-    rtmp_mgr_(rtmp_mgr),
-    server_mgr_(server_mgr)
+    epoller_(epoller)
 {
 }
 

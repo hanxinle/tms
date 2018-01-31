@@ -5,6 +5,7 @@
 
 #include "admin_mgr.h"
 #include "any.h"
+#include "base_64.h"
 #include "bit_buffer.h"
 #include "bit_stream.h"
 #include "epoller.h"
@@ -17,11 +18,15 @@
 #include "rtmp_mgr.h"
 #include "server_mgr.h"
 #include "socket_util.h"
+#include "ssl_socket.h"
 #include "tcp_socket.h"
 #include "timer_in_second.h"
 #include "timer_in_millsecond.h"
 #include "trace_tool.h"
 #include "util.h"
+#include "web_socket_mgr.h"
+
+#include "openssl/ssl.h"
 
 using namespace any;
 using namespace std;
@@ -37,23 +42,137 @@ LocalStreamCenter       g_local_stream_center;
 NodeInfo                g_node_info;
 Epoller*                g_epoll = NULL;
 HttpFlvMgr*             g_http_flv_mgr = NULL;
+HttpFlvMgr*             g_https_flv_mgr = NULL;
 HttpHlsMgr*             g_http_hls_mgr = NULL;
 MediaCenterMgr*         g_media_center_mgr = NULL;
 MediaNodeDiscoveryMgr*  g_media_node_discovery_mgr = NULL;
 RtmpMgr*                g_rtmp_mgr = NULL;
 ServerMgr*              g_server_mgr = NULL;
+SSL_CTX*                g_ssl_ctx = NULL;
 
 int main(int argc, char* argv[])
 {
+    string raw = "Man is distinguished, not only by his reason, but by this singular passion from other animals, which is a lust of the mind, that by a perseverance of delight in the continued and indefatigable generation of knowledge, exceeds the short vehemence of any carnal pleasure.";
+
+    string base64;
+
+    Base64::Encode(raw, base64);
+
+    cout << base64 << endl;
+
+    string tmp;
+    Base64::Decode(base64, tmp);
+
+    cout << raw << endl;
+    cout << tmp << endl;
+
+    cout << raw.size() << endl;
+    cout << tmp.size() << endl;
+
+    assert(raw == tmp);
+
+    FILE* server_private_key_file = fopen("server.key", "r");
+    if (server_private_key_file == NULL)
+    {
+        cout << LMSG << endl;
+        return -1;
+    }
+
+    // Open ssl init
+	SSL_load_error_strings();
+    int ret = SSL_library_init();
+
+    assert(ret == 1);
+
+    g_ssl_ctx = SSL_CTX_new(SSLv23_method());
+
+    assert(g_ssl_ctx != NULL);
+
+	string server_crt = "";
+	string server_key = "";
+
+    int server_crt_fd = open("server.crt", O_RDONLY, 0664);
+    if (server_crt_fd < 0)
+    {
+        cout << LMSG << "open server.crt failed" << endl;
+        return -1;
+    }
+
+    while (true)
+    {
+        char buf[4096];
+        int bytes = read(server_crt_fd, buf, sizeof(buf));
+
+        if (bytes < 0)
+        {
+            cout << "read server.crt failed" << endl;
+            return -1;
+        }
+        else if (bytes == 0)
+        {
+            break;
+        }
+
+        server_crt.append(buf, bytes);
+    }
+
+
+    int server_key_fd = open("server.key", O_RDONLY, 0664);
+    if (server_key_fd < 0)
+    {
+        cout << LMSG << "open server.key failed" << endl;
+        return -1;
+    }
+
+    while (true)
+    {
+        char buf[4096];
+        int bytes = read(server_key_fd, buf, sizeof(buf));
+
+        if (bytes < 0)
+        {
+            cout << "read server.key failed" << endl;
+            return -1;
+        }
+        else if (bytes == 0)
+        {
+            break;
+        }
+
+        server_key.append(buf, bytes);
+    }
+
+	BIO *mem_cert = BIO_new_mem_buf((void *)server_crt.c_str(), server_crt.length());
+    assert(mem_cert != NULL);
+    X509 *cert= PEM_read_bio_X509(mem_cert,NULL,NULL,NULL);
+    assert(cert != NULL);    
+    SSL_CTX_use_certificate(g_ssl_ctx, cert);
+    X509_free(cert);
+    BIO_free(mem_cert);    
+    
+    BIO *mem_key = BIO_new_mem_buf((void *)server_key.c_str(), server_key.length());
+    assert(mem_key != NULL);
+    RSA *rsa_private = PEM_read_bio_RSAPrivateKey(mem_key, NULL, NULL, NULL);
+    assert(rsa_private != NULL);
+    SSL_CTX_use_RSAPrivateKey(g_ssl_ctx, rsa_private);
+    RSA_free(rsa_private);
+    BIO_free(mem_key);
+
+    ret = SSL_CTX_check_private_key(g_ssl_ctx);
+
+    // parse args
     map<string, string> args_map = Util::ParseArgs(argc, argv);
 
-    uint16_t rtmp_port     = 1935;
-    uint16_t http_flv_port = 8787;
-    uint16_t http_hls_port = 8788;
-    string server_ip       = "";
-    uint16_t server_port   = 10001;
-    uint16_t admin_port    = 11000;
-    bool daemon            = false;
+    uint16_t rtmp_port              = 1935;
+    uint16_t https_flv_port         = 8743;
+    uint16_t http_flv_port          = 8787;
+    uint16_t http_hls_port          = 8888;
+    string server_ip                = "";
+    uint16_t server_port            = 10001;
+    uint16_t admin_port             = 11000;
+    uint16_t web_socket_port        = 8901;
+    uint16_t ssl_web_socket_port    = 8943;
+    bool daemon                     = false;
 
     auto iter_server_ip     = args_map.find("server_ip");
     auto iter_rtmp_port     = args_map.find("rtmp_port");
@@ -175,21 +294,37 @@ int main(int argc, char* argv[])
     server_rtmp_socket.EnableRead();
     server_rtmp_socket.AsServerSocket();
 
-    // === Init Server Flv Socket ===
-    int server_flv_fd = CreateNonBlockTcpSocket();
+    // === Init Server Http Flv Socket ===
+    int server_http_flv_fd = CreateNonBlockTcpSocket();
 
-    ReuseAddr(server_flv_fd);
-    Bind(server_flv_fd, "0.0.0.0", http_flv_port);
-    Listen(server_flv_fd);
-    SetNonBlock(server_flv_fd);
+    ReuseAddr(server_http_flv_fd);
+    Bind(server_http_flv_fd, "0.0.0.0", http_flv_port);
+    Listen(server_http_flv_fd);
+    SetNonBlock(server_http_flv_fd);
 
-    HttpFlvMgr http_flv_mgr(&epoller, &rtmp_mgr, &server_mgr);
+    HttpFlvMgr http_flv_mgr(&epoller);
 
     g_http_flv_mgr = &http_flv_mgr;
 
-    TcpSocket server_flv_socket(&epoller, server_flv_fd, &http_flv_mgr);
-    server_flv_socket.EnableRead();
-    server_flv_socket.AsServerSocket();
+    TcpSocket server_http_flv_socket(&epoller, server_http_flv_fd, &http_flv_mgr);
+    server_http_flv_socket.EnableRead();
+    server_http_flv_socket.AsServerSocket();
+
+    // === Init Server Https Flv Socket ===
+    int server_https_flv_fd = CreateNonBlockTcpSocket();
+
+    ReuseAddr(server_https_flv_fd);
+    Bind(server_https_flv_fd, "0.0.0.0", https_flv_port);
+    Listen(server_https_flv_fd);
+    SetNonBlock(server_https_flv_fd);
+
+    HttpFlvMgr https_flv_mgr(&epoller);
+
+    g_https_flv_mgr = &https_flv_mgr;
+
+    SslSocket server_https_flv_socket(&epoller, server_https_flv_fd, &https_flv_mgr);
+    server_https_flv_socket.EnableRead();
+    server_https_flv_socket.AsServerSocket();
 
     // === Init Server Hls Socket ===
     int server_hls_fd = CreateNonBlockTcpSocket();
@@ -220,6 +355,34 @@ int main(int argc, char* argv[])
     TcpSocket admin_socket(&epoller, admin_fd, &admin_mgr);
     admin_socket.EnableRead();
     admin_socket.AsServerSocket();
+
+    // === Init WebSocket Socket ===
+    int web_socket_fd = CreateNonBlockTcpSocket();
+
+    ReuseAddr(web_socket_fd);
+    Bind(web_socket_fd, "0.0.0.0", web_socket_port);
+    Listen(web_socket_fd);
+    SetNonBlock(web_socket_fd);
+
+    WebSocketMgr web_socket_mgr(&epoller);
+
+    TcpSocket web_socket_socket(&epoller, web_socket_fd, &web_socket_mgr);
+    web_socket_socket.EnableRead();
+    web_socket_socket.AsServerSocket();
+
+    // === Init SSL WebSocket Socket ===
+    int ssl_web_socket_fd = CreateNonBlockTcpSocket();
+
+    ReuseAddr(ssl_web_socket_fd);
+    Bind(ssl_web_socket_fd, "0.0.0.0", ssl_web_socket_port);
+    Listen(ssl_web_socket_fd);
+    SetNonBlock(ssl_web_socket_fd);
+
+    WebSocketMgr ssl_web_socket_mgr(&epoller);
+
+    SslSocket ssl_web_socket_socket(&epoller, ssl_web_socket_fd, &ssl_web_socket_mgr);
+    ssl_web_socket_socket.EnableRead();
+    ssl_web_socket_socket.AsServerSocket();
 
     // === Init Media Center ===
     MediaCenterMgr media_center_mgr(&epoller);

@@ -10,6 +10,7 @@
 #include "media_node_discovery_mgr.h"
 #include "rtmp_mgr.h"
 #include "server_mgr.h"
+#include <openssl/ssl.h>
 
 extern LocalStreamCenter 	    g_local_stream_center;
 extern NodeInfo          	    g_node_info;
@@ -20,5 +21,6 @@ extern MediaCenterMgr* 	        g_media_center_mgr;
 extern MediaNodeDiscoveryMgr*   g_media_node_discovery_mgr;
 extern RtmpMgr*        	        g_rtmp_mgr;
 extern ServerMgr*      	        g_server_mgr;
+extern SSL_CTX*                 g_ssl_ctx;
 
 #endif // __GLOBAL_H__

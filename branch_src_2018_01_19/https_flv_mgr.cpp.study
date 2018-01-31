@@ -1,0 +1,74 @@
+#include "fd.h"
+#include "https_flv_mgr.h"
+#include "https_flv_protocol.h"
+#include "rtmp_mgr.h"
+#include "server_mgr.h"
+
+HttpsFlvMgr::HttpsFlvMgr(Epoller* epoller)
+    :
+    epoller_(epoller)
+{
+}
+
+HttpsFlvMgr::~HttpsFlvMgr()
+{
+}
+
+int HttpsFlvMgr::HandleRead(IoBuffer& io_buffer, Fd& socket)
+{
+	HttpsFlvProtocol* https_protocol = GetOrCreateProtocol(socket);
+
+    int ret = kClose;
+
+    while ((ret = https_protocol->Parse(io_buffer)) == kSuccess)
+    {   
+    }
+
+    return ret;
+}
+
+int HttpsFlvMgr::HandleClose(IoBuffer& io_buffer, Fd& socket)
+{
+    UNUSED(io_buffer);
+
+	HttpsFlvProtocol* https_protocol = GetOrCreateProtocol(socket);
+
+    https_protocol->OnStop();
+
+    delete https_protocol;
+    fd_protocol_.erase(socket.GetFd());
+
+    return kSuccess;
+}
+
+int HttpsFlvMgr::HandleError(IoBuffer& io_buffer, Fd& socket)
+{
+    UNUSED(io_buffer);
+
+	HttpsFlvProtocol* https_protocol = GetOrCreateProtocol(socket);
+
+    https_protocol->OnStop();
+
+    delete https_protocol;
+    fd_protocol_.erase(socket.GetFd());
+
+    return kSuccess;
+}
+
+int HttpsFlvMgr::HandleConnected(Fd& socket)
+{
+    UNUSED(socket);
+
+    return kSuccess;
+}
+
+HttpsFlvProtocol* HttpsFlvMgr::GetOrCreateProtocol(Fd& socket)
+{
+    int fd = socket.GetFd();
+    if (fd_protocol_.count(fd) == 0)
+    {   
+        fd_protocol_[fd] = new HttpsFlvProtocol(epoller_, &socket);
+    }   
+
+    return fd_protocol_[fd];
+}

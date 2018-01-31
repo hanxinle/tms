@@ -101,7 +101,7 @@ public:
     }
 
 private:
-    uint8_t buf_[1024];
+    uint8_t buf_[4096];
     uint32_t bit_len_;
     uint32_t cur_pos_;
 };

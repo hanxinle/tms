@@ -1,13 +1,13 @@
 # =========================================================
-INCLUDE_DIR    += -I. -I./include/ -I../rpc -I../common
+INCLUDE_DIR    += -I. -I./include/ -I../rpc -I../common -I../depend/build/include
 
-LIB_DIR        +=
+LIB_DIR        += ../depend/build/lib/libssl.a ../depend/build/lib/libcrypto.a -lpthread -ldl
 # ==========================================================
 CC             = gcc
 CXX 		   = g++
 #CXX 		   = clang
 CFLAGS         = -g -W -Wall -Werror -O2 -pg
-CXXFLAGS       = -g -std=c++0x -W -Wall -Werror -O2 -pg -Wno-strict-aliasing -Wno-missing-field-initializers -Wno-unused-function
+CXXFLAGS       = -g -std=c++0x -W -Wall -Werror -O2 -pg -Wno-strict-aliasing -Wno-missing-field-initializers -Wno-unused-function -Wno-deprecated-declarations -Wno-unused-variable -Wno-unused-parameter
 # ==========================================================
 SOURCES += $(wildcard ./*.cpp)
 SOURCES += $(wildcard ../common/*.cpp)

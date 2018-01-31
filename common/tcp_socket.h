@@ -8,14 +8,6 @@
 class Epoller;
 class SocketHandle;
 
-enum ConnectStatus
-{
-    kDisconnected = -1,
-    kConnecting = 0,
-    kConnected = 1,
-    kDisconnecting = 2,
-};
-
 class TcpSocket : public Fd
 {
 public:

@@ -107,6 +107,30 @@ namespace socket_util
         return fd;
     }
 
+    inline int CreateUdpSocket()
+    {
+        int fd = socket(AF_INET, SOCK_DGRAM, 0);
+
+        if (fd < 0)
+        {
+            cout << LMSG << "socket err:" << strerror(errno) << endl;
+        }
+
+        return fd;
+    }
+
+    inline int CreateNonBlockUdpSocket()
+    {
+        int fd = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0);
+
+        if (fd < 0)
+        {
+            cout << LMSG << "socket err:" << strerror(errno) << endl;
+        }
+
+        return fd;
+    }
+
     inline int ReuseAddr(const int& fd)
     {
         int i = 1;

@@ -24,6 +24,7 @@ public:
     static uint64_t GetNow();
     static uint64_t GetNowUs();
     static string GetNowStr();
+    static string GetNowStrHttpFormat(); // RFC 2822
     static string GetNowMsStr();
 
 	template<typename T>

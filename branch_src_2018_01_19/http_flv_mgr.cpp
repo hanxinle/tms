@@ -72,3 +72,13 @@ HttpFlvProtocol* HttpFlvMgr::GetOrCreateProtocol(Fd& socket)
 
     return fd_protocol_[fd];
 }
+
+int HttpFlvMgr::HandleTimerInSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)
+{
+    for (auto& kv : fd_protocol_)
+    {   
+        kv.second->EveryNSecond(now_in_ms, interval, count);
+    }   
+
+    return kSuccess;
+}

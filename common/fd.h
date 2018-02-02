@@ -4,12 +4,14 @@
 #include <unistd.h>
 
 #include <iostream>
+#include <string>
 
 #include "common_define.h"
 #include "epoller.h"
 
 using std::cout;
 using std::endl;
+using std::string;
 
 class Fd
 {
@@ -69,6 +71,10 @@ public:
     }
 
     virtual int Send(const uint8_t* data, const size_t& len) = 0;
+    virtual int SendTo(const uint8_t* data, const size_t& len, const string& dst_ip, const uint16_t& dst_port)
+    {
+        return 0;
+    };
 
 protected:
     Epoller* epoller_;

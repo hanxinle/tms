@@ -245,6 +245,25 @@ string Util::GetNowStr()
     return "";
 }
 
+string Util::GetNowStrHttpFormat()
+{
+    char time_printf[256];
+
+    timeval tv;
+    gettimeofday(&tv, NULL);
+
+    tm* time_struct = localtime(&tv.tv_sec);
+
+    size_t ret = strftime(time_printf, sizeof(time_printf), "%a, %d %b %Y %T %z", time_struct);
+
+    if (ret > 0)
+    {
+        return string(time_printf, ret);
+    }
+
+    return "";
+}
+
 string Util::GetNowMsStr()
 {
     char time_printf[256];
@@ -285,7 +304,16 @@ vector<string> Util::SepStr(const string& input, const string& sep)
             break;
         }
 
-        ret.push_back(input.substr(pre_pos, pos - pre_pos));
+        string tmp = input.substr(pre_pos, pos - pre_pos);
+
+        if (tmp == sep)
+        {
+        }
+        else
+        {
+            ret.push_back(tmp);
+        }
+
         pre_pos = pos + sep.size();
     }
 

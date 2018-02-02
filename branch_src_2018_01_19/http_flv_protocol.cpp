@@ -5,6 +5,7 @@
 #include "global.h"
 #include "http_flv_mgr.h"
 #include "http_flv_protocol.h"
+#include "http_sender.h"
 #include "io_buffer.h"
 #include "local_stream_center.h"
 #include "media_center_mgr.h"
@@ -33,158 +34,69 @@ HttpFlvProtocol::~HttpFlvProtocol()
 
 int HttpFlvProtocol::Parse(IoBuffer& io_buffer)
 {
-    uint8_t* data = NULL;
+    int ret = http_parse_.Decode(io_buffer);
 
-    int size = io_buffer.Read(data, io_buffer.Size());
-
-
-    int r_pos = -1; // '\r'
-    int n_pos = -1; // '\n'
-    int m_pos = -1; // ':'
-
-    bool key_value = false; // false:key, true:value
-
-    string key;
-    string value;
-
-    map<string, string> header;
-
-    for (int i = 0; i != size; ++i)
+    if (ret == kSuccess)
     {
-        if (data[i] == '\r')
+        if (http_parse_.IsFlvRequest(app_, stream_))
         {
-            r_pos = i;
-        }
-        else if (data[i] == '\n')
-        {
-            if (i == r_pos + 1)
+            if (! app_.empty() && ! stream_.empty())
             {
-                if (i == n_pos + 2) // \r\n\r\n
+                media_publisher_ = g_local_stream_center.GetMediaPublisherByAppStream(app_, stream_);
+
+                if (media_publisher_ != NULL) // 本进程有流
                 {
-                    cout << LMSG << "http done" << endl;
+                    HttpSender http_rsp;
+                    http_rsp.SetStatus("200");
+                    http_rsp.SetContentType("flv");
+                    http_rsp.SetKeepAlive();
 
-                    cout << LMSG << "app_:" << app_ << ",stream_:" << stream_ << ",type_:" << type_ << endl;
-                    if (! app_.empty() && ! stream_.empty())
-                    {
-                        media_publisher_ = g_local_stream_center.GetMediaPublisherByAppStream(app_, stream_);
+	                string http_response = http_rsp.Encode();
 
-                        if (media_publisher_ != NULL) // 本进程有流
-                        {
-                            if (type_ == "flv")
-                            {
-					            string http_response = "HTTP/1.1 200 OK\r\n"
-                                                       "Server: trs\r\n"
-                                                       "Content-Type: flv-application/octet-stream\r\n"
-                                                       "Connection: keep-alive\r\n"
-                                                       "\r\n";
-
-					            GetTcpSocket()->Send((const uint8_t*)http_response.data(), http_response.size());
-                                SendFlvHeader();
-                                media_publisher_->AddSubscriber(this);
-                            }
-                        }
-                        else  // 本进程无流, 从MediaCenter获取publish node
-                        {
-                            g_media_center_mgr->GetAppStreamMasterNode(app_, stream_);
-                            expired_time_ms_ = Util::GetNowMs() + 10000;
-
-                            g_local_stream_center.AddAppStreamPendingSubscriber(app_, stream_, this);
-                        }
-                    }
-
-                    return kSuccess;
+		            GetTcpSocket()->Send((const uint8_t*)http_response.data(), http_response.size());
+                    SendFlvHeader();
+                    media_publisher_->AddSubscriber(this);
                 }
-                else // \r\n
+                else  // 本进程无流, 从MediaCenter获取publish node
                 {
-                    key_value = false;
+                    g_media_center_mgr->GetAppStreamMasterNode(app_, stream_);
+                    expired_time_ms_ = Util::GetNowMs() + 10000;
 
-                    cout << LMSG << key << ":" << value << endl;
-
-                    if (key.find("GET") != string::npos)
-                    {
-                        //GET /test.flv HTTP/1.1
-                        int s_count = 0;
-                        int x_count = 0; // /
-                        int d_count = 0; // .
-                        for (const auto& ch : key)
-                        {
-                            if (ch == ' ')
-                            {
-                                ++s_count;
-                            }
-                            else if (ch == '/')
-                            {
-                                ++x_count;
-                            }
-                            else if (ch == '.')
-                            {
-                                ++d_count;
-                            }
-                            else
-                            {
-                                if (x_count == 1)
-                                {
-                                    app_ += ch;
-                                }
-                                else if (x_count == 2 && s_count < 2)
-                                {
-                                    if (d_count == 1)
-                                    {
-                                        type_ += ch;
-                                    }
-                                    else
-                                    {
-                                        stream_ += ch;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    header[key] = value;
-                    key.clear();
-                    value.clear();
+                    g_local_stream_center.AddAppStreamPendingSubscriber(app_, stream_, this);
                 }
-            }
-
-            n_pos = i;
-        }
-        else if (data[i] == ':')
-        {
-            m_pos = i;
-            key_value = true;
-        }
-        else if (data[i] == ' ')
-        {
-            if (m_pos + 1 == i)
-            {
             }
             else
             {
-                if (key_value)
-                {
-                    value += (char)data[i];
-                }
-                else
-                {
-                    key += (char)data[i];
-                }
+                cout << LMSG << "no flv" << endl;
+
+                HttpSender http_rsp;
+                http_rsp.SetStatus("404");
+                http_rsp.SetContentType("html");
+                http_rsp.SetClose();
+                http_rsp.SetContent("fuck you");
+
+	            string http_response = http_rsp.Encode();
+
+		        GetTcpSocket()->Send((const uint8_t*)http_response.data(), http_response.size());
             }
         }
         else
         {
-            if (key_value)
-            {
-                value += (char)data[i];
-            }
-            else
-            {
-                key += (char)data[i];
-            }
+            cout << LMSG << "no flv" << endl;
+
+            HttpSender http_rsp;
+            http_rsp.SetStatus("404");
+            http_rsp.SetContentType("html");
+            http_rsp.SetClose();
+            http_rsp.SetContent("fuck you");
+
+	        string http_response = http_rsp.Encode();
+
+		    GetTcpSocket()->Send((const uint8_t*)http_response.data(), http_response.size());
         }
     }
 
-    return kNoEnoughData;
+    return ret;
 }
 
 int HttpFlvProtocol::SendFlvHeader()
@@ -412,22 +324,19 @@ int HttpFlvProtocol::OnPendingArrive()
         if (media_publisher_ != NULL) // 从MediaCenter查到了publish node
         {
             cout << LMSG << endl;
-            if (type_ == "flv")
-            {
-                cout << LMSG << endl;
 
-	            string http_response = "HTTP/1.1 200 OK\r\n"
-                                       "Server: trs\r\n"
-                                       "Content-Type: flv-application/octet-stream\r\n"
-                                       "Connection: keep-alive\r\n"
-                                       "\r\n";
+            HttpSender http_rsp;
+            http_rsp.SetStatus("200");
+            http_rsp.SetContentType("flv");
+            http_rsp.SetKeepAlive();
 
-	            GetTcpSocket()->Send((const uint8_t*)http_response.data(), http_response.size());
-                SendFlvHeader();
-                media_publisher_->AddSubscriber(this);
+	        string http_response = http_rsp.Encode();
 
-                expired_time_ms_ = 0;
-            }
+	        GetTcpSocket()->Send((const uint8_t*)http_response.data(), http_response.size());
+            SendFlvHeader();
+            media_publisher_->AddSubscriber(this);
+
+            expired_time_ms_ = 0;
         }
         else
         {

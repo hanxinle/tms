@@ -1,5 +1,5 @@
-#ifndef __HTTP_FLV_MGR_H__
-#define __HTTP_FLV_MGR_H__
+#ifndef __ECHO_MGR_H__
+#define __ECHO_MGR_H__
 
 #include <map>
 #include <set>
@@ -11,15 +11,13 @@ using std::set;
 
 class Epoller;
 class Fd;
-class HttpFlvProtocol;
-class ServerMgr;
-class RtmpMgr;
+class EchoProtocol;
 
-class HttpFlvMgr : public SocketHandle
+class EchoMgr : public SocketHandle
 {
 public:
-    HttpFlvMgr(Epoller* epoller);
-    ~HttpFlvMgr();
+    EchoMgr(Epoller* epoller);
+    ~EchoMgr();
 
     virtual int HandleRead(IoBuffer& io_buffer, Fd& socket);
     virtual int HandleClose(IoBuffer& io_buffer, Fd& socket);
@@ -29,11 +27,11 @@ public:
 	virtual int HandleTimerInSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
 
 private:
-    HttpFlvProtocol* GetOrCreateProtocol(Fd& socket);
+    EchoProtocol* GetOrCreateProtocol(Fd& socket);
 
 private:
     Epoller* epoller_;
-    map<int, HttpFlvProtocol*> fd_protocol_;
+    map<int, EchoProtocol*> fd_protocol_;
 };
 
-#endif // __HTTP_FLV_MGR_H__
+#endif // __ECHO_MGR_H__

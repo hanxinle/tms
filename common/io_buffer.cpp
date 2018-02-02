@@ -72,6 +72,35 @@ int IoBuffer::ReadFromFdAndWrite(const int& fd)
     return bytes;
 }
 
+int IoBuffer::ReadFromFdAndWrite(const int& fd, sockaddr* addr, socklen_t* addr_len)
+{
+    MakeSpaceIfNeed(kUdpMaxSize);
+
+    //VERBOSE << LMSG << "IoBuffer capacity:" << CapacityLeft() << endl;
+
+    int bytes = recvfrom(fd, end_, CapacityLeft(), 0, addr, addr_len);
+
+    if (bytes > 0)
+    {
+        //VERBOSE << LMSG << "read " << bytes << " bytes" << endl;
+        end_ += bytes;
+    }
+    else if (bytes == 0)
+    {
+        cout << LMSG << "udp read 0 bytes is impossible" << endl;
+        assert(false);
+    }
+    else
+    {
+        if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
+        {
+            cout << LMSG << "read err:" << strerror(errno) << endl;
+        }
+    }
+
+    return bytes;
+}
+
 int IoBuffer::WriteToFd(const int& fd)
 {
     if (Empty())

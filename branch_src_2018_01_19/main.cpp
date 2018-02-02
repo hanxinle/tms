@@ -8,7 +8,9 @@
 #include "base_64.h"
 #include "bit_buffer.h"
 #include "bit_stream.h"
+#include "echo_mgr.h"
 #include "epoller.h"
+#include "http_file_mgr.h"
 #include "http_flv_mgr.h"
 #include "http_hls_mgr.h"
 #include "local_stream_center.h"
@@ -23,7 +25,9 @@
 #include "timer_in_second.h"
 #include "timer_in_millsecond.h"
 #include "trace_tool.h"
+#include "udp_socket.h"
 #include "util.h"
+#include "webrtc_mgr.h"
 #include "web_socket_mgr.h"
 
 #include "openssl/ssl.h"
@@ -44,6 +48,7 @@ Epoller*                g_epoll = NULL;
 HttpFlvMgr*             g_http_flv_mgr = NULL;
 HttpFlvMgr*             g_https_flv_mgr = NULL;
 HttpHlsMgr*             g_http_hls_mgr = NULL;
+HttpHlsMgr*             g_https_hls_mgr = NULL;
 MediaCenterMgr*         g_media_center_mgr = NULL;
 MediaNodeDiscoveryMgr*  g_media_node_discovery_mgr = NULL;
 RtmpMgr*                g_rtmp_mgr = NULL;
@@ -164,14 +169,18 @@ int main(int argc, char* argv[])
     map<string, string> args_map = Util::ParseArgs(argc, argv);
 
     uint16_t rtmp_port              = 1935;
+    uint16_t http_file_port         = 8666;
     uint16_t https_flv_port         = 8743;
     uint16_t http_flv_port          = 8787;
+    uint16_t https_hls_port         = 8843;
     uint16_t http_hls_port          = 8888;
     string server_ip                = "";
     uint16_t server_port            = 10001;
     uint16_t admin_port             = 11000;
     uint16_t web_socket_port        = 8901;
     uint16_t ssl_web_socket_port    = 8943;
+    uint16_t echo_port              = 11345;
+    uint16_t webrtc_port            = 11445;
     bool daemon                     = false;
 
     auto iter_server_ip     = args_map.find("server_ip");
@@ -326,21 +335,37 @@ int main(int argc, char* argv[])
     server_https_flv_socket.EnableRead();
     server_https_flv_socket.AsServerSocket();
 
-    // === Init Server Hls Socket ===
-    int server_hls_fd = CreateNonBlockTcpSocket();
+    // === Init Server Http Hls Socket ===
+    int server_http_hls_fd = CreateNonBlockTcpSocket();
 
-    ReuseAddr(server_hls_fd);
-    Bind(server_hls_fd, "0.0.0.0", http_hls_port);
-    Listen(server_hls_fd);
-    SetNonBlock(server_hls_fd);
+    ReuseAddr(server_http_hls_fd);
+    Bind(server_http_hls_fd, "0.0.0.0", http_hls_port);
+    Listen(server_http_hls_fd);
+    SetNonBlock(server_http_hls_fd);
 
     HttpHlsMgr http_hls_mgr(&epoller, &rtmp_mgr, &server_mgr);
 
     g_http_hls_mgr = &http_hls_mgr;
 
-    TcpSocket server_hls_socket(&epoller, server_hls_fd, &http_hls_mgr);
-    server_hls_socket.EnableRead();
-    server_hls_socket.AsServerSocket();
+    TcpSocket server_http_hls_socket(&epoller, server_http_hls_fd, &http_hls_mgr);
+    server_http_hls_socket.EnableRead();
+    server_http_hls_socket.AsServerSocket();
+
+    // === Init Server Https Hls Socket ===
+    int server_https_hls_fd = CreateNonBlockTcpSocket();
+
+    ReuseAddr(server_https_hls_fd);
+    Bind(server_https_hls_fd, "0.0.0.0", https_hls_port);
+    Listen(server_https_hls_fd);
+    SetNonBlock(server_https_hls_fd);
+
+    HttpHlsMgr https_hls_mgr(&epoller, &rtmp_mgr, &server_mgr);
+
+    g_https_hls_mgr = &https_hls_mgr;
+
+    SslSocket server_https_hls_socket(&epoller, server_https_hls_fd, &https_hls_mgr);
+    server_https_hls_socket.EnableRead();
+    server_https_hls_socket.AsServerSocket();
 
     // === Init Admin Socket ===
     int admin_fd = CreateNonBlockTcpSocket();
@@ -383,6 +408,46 @@ int main(int argc, char* argv[])
     SslSocket ssl_web_socket_socket(&epoller, ssl_web_socket_fd, &ssl_web_socket_mgr);
     ssl_web_socket_socket.EnableRead();
     ssl_web_socket_socket.AsServerSocket();
+
+    // === Init Server Http File Socket ===
+    int server_http_file_fd = CreateNonBlockTcpSocket();
+
+    ReuseAddr(server_http_file_fd);
+    Bind(server_http_file_fd, "0.0.0.0", http_file_port);
+    Listen(server_http_file_fd);
+    SetNonBlock(server_http_file_fd);
+
+    HttpFileMgr http_file_mgr(&epoller);
+
+    TcpSocket server_http_file_socket(&epoller, server_http_file_fd, &http_file_mgr);
+    server_http_file_socket.EnableRead();
+    server_http_file_socket.AsServerSocket();
+
+    // === Init Udp Echo Socket ===
+    int echo_fd = CreateNonBlockUdpSocket();
+
+    ReuseAddr(echo_fd);
+    Bind(echo_fd, "0.0.0.0", echo_port);
+    Listen(echo_fd);
+    SetNonBlock(echo_fd);
+
+    EchoMgr echo_mgr(&epoller);
+
+    UdpSocket server_echo_socket(&epoller, echo_fd, &echo_mgr);
+    server_echo_socket.EnableRead();
+
+    // === Init Udp Echo Socket ===
+    int webrtc_fd = CreateNonBlockUdpSocket();
+
+    ReuseAddr(webrtc_fd);
+    Bind(webrtc_fd, "0.0.0.0", webrtc_port);
+    Listen(webrtc_fd);
+    SetNonBlock(webrtc_fd);
+
+    WebrtcMgr webrtc_mgr(&epoller);
+
+    UdpSocket server_webrtc_socket(&epoller, webrtc_fd, &webrtc_mgr);
+    server_webrtc_socket.EnableRead();
 
     // === Init Media Center ===
     MediaCenterMgr media_center_mgr(&epoller);

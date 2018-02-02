@@ -5,6 +5,7 @@
 
 #include <string>
 
+#include "http_parse.h"
 #include "media_subscriber.h"
 
 class Epoller;
@@ -60,9 +61,10 @@ private:
 
     string app_;
     string stream_;
-    string type_;
 
     uint32_t pre_tag_size_;
+
+    HttpParse http_parse_;
 };
 
 #endif // __HTTP_FLV_PROTOCOL_H__

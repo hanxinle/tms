@@ -1,6 +1,8 @@
 #ifndef __IO_BUFFER_H__
 #define __IO_BUFFER_H__
 
+#include <sys/socket.h>
+
 #include <assert.h>
 
 #include <iostream>
@@ -16,6 +18,7 @@ using std::endl;
 const uint64_t kDefaultSize = 1024*64;
 const uint64_t kShrinkSize = 2*1024*64;
 const uint64_t kEnlargeSize = 1024*64;
+const uint64_t kUdpMaxSize = 1460;
 
 class IoBuffer
 {
@@ -24,6 +27,7 @@ public:
     virtual ~IoBuffer();
 
     virtual int ReadFromFdAndWrite(const int& fd);
+    virtual int ReadFromFdAndWrite(const int& fd, sockaddr* addr, socklen_t* addr_len);
     virtual int WriteToFd(const int& fd);
 
     int Write(const string& data);

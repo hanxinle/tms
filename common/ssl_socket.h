@@ -4,7 +4,6 @@
 #include "epoller.h"
 #include "ssl_io_buffer.h"
 #include "fd.h"
-#include "ssl_socket.h"
 
 #include "openssl/ssl.h"
 

@@ -3,6 +3,7 @@
 
 #include "base_64.h"
 #include "bit_buffer.h"
+#include "bit_stream.h"
 #include "common_define.h"
 #include "global.h"
 #include "web_socket_protocol.h"
@@ -23,6 +24,40 @@ WebSocketProtocol::~WebSocketProtocol()
 {
 }
 
+/*
+	 0                   1                   2                   3
+      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+     +-+-+-+-+-------+-+-------------+-------------------------------+
+     |F|R|R|R| opcode|M| Payload len |    Extended payload length    |
+     |I|S|S|S|  (4)  |A|     (7)     |             (16/64)           |
+     |N|V|V|V|       |S|             |   (if payload len==126/127)   |
+     | |1|2|3|       |K|             |                               |
+     +-+-+-+-+-------+-+-------------+ - - - - - - - - - - - - - - - +
+     |     Extended payload length continued, if payload len == 127  |
+     + - - - - - - - - - - - - - - - +-------------------------------+
+     |                               |Masking-key, if MASK set to 1  |
+     +-------------------------------+-------------------------------+
+     | Masking-key (continued)       |          Payload Data         |
+     +-------------------------------- - - - - - - - - - - - - - - - +
+     :                     Payload Data continued ...                :
+     + - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - +
+     |                     Payload Data continued ...                |
+     +---------------------------------------------------------------+
+
+	Opcode:  4 bits
+      Defines the interpretation of the "Payload data".  If an unknown
+      opcode is received, the receiving endpoint MUST _Fail the
+      WebSocket Connection_.  The following values are defined.
+
+      *  %x0 denotes a continuation frame
+      *  %x1 denotes a text frame
+      *  %x2 denotes a binary frame
+      *  %x3-7 are reserved for further non-control frames
+      *  %x8 denotes a connection close
+      *  %x9 denotes a ping
+      *  %xA denotes a pong
+      *  %xB-F are reserved for further control frames
+*/
 int WebSocketProtocol::Parse(IoBuffer& io_buffer)
 {
     int http_size = 0;
@@ -278,8 +313,38 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
 
         cout << LMSG << "payload:" << Util::Bin2Hex(data, extended_payload_length) << endl;
 
+        // FIXME: sdp 
+        if (extended_payload_length >= 2 && data[0] == 'v' && data[1] == '=')
+        {
+            string webrtc_test_sdp = Util::ReadFile("webrtc_test.sdp");
+
+            if (webrtc_test_sdp.empty())
+            {
+                return kClose;
+            }
+
+            Util::Replace(webrtc_test_sdp, "a=fingerprint:sha-256\r\n", "a=fingerprint:sha-256 " + g_dtls_fingerprint + "\r\n");
+
+			auto ufrag = Util::GenRandom(15);
+            //auto pwd = Util::GenRandom(22);
+            string pwd = "xiaozhihongxiaozhihong";
+
+            Util::Replace(webrtc_test_sdp, "a=ice-ufrag:xxx\r\n", "a=ice-ufrag:" + ufrag + "\r\n");
+            Util::Replace(webrtc_test_sdp, "a=ice-pwd:xxx\r\n", "a=ice-pwd:" + pwd + "\r\n");
+            Util::Replace(webrtc_test_sdp, "xxx.xxx.xxx.xxx:what", "192.168.247.128 11445");
+
+            string sdp_answer = "{\"sdpAnswer\":\"" + webrtc_test_sdp + "\"}";
+
+            Util::Replace(sdp_answer, "\r\n", "\\r\\n");
+
+            cout << LMSG << sdp_answer << endl;
+
+            Send((const uint8_t*)sdp_answer.data(), sdp_answer.size());
+        }
+
         return kSuccess;
     }
+
 
     // avoid warning
     return kClose;
@@ -287,6 +352,37 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
 
 int WebSocketProtocol::Send(const uint8_t* data, const size_t& len)
 {
+    BitStream bs;
+
+    bs.WriteBits(1, 0x01);
+    bs.WriteBits(3, 0x00);
+    
+    bs.WriteBits(4, 0x01);
+
+    bs.WriteBits(1, 0x00);
+
+    if (len > 125)
+    {
+        if (len < ((1UL<<31)-1))
+        {
+            bs.WriteBits(7, 126);
+            bs.WriteBytes(2, len);
+        }
+        else
+        {
+            bs.WriteBits(7, 127);
+            bs.WriteBytes(8, len);
+        }
+    }
+    else
+    {
+        bs.WriteBits(7, len);
+    }
+
+    bs.WriteData(len, data);
+
+    GetTcpSocket()->Send(bs.GetData(), bs.SizeInBytes());
+
     return kSuccess;
 }
 

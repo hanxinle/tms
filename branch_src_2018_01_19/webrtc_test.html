@@ -1,0 +1,84 @@
+<html>
+
+<body>
+
+<input type="text" name="ws_data_input" id="ws_input">
+
+<button onclick="sendMsg()">
+Click Here Send Msg
+</button>
+<br>
+
+Local Media: <br>
+<video id = "local_media" autoplay></video><br>
+Remote Media: <br>
+<video id = "remote_media" autoplay></video>
+
+</body>
+
+<script>
+
+var socket = new WebSocket("wss://john.com:8943/ws");
+var pc = new webkitRTCPeerConnection(null);
+
+pc.onaddstream = function(event)
+{
+    var url = event.stream ? URL.createObjectURL(event.stream) : ''
+    var remote_media = document.getElementById('remote_media');
+    remote_media.src = url;
+    console.log('onaddstream callback: ' + url);
+    remote_media.load();
+};
+
+socket.onerror = function(event)
+{
+    console.log('websocket error');
+};
+
+socket.onclose = function(event) 
+{
+    console.log('websocket close' + event.code);
+};
+
+var sendViewerOfferFn = function(desc)
+{
+    console.log('sendOfferFn: ', desc);
+
+    pc.setLocalDescription(desc);
+
+    socket.send(desc.sdp);
+};
+
+socket.onopen = function(event) 
+{
+    var constraints = 
+    {
+        mandatory:
+        {
+            OfferToReceiveAudio: true,
+            OfferToReceiveVideo: true
+        }
+    };
+
+    pc.createOffer(sendViewerOfferFn, function(error) { console.log('sendViewerOfferFn error: ' + error); }, constraints);
+};
+
+socket.onmessage = function(event)
+{
+    console.log('onmessage: ', event);
+    console.log('onmessage: ', event.data);
+    var json = JSON.parse(event.data);
+
+    pc.setRemoteDescription(new RTCSessionDescription({type:'answer', sdp:json.sdpAnswer}));
+    console.log('onmessage viewerResponse: ', json.sdpAnswer);
+}
+
+function sendMsg()
+{
+    var t = document.getElementById("ws_input").value;
+    socket.send(t)
+}
+
+</script>
+
+</html>

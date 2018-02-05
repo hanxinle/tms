@@ -27,6 +27,8 @@ public:
     static string GetNowStrHttpFormat(); // RFC 2822
     static string GetNowMsStr();
 
+	static string ReadFile(const string& file_name);
+
 	template<typename T>
     static string Num2Str(const T& t)
     {   
@@ -48,6 +50,9 @@ public:
     }
 
     static vector<string> SepStr(const string& input, const string& sep);
+	static void Replace(string& input, const string& from, const string& to);
+    static string GenRandom(const size_t& len);
+    static string GenRandomNum(const size_t& len);
 };
 
 #endif // __UTIL_H__

@@ -9,9 +9,15 @@
 #include <string.h>
 
 #include <iostream>
+#include <random>
 
 #include "common_define.h"
 #include "util.h"
+
+const char letter[] = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const char num[] = "0123456789";
+
+using namespace std;
 
 void Util::Daemon()
 {
@@ -289,6 +295,39 @@ string Util::GetNowMsStr()
     return "";
 }
 
+string Util::ReadFile(const string& file_name)
+{
+    string ret = "";
+
+	int fd = open(file_name.c_str(), O_RDONLY, 0664);
+    if (fd < 0)
+    {   
+        cout << LMSG << "open " << file_name << " faild, ret:" << fd << ",error:" << strerror(errno) << endl;
+    }   
+    else
+    {
+        while (true)
+        {   
+            char buf[4096];
+            int bytes = read(fd, buf, sizeof(buf));
+
+            if (bytes < 0)
+            {   
+            	cout << LMSG << "open " << file_name << " faild, ret:" << fd << ",error:" << strerror(errno) << endl;
+                break;
+            }   
+            else if (bytes == 0)
+            {   
+                break;
+            }   
+
+            ret.append(buf, bytes);
+        }
+    }
+
+	return ret;
+}
+
 vector<string> Util::SepStr(const string& input, const string& sep)
 {
     vector<string> ret;
@@ -315,6 +354,43 @@ vector<string> Util::SepStr(const string& input, const string& sep)
         }
 
         pre_pos = pos + sep.size();
+    }
+
+    return ret;
+}
+
+void Util::Replace(string& input, const string& from, const string& to) 
+{
+    size_t pos = 0;
+    size_t next_pos = 0;
+
+    while ((next_pos = input.find(from, pos)) != string::npos)
+    {   
+        input.replace(next_pos, from.length(), to);
+    }   
+}
+
+string Util::GenRandom(const size_t& len)
+{   
+    string ret;
+    random_device random_generate;
+
+    for (size_t index = 0; index != len; ++index)
+    {   
+        ret += letter[random_generate() % sizeof(letter)];
+    }   
+
+    return ret;
+}
+
+string Util::GenRandomNum(const size_t& len)
+{   
+    string ret;
+    random_device random_generate;
+    
+    for (size_t index = 0; index != len; ++index)
+    {   
+        ret += num[random_generate() % sizeof(letter)];
     }
 
     return ret;

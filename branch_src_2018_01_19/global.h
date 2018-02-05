@@ -21,6 +21,9 @@ extern MediaCenterMgr* 	        g_media_center_mgr;
 extern MediaNodeDiscoveryMgr*   g_media_node_discovery_mgr;
 extern RtmpMgr*        	        g_rtmp_mgr;
 extern ServerMgr*      	        g_server_mgr;
-extern SSL_CTX*                 g_ssl_ctx;
+extern SSL_CTX*                 g_tls_ctx;
+extern SSL_CTX*                 g_dtls_ctx;
+
+extern string                   g_dtls_fingerprint;
 
 #endif // __GLOBAL_H__

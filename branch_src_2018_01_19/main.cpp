@@ -53,7 +53,9 @@ MediaCenterMgr*         g_media_center_mgr = NULL;
 MediaNodeDiscoveryMgr*  g_media_node_discovery_mgr = NULL;
 RtmpMgr*                g_rtmp_mgr = NULL;
 ServerMgr*              g_server_mgr = NULL;
-SSL_CTX*                g_ssl_ctx = NULL;
+SSL_CTX*                g_tls_ctx = NULL;
+SSL_CTX*                g_dtls_ctx = NULL;
+string                  g_dtls_fingerprint;
 
 int main(int argc, char* argv[])
 {
@@ -76,10 +78,12 @@ int main(int argc, char* argv[])
 
     assert(raw == tmp);
 
-    FILE* server_private_key_file = fopen("server.key", "r");
-    if (server_private_key_file == NULL)
+	string server_crt = Util::ReadFile("server.crt");
+	string server_key = Util::ReadFile("server.key");
+
+    if (server_crt.empty() || server_key.empty())
     {
-        cout << LMSG << endl;
+        cout << LMSG << "server.crt or server.key incorrect" << endl;
         return -1;
     }
 
@@ -89,86 +93,76 @@ int main(int argc, char* argv[])
 
     assert(ret == 1);
 
-    g_ssl_ctx = SSL_CTX_new(SSLv23_method());
+    // tls init
+    g_tls_ctx = SSL_CTX_new(SSLv23_method());
 
-    assert(g_ssl_ctx != NULL);
+    assert(g_tls_ctx != NULL);
 
-	string server_crt = "";
-	string server_key = "";
-
-    int server_crt_fd = open("server.crt", O_RDONLY, 0664);
-    if (server_crt_fd < 0)
-    {
-        cout << LMSG << "open server.crt failed" << endl;
-        return -1;
-    }
-
-    while (true)
-    {
-        char buf[4096];
-        int bytes = read(server_crt_fd, buf, sizeof(buf));
-
-        if (bytes < 0)
-        {
-            cout << "read server.crt failed" << endl;
-            return -1;
-        }
-        else if (bytes == 0)
-        {
-            break;
-        }
-
-        server_crt.append(buf, bytes);
-    }
-
-
-    int server_key_fd = open("server.key", O_RDONLY, 0664);
-    if (server_key_fd < 0)
-    {
-        cout << LMSG << "open server.key failed" << endl;
-        return -1;
-    }
-
-    while (true)
-    {
-        char buf[4096];
-        int bytes = read(server_key_fd, buf, sizeof(buf));
-
-        if (bytes < 0)
-        {
-            cout << "read server.key failed" << endl;
-            return -1;
-        }
-        else if (bytes == 0)
-        {
-            break;
-        }
-
-        server_key.append(buf, bytes);
-    }
-
-	BIO *mem_cert = BIO_new_mem_buf((void *)server_crt.c_str(), server_crt.length());
-    assert(mem_cert != NULL);
-    X509 *cert= PEM_read_bio_X509(mem_cert,NULL,NULL,NULL);
-    assert(cert != NULL);    
-    SSL_CTX_use_certificate(g_ssl_ctx, cert);
-    X509_free(cert);
-    BIO_free(mem_cert);    
+	BIO *tls_mem_cert = BIO_new_mem_buf((void *)server_crt.c_str(), server_crt.length());
+    X509 *tls_cert= PEM_read_bio_X509(tls_mem_cert,NULL,NULL,NULL);
+    SSL_CTX_use_certificate(g_tls_ctx, tls_cert);
+    X509_free(tls_cert);
+    BIO_free(tls_mem_cert);    
     
-    BIO *mem_key = BIO_new_mem_buf((void *)server_key.c_str(), server_key.length());
-    assert(mem_key != NULL);
-    RSA *rsa_private = PEM_read_bio_RSAPrivateKey(mem_key, NULL, NULL, NULL);
-    assert(rsa_private != NULL);
-    SSL_CTX_use_RSAPrivateKey(g_ssl_ctx, rsa_private);
-    RSA_free(rsa_private);
-    BIO_free(mem_key);
+    BIO *tls_mem_key = BIO_new_mem_buf((void *)server_key.c_str(), server_key.length());
+    RSA *tls_rsa_private = PEM_read_bio_RSAPrivateKey(tls_mem_key, NULL, NULL, NULL);
+    SSL_CTX_use_RSAPrivateKey(g_tls_ctx, tls_rsa_private);
+    RSA_free(tls_rsa_private);
+    BIO_free(tls_mem_key);
 
-    ret = SSL_CTX_check_private_key(g_ssl_ctx);
+    ret = SSL_CTX_check_private_key(g_tls_ctx);
+
+    // dtls init
+    g_dtls_ctx = SSL_CTX_new(DTLSv1_2_method());
+
+	BIO *dtls_mem_cert = BIO_new_mem_buf((void *)server_crt.c_str(), server_crt.length());
+    X509 *dtls_cert= PEM_read_bio_X509(dtls_mem_cert,NULL,NULL,NULL);
+    SSL_CTX_use_certificate(g_dtls_ctx, dtls_cert);
+    X509_free(dtls_cert);
+    BIO_free(dtls_mem_cert);    
+    
+    BIO *dtls_mem_key = BIO_new_mem_buf((void *)server_key.c_str(), server_key.length());
+    RSA *dtls_rsa_private = PEM_read_bio_RSAPrivateKey(dtls_mem_key, NULL, NULL, NULL);
+    SSL_CTX_use_RSAPrivateKey(g_dtls_ctx, dtls_rsa_private);
+    RSA_free(dtls_rsa_private);
+    BIO_free(dtls_mem_key);
+
+    ret = SSL_CTX_check_private_key(g_dtls_ctx);
+
+    // dtls fingerprint
+    char fp[100];
+    char *fingerprint = fp;
+    unsigned char md[EVP_MAX_MD_SIZE];
+    unsigned int i; 
+    unsigned int n; 
+ 
+    int r = X509_digest(dtls_cert, EVP_sha256(), md, &n);
+    
+    for (i = 0; i < n; i++)
+    {
+        sprintf(fingerprint, "%02X", md[i]);
+        fingerprint += 2;
+        
+        if(i < (n-1))
+        {
+            *fingerprint = ':';
+        }
+        else
+        {
+            *fingerprint = '\0';
+        }
+        ++fingerprint;
+    }
+
+    g_dtls_fingerprint.assign(fp, strlen(fp));
+
+    cout << "DTLS fingerprint[" << g_dtls_fingerprint << "]" << endl;
 
     // parse args
     map<string, string> args_map = Util::ParseArgs(argc, argv);
 
     uint16_t rtmp_port              = 1935;
+    uint16_t https_file_port        = 8643;
     uint16_t http_file_port         = 8666;
     uint16_t https_flv_port         = 8743;
     uint16_t http_flv_port          = 8787;
@@ -408,6 +402,20 @@ int main(int argc, char* argv[])
     SslSocket ssl_web_socket_socket(&epoller, ssl_web_socket_fd, &ssl_web_socket_mgr);
     ssl_web_socket_socket.EnableRead();
     ssl_web_socket_socket.AsServerSocket();
+
+    // === Init Server Http File Socket ===
+    int server_https_file_fd = CreateNonBlockTcpSocket();
+
+    ReuseAddr(server_https_file_fd);
+    Bind(server_https_file_fd, "0.0.0.0", https_file_port);
+    Listen(server_https_file_fd);
+    SetNonBlock(server_https_file_fd);
+
+    HttpFileMgr https_file_mgr(&epoller);
+
+    SslSocket server_https_file_socket(&epoller, server_https_file_fd, &https_file_mgr);
+    server_https_file_socket.EnableRead();
+    server_https_file_socket.AsServerSocket();
 
     // === Init Server Http File Socket ===
     int server_http_file_fd = CreateNonBlockTcpSocket();

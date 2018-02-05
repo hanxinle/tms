@@ -5,6 +5,8 @@
 
 #include <string>
 
+#include "bit_buffer.h"
+
 class Epoller;
 class Fd;
 class IoBuffer;
@@ -21,6 +23,9 @@ public:
 
     int Parse(IoBuffer& io_buffer);
     int EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
+
+private:
+    int OnStun(const uint8_t* data, const size_t& len);
 
 private:
     UdpSocket* GetUdpSocket()

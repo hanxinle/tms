@@ -7,7 +7,7 @@
 #include "socket_handle.h"
 #include "ssl_socket.h"
 
-extern SSL_CTX* g_ssl_ctx;
+extern SSL_CTX* g_tls_ctx;
 
 using namespace std;
 using namespace socket_util;
@@ -18,8 +18,8 @@ SslSocket::SslSocket(Epoller* epoller, const int& fd, SocketHandle* handler)
     server_socket_(false),
     handler_(handler)
 {
-    assert(g_ssl_ctx != NULL);
-    ssl_ = SSL_new(g_ssl_ctx);
+    assert(g_tls_ctx != NULL);
+    ssl_ = SSL_new(g_tls_ctx);
 
     assert(ssl_ != NULL);
 

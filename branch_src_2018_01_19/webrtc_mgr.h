@@ -5,6 +5,7 @@
 #include <set>
 
 #include "socket_handle.h"
+#include "timer_handle.h"
 
 using std::map;
 using std::set;
@@ -13,7 +14,7 @@ class Epoller;
 class Fd;
 class WebrtcProtocol;
 
-class WebrtcMgr : public SocketHandle
+class WebrtcMgr : public SocketHandle, public TimerSecondHandle, public TimerMillSecondHandle
 {
 public:
     WebrtcMgr(Epoller* epoller);
@@ -25,6 +26,7 @@ public:
     virtual int HandleConnected(Fd& socket);
 
 	virtual int HandleTimerInSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
+    virtual int HandleTimerInMillSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
 
 private:
     WebrtcProtocol* GetOrCreateProtocol(Fd& socket);

@@ -14,8 +14,8 @@
 #include "common_define.h"
 #include "util.h"
 
-const char letter[] = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const char num[] = "0123456789";
+const string letter = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const string num = "0123456789";
 
 using namespace std;
 
@@ -377,7 +377,7 @@ string Util::GenRandom(const size_t& len)
 
     for (size_t index = 0; index != len; ++index)
     {   
-        ret += letter[random_generate() % sizeof(letter)];
+        ret += letter[random_generate() % letter.size()];
     }   
 
     return ret;
@@ -390,7 +390,7 @@ string Util::GenRandomNum(const size_t& len)
     
     for (size_t index = 0; index != len; ++index)
     {   
-        ret += num[random_generate() % sizeof(letter)];
+        ret += num[random_generate() % num.size()];
     }
 
     return ret;

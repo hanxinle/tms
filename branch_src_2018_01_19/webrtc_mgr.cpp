@@ -64,3 +64,13 @@ int WebrtcMgr::HandleTimerInSecond(const uint64_t& now_in_ms, const uint32_t& in
 
     return kSuccess;
 }
+
+int WebrtcMgr::HandleTimerInMillSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)
+{
+    for (auto& kv : fd_protocol_)
+    {   
+        kv.second->EveryNMillSecond(now_in_ms, interval, count);
+    }   
+
+    return kSuccess;
+}

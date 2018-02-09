@@ -32,14 +32,11 @@ int UdpSocket::OnRead()
 
         int bytes = io_buffer.ReadFromFdAndWrite(fd_, &src_addr_, &src_addr_len_);
 
-        string udp_client_ip = "";
-        uint16_t udp_client_port = 0;
-
-        SocketAddrInetToIpPort(*(sockaddr_in*)(&src_addr_), udp_client_ip, udp_client_port);
+        SocketAddrInetToIpPort(*(sockaddr_in*)(&src_addr_), client_ip_, client_port_);
 
         if (bytes > 0)
         {
-            cout << LMSG << "udp recv from:" << udp_client_ip << ":" << udp_client_port << endl;
+            cout << LMSG << "udp recv from:" << client_ip_ << ":" << client_port_ << endl;
 
             if (handler_)
             {

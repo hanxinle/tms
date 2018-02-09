@@ -1,6 +1,5 @@
 #include <signal.h>
 
-
 #include <iostream>
 
 #include "admin_mgr.h"
@@ -55,10 +54,19 @@ RtmpMgr*                g_rtmp_mgr = NULL;
 ServerMgr*              g_server_mgr = NULL;
 SSL_CTX*                g_tls_ctx = NULL;
 SSL_CTX*                g_dtls_ctx = NULL;
-string                  g_dtls_fingerprint;
+string                  g_dtls_fingerprint = "";
+string                  g_local_ice_pwd = "";
+string                  g_local_ice_ufrag = "";
+string                  g_remote_ice_pwd = "";
+string                  g_remote_ice_ufrag = "";
 
 int main(int argc, char* argv[])
 {
+    CRC32 crc32;
+
+    uint8_t crc[] = {1, 2, 3, 4, 5, 6};
+    cout << LMSG << crc32.GetCrc32(crc, 6) << endl;
+
     string raw = "Man is distinguished, not only by his reason, but by this singular passion from other animals, which is a lust of the mind, that by a perseverance of delight in the continued and indefatigable generation of knowledge, exceeds the short vehemence of any carnal pleasure.";
 
     string base64;
@@ -113,8 +121,11 @@ int main(int argc, char* argv[])
     ret = SSL_CTX_check_private_key(g_tls_ctx);
 
     // dtls init
-    g_dtls_ctx = SSL_CTX_new(DTLSv1_2_method());
+    //g_dtls_ctx = SSL_CTX_new(DTLSv1_2_method());
 
+#if 0 
+    // 用导入证书的方法,目前不可行
+    g_dtls_ctx = SSL_CTX_new(DTLSv1_method());
 	BIO *dtls_mem_cert = BIO_new_mem_buf((void *)server_crt.c_str(), server_crt.length());
     X509 *dtls_cert= PEM_read_bio_X509(dtls_mem_cert,NULL,NULL,NULL);
     SSL_CTX_use_certificate(g_dtls_ctx, dtls_cert);
@@ -128,6 +139,115 @@ int main(int argc, char* argv[])
     BIO_free(dtls_mem_key);
 
     ret = SSL_CTX_check_private_key(g_dtls_ctx);
+#else
+    // 代码里生成证书
+	EVP_PKEY* dtls_private_key = EVP_PKEY_new();
+    if (dtls_private_key == NULL)
+    {
+        cout << LMSG << "EVP_PKEY_new err" << endl;
+        return -1;
+    }
+
+    RSA* rsa = RSA_new();
+    if (rsa == NULL)
+    {
+        cout << LMSG << "RSA_new err" << endl;
+        return -1;
+    }
+
+    BIGNUM* exponent = BN_new();
+    if (exponent == NULL)
+    {
+        cout << LMSG << "BN_new err" << endl;
+        return -1;
+    }
+
+    BN_set_word(exponent, RSA_F4);
+
+	const string& aor = "www.john.com";
+	int expire_day = 365;
+	int private_key_len = 1024;
+
+    RSA_generate_key_ex(rsa, private_key_len, exponent, NULL);
+
+    ret = EVP_PKEY_set1_RSA(dtls_private_key, rsa);
+    if (ret != 1)
+    {
+        cout << LMSG << "EVP_PKEY_set1_RSA err:" << ret << endl;
+    }
+
+    X509* dtls_cert = X509_new();
+    if (dtls_cert == NULL)
+    {
+        cout << LMSG << "X509_new err" << endl;
+        return -1;
+    }
+
+    X509_NAME* subject = X509_NAME_new();
+    if (subject == NULL)
+    {
+        cout << LMSG << "X509_NAME_new err" << endl;
+        return -1;
+    }
+
+    int serial = rand();
+    ASN1_INTEGER_set(X509_get_serialNumber(dtls_cert), serial);
+
+    X509_NAME_add_entry_by_txt(subject, "CN", MBSTRING_ASC, (unsigned char *) aor.data(), aor.size(), -1, 0);
+
+    X509_set_issuer_name(dtls_cert, subject);
+    X509_set_subject_name(dtls_cert, subject);
+
+    const long cert_duration = 60*60*24*expire_day;
+
+    X509_gmtime_adj(X509_get_notBefore(dtls_cert), 0);
+    X509_gmtime_adj(X509_get_notAfter(dtls_cert), cert_duration);
+
+    ret = X509_set_pubkey(dtls_cert, dtls_private_key);
+    if (ret != 1)
+    {
+        cout << LMSG << "X509_set_pubkey err:" << ret << endl;
+    }
+
+    ret = X509_sign(dtls_cert, dtls_private_key, EVP_sha1());
+    if (ret == 0)
+    {
+        cout << LMSG << "X509_sign err:" << ret << endl;
+    }
+
+    // free
+    RSA_free(rsa);
+    BN_free(exponent);
+    X509_NAME_free(subject);
+
+    g_dtls_ctx = SSL_CTX_new(DTLSv1_2_method());
+	ret = SSL_CTX_use_certificate(g_dtls_ctx, dtls_cert);
+    if (ret != 1)
+    {   
+        cout << LMSG << "|SSL_CTX_use_certificate error:" << ret << endl; 
+    }   
+
+    ret = SSL_CTX_use_PrivateKey(g_dtls_ctx, dtls_private_key);
+    if (ret != 1)
+    {   
+        cout << LMSG << "|SSL_CTX_use_PrivateKey error:" << ret << endl; 
+    }   
+
+    ret = SSL_CTX_set_cipher_list(g_dtls_ctx, "ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH");
+    if (ret != 1)
+    {   
+        cout << LMSG << "|SSL_CTX_set_cipher_list error:" << ret << endl; 
+    }   
+
+    ret = SSL_CTX_set_tlsext_use_srtp(g_dtls_ctx, "SRTP_AES128_CM_SHA1_80");
+    if (ret != 0)
+    {   
+        cout << LMSG << "|SSL_CTX_set_tlsext_use_srtp error:" << ret << endl; 
+    }   
+
+    SSL_CTX_set_verify_depth (g_dtls_ctx, 4); 
+    SSL_CTX_set_read_ahead(g_dtls_ctx, 1);
+#endif
 
     // dtls fingerprint
     char fp[100];
@@ -453,6 +573,9 @@ int main(int argc, char* argv[])
     SetNonBlock(webrtc_fd);
 
     WebrtcMgr webrtc_mgr(&epoller);
+
+    timer_in_second.AddTimerSecondHandle(&webrtc_mgr);
+    timer_in_millsecond.AddTimerMillSecondHandle(&webrtc_mgr);
 
     UdpSocket server_webrtc_socket(&epoller, webrtc_fd, &webrtc_mgr);
     server_webrtc_socket.EnableRead();

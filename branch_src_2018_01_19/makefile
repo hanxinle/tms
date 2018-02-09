@@ -1,16 +1,37 @@
 # =========================================================
-INCLUDE_DIR    += -I. -I./include/ -I../rpc -I../common -I../depend/build/include
+INCLUDE_DIR    += -I. -I./include/ -I../rpc -I../common -I../depend/build/include -I../
 
-LIB_DIR        += ../depend/build/lib/libssl.a ../depend/build/lib/libcrypto.a -lpthread -ldl
+LIB_DIR        += ../depend/build/lib/libssl.a
+LIB_DIR        += ../depend/build/lib/libcrypto.a
+LIB_DIR        += ../depend/build/lib/libsrtp2.a
+LIB_DIR        += ../depend/build/lib/libavformat.a
+LIB_DIR        += ../depend/build/lib/libavfilter.a
+LIB_DIR        += ../depend/build/lib/libavcodec.a
+LIB_DIR        += ../depend/build/lib/libswresample.a
+LIB_DIR        += ../depend/build/lib/libswscale.a
+LIB_DIR        += ../depend/build/lib/libavutil.a
+#LIB_DIR        += ../depend/build/lib/libavdevice.a
+LIB_DIR        += ../depend/build/lib/libopus.a
+LIB_DIR        += ../depend/build/lib/libfdk-aac.a
+LIB_DIR        += ../depend/build/lib/libvpx.a
+LIB_DIR        += ../depend/build/lib/libx264.a
+LIB_DIR        += ../depend/build/lib/libx265.a
+LIB_DIR        += -lpthread -ldl -lbz2 -lz -lva -lX11 -lva-x11 -lvdpau -lva-drm
+
 # ==========================================================
 CC             = gcc
 CXX 		   = g++
 #CXX 		   = clang
 CFLAGS         = -g -W -Wall -Werror -O2 -pg
-CXXFLAGS       = -g -std=c++0x -W -Wall -Werror -O2 -pg -Wno-strict-aliasing -Wno-missing-field-initializers -Wno-unused-function -Wno-deprecated-declarations -Wno-unused-variable -Wno-unused-parameter
+CXXFLAGS       = -g -std=c++0x -DWEBRTC_POSIX -W -Wall -Werror -O2 -pg -Wno-strict-aliasing -Wno-missing-field-initializers -Wno-unused-function -Wno-deprecated-declarations \
+				 -Wno-unused-variable -Wno-unused-parameter -Wno-unused-value \
+				 -DUSE_VP8_WEBM
 # ==========================================================
 SOURCES += $(wildcard ./*.cpp)
 SOURCES += $(wildcard ../common/*.cpp)
+SOURCES += $(wildcard ../webrtc/p2p/base/*.cpp)
+SOURCES += $(wildcard ../webrtc/base/*.cpp)
+SOURCES += $(wildcard ../webrtc/modules/rtp_rtcp/source/*.cpp)
 OBJECTS += $(patsubst %.cpp,%.o, $(patsubst %.c,%.o, $(SOURCES)))
 # ==========================================================
 ALL_OBJECTS = $(OBJECTS)

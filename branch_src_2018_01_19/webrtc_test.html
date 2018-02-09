@@ -1,4 +1,9 @@
-<html>
+<!DOCTYPE html>
+<html lang="zh-cmn-Hans">
+<head>
+<meta charset="utf-8">
+</head>
+  
 
 <body>
 
@@ -18,8 +23,11 @@ Remote Media: <br>
 
 <script>
 
+var PeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection;
+var SessionDescription = window.RTCSessionDescription || window.mozRTCSessionDescription || window.webkitRTCSessionDescription;
+
 var socket = new WebSocket("wss://john.com:8943/ws");
-var pc = new webkitRTCPeerConnection(null);
+var pc = new PeerConnection(null);
 
 pc.onaddstream = function(event)
 {
@@ -28,6 +36,26 @@ pc.onaddstream = function(event)
     remote_media.src = url;
     console.log('onaddstream callback: ' + url);
     remote_media.load();
+};
+
+pc.onicecandidate = function(event)
+{
+    console.log('onicecandidate');
+};
+
+pc.onconnectionstatechange = function(event)
+{
+    console.log('onconnectionstatechange');
+};
+
+pc.onicegatheringstatechange = function(event)
+{
+    console.log('onicegatheringstatechange');
+};
+
+pc.onsignalingstatechange = function(event)
+{
+    console.log('onsignalingstatechange');
 };
 
 socket.onerror = function(event)
@@ -69,7 +97,7 @@ socket.onmessage = function(event)
     console.log('onmessage: ', event.data);
     var json = JSON.parse(event.data);
 
-    pc.setRemoteDescription(new RTCSessionDescription({type:'answer', sdp:json.sdpAnswer}));
+    pc.setRemoteDescription(new SessionDescription({type:'answer', sdp:json.sdpAnswer}));
     console.log('onmessage viewerResponse: ', json.sdpAnswer);
 }
 

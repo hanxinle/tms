@@ -313,9 +313,42 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
 
         cout << LMSG << "payload:" << Util::Bin2Hex(data, extended_payload_length) << endl;
 
+
         // FIXME: sdp 
         if (extended_payload_length >= 2 && data[0] == 'v' && data[1] == '=')
         {
+            string remote_sdp((const char*)data, extended_payload_length);
+
+            vector<string> sdp_line = Util::SepStr(remote_sdp, "\r\n");
+
+            cout << LMSG << "==================== remote sdp ====================" << endl;
+            for (const auto& line : sdp_line)
+            {
+                cout << LMSG << line << endl;
+
+                if (line.find("a=ice-ufrag") != string::npos)
+                {
+                    vector<string> tmp = Util::SepStr(line, ":");
+
+                    if (tmp.size() == 2)
+                    {
+                        g_remote_ice_ufrag = tmp[1];
+                    }
+                }
+                else if (line.find("a=ice-pwd") != string::npos)
+                {
+                    vector<string> tmp = Util::SepStr(line, ":");
+
+                    if (tmp.size() == 2)
+                    {
+                        g_remote_ice_pwd = tmp[1];
+                    }
+                }
+            }
+
+            cout << LMSG << "g_remote_ice_ufrag:" << Util::Bin2Hex(g_remote_ice_ufrag) << endl;
+            cout << LMSG << "g_remote_ice_pwd:" << Util::Bin2Hex(g_remote_ice_pwd) << endl;
+
             string webrtc_test_sdp = Util::ReadFile("webrtc_test.sdp");
 
             if (webrtc_test_sdp.empty())
@@ -325,15 +358,25 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
 
             Util::Replace(webrtc_test_sdp, "a=fingerprint:sha-256\r\n", "a=fingerprint:sha-256 " + g_dtls_fingerprint + "\r\n");
 
-			auto ufrag = Util::GenRandom(15);
-            //auto pwd = Util::GenRandom(22);
-            string pwd = "xiaozhihongxiaozhihong";
+			g_local_ice_ufrag = Util::GenRandom(15);
+            g_local_ice_pwd = Util::GenRandom(22);
 
-            Util::Replace(webrtc_test_sdp, "a=ice-ufrag:xxx\r\n", "a=ice-ufrag:" + ufrag + "\r\n");
-            Util::Replace(webrtc_test_sdp, "a=ice-pwd:xxx\r\n", "a=ice-pwd:" + pwd + "\r\n");
+            cout << LMSG << "g_local_ice_ufrag:" << Util::Bin2Hex(g_local_ice_ufrag) << endl;
+            cout << LMSG << "g_local_ice_pwd:" << Util::Bin2Hex(g_local_ice_pwd) << endl;
+
+            Util::Replace(webrtc_test_sdp, "a=ice-ufrag:xxx\r\n", "a=ice-ufrag:" + g_local_ice_ufrag + "\r\n");
+            Util::Replace(webrtc_test_sdp, "a=ice-pwd:xxx\r\n", "a=ice-pwd:" + g_local_ice_pwd + "\r\n");
             Util::Replace(webrtc_test_sdp, "xxx.xxx.xxx.xxx:what", "192.168.247.128 11445");
 
             string sdp_answer = "{\"sdpAnswer\":\"" + webrtc_test_sdp + "\"}";
+
+            cout << LMSG << "==================== local sdp ====================" << endl;
+            sdp_line = Util::SepStr(webrtc_test_sdp, "\r\n");
+            for (const auto& line : sdp_line)
+            {
+                cout << LMSG << line << endl;
+            }
+
 
             Util::Replace(sdp_answer, "\r\n", "\\r\\n");
 

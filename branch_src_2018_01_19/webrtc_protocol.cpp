@@ -137,6 +137,42 @@ int WebrtcProtocol::Parse(IoBuffer& io_buffer)
     return kSuccess;
 }
 
+int WebrtcProtocol::ProtectRtp(const uint8_t* un_protect_rtp, const int& un_protect_rtp_len, uint8_t* protect_rtp, int& protect_rtp_len)
+{
+    memcpy(protect_rtp, un_protect_rtp, un_protect_rtp_len);
+
+    int ret = srtp_protect(srtp_send_, protect_rtp, &protect_rtp_len);
+
+    return ret;
+}
+
+int WebrtcProtocol::UnProtectRtp(const uint8_t* protect_rtp, const int& protect_rtp_len, uint8_t* un_protect_rtp, int& un_protect_rtp_len)
+{
+    memcpy(un_protect_rtp, protect_rtp, protect_rtp_len);
+
+    int ret = srtp_unprotect(srtp_recv_, un_protect_rtp, &un_protect_rtp_len);
+    
+    return ret;
+}
+
+int WebrtcProtocol::ProtectRtcp(const uint8_t* un_protect_rtcp, const int& un_protect_rtcp_len, uint8_t* protect_rtcp, int& protect_rtcp_len)
+{
+    memcpy(protect_rtcp, un_protect_rtcp, un_protect_rtcp_len);
+
+    int ret = srtp_unprotect_rtcp(srtp_send_, protect_rtcp, &protect_rtcp_len);
+
+    return ret;
+}
+
+int WebrtcProtocol::UnProtectRtcp(const uint8_t* protect_rtcp, const int& protect_rtcp_len, uint8_t* un_protect_rtcp, int& un_protect_rtcp_len)
+{
+    memcpy(un_protect_rtcp, protect_rtcp, protect_rtcp_len);
+
+    int ret = srtp_unprotect_rtcp(srtp_recv_, un_protect_rtcp, &un_protect_rtcp_len);
+    
+    return ret;
+}
+
 int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
 {
     BitBuffer bit_buffer(data, len);
@@ -772,11 +808,13 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
 
                 rtp_header->setSSRC(3233846889);
 
-                char protect_buf[1500];
-                int protect_buf_len = unprotect_buf_len;
-                memcpy(protect_buf, unprotect_buf, protect_buf_len);
+                g_webrtc_mgr->__DebugBroadcast(unprotect_buf, unprotect_buf_len);
 
-                int ret = srtp_protect(srtp_send_, protect_buf, &protect_buf_len);
+                /*
+                uint8_t protect_buf[1500];
+                int protect_buf_len = unprotect_buf_len;
+                int ret = ProtectRtp(unprotect_buf, unprotect_buf_len, protect_buf, protect_buf_len);
+
                 if (ret == 0)
                 {
                     cout << LMSG << "srtp_protect success" << endl;
@@ -786,15 +824,19 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
                 {
                     cout << LMSG << "srtp_protect faile:" << ret << endl;
                 }
-
-                cout << LMSG << "srtp protect_buf_len:" << protect_buf_len << endl;
-
-                //cout << LMSG << "==> packet rtp success <==" << endl;
+                */
             }
 #endif
         }
         else if (payload_type == 111)
         {
+            RtpHeader* rtp_header = (RtpHeader*)unprotect_buf;
+
+            audio_publisher_ssrc_ = ssrc;
+
+            rtp_header->setSSRC(3233846889 + 1);
+
+            g_webrtc_mgr->__DebugBroadcast(unprotect_buf, unprotect_buf_len);
         }
     }
 
@@ -983,11 +1025,95 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
 
     if (dtls_handshake_done_ && count % 50 == 0)
     {
+        uint32_t pli_ssrc[4][2];
+        pli_ssrc[0][0] = video_publisher_ssrc_;
+        pli_ssrc[0][1] = video_publisher_ssrc_;
+        pli_ssrc[1][0] = 3233846889;
+        pli_ssrc[1][1] = 3233846889;
+        pli_ssrc[2][0] = video_publisher_ssrc_;
+        pli_ssrc[2][1] = 3233846889;
+        pli_ssrc[3][0] = 3233846889;
+        pli_ssrc[3][1] = video_publisher_ssrc_;
+
+        for (int i = 0; i != 4; ++i)
+        {
+            BitStream bs_pli;
+
+            bs_pli.WriteBits(2, 0x02);
+            bs_pli.WriteBits(1, 0x00);
+            bs_pli.WriteBits(5, 0x01);
+            bs_pli.WriteBytes(1, 206);
+            bs_pli.WriteBytes(2, 2);
+            bs_pli.WriteBytes(4, pli_ssrc[i][0]);
+            bs_pli.WriteBytes(4, pli_ssrc[i][1]);
+
+            GetUdpSocket()->Send(bs_pli.GetData(), bs_pli.SizeInBytes());
+        }
+
+        uint32_t fir_ssrc[8][3];
+        fir_ssrc[0][0] = video_publisher_ssrc_;
+        fir_ssrc[0][1] = video_publisher_ssrc_;
+        fir_ssrc[0][2] = video_publisher_ssrc_;
+
+        fir_ssrc[1][0] = video_publisher_ssrc_;
+        fir_ssrc[1][1] = video_publisher_ssrc_;
+        fir_ssrc[1][2] = 3233846889;
+
+        fir_ssrc[2][0] = video_publisher_ssrc_;
+        fir_ssrc[2][1] = 3233846889;
+        fir_ssrc[2][2] = 3233846889;
+
+        fir_ssrc[3][0] = video_publisher_ssrc_;
+        fir_ssrc[3][1] = 3233846889;
+        fir_ssrc[3][2] = video_publisher_ssrc_;
+
+        fir_ssrc[4][0] = 3233846889;
+        fir_ssrc[4][1] = 3233846889;
+        fir_ssrc[4][2] = 3233846889;
+
+        fir_ssrc[5][0] = 3233846889;
+        fir_ssrc[5][1] = 3233846889;
+        fir_ssrc[5][2] = video_publisher_ssrc_;
+
+        fir_ssrc[6][0] = 3233846889;
+        fir_ssrc[6][1] = video_publisher_ssrc_;
+        fir_ssrc[6][2] = 3233846889;
+
+        fir_ssrc[7][0] = 3233846889;
+        fir_ssrc[7][1] = video_publisher_ssrc_;
+        fir_ssrc[7][2] = video_publisher_ssrc_;
+
+        for (int i = 0; i != 8; ++i)
+        {
+            BitStream bs_fir;
+
+            bs_fir.WriteBits(2, 0x02);
+            bs_fir.WriteBits(1, 0x00);
+            bs_fir.WriteBits(5, 0x04);  // FIR
+            bs_fir.WriteBytes(1, 206);
+            bs_fir.WriteBytes(2, 4);
+            bs_fir.WriteBytes(4, fir_ssrc[i][0]);
+            bs_fir.WriteBytes(4, fir_ssrc[i][1]);
+            bs_fir.WriteBytes(4, fir_ssrc[i][2]);
+            static uint8_t seq_nr = 1;
+            bs_fir.WriteBytes(1, ++seq_nr);
+            bs_fir.WriteBytes(3, 0x000000);
+
+            GetUdpSocket()->Send(bs_fir.GetData(), bs_fir.SizeInBytes());
+        }
+
+        return 0;
+
 		RtcpHeader rtcp_pli;
     	rtcp_pli.setPacketType(RTCP_PS_Feedback_PT);
     	rtcp_pli.setBlockCount(1);
+#if 0
     	rtcp_pli.setSSRC(3233846889);
     	rtcp_pli.setSourceSSRC(video_publisher_ssrc_);
+#else
+    	rtcp_pli.setSSRC(video_publisher_ssrc_);
+    	rtcp_pli.setSourceSSRC(3233846889);
+#endif
     	rtcp_pli.setLength(2);
 
     	uint8_t *buf = (uint8_t*)(&rtcp_pli);
@@ -1005,6 +1131,7 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
 
     if (dtls_handshake_done_ && media_input_ != NULL)
     {
+        // FIXME:这种用法如果webrtc_mgr里面有多个webrtc_protocol的话, 会卡死, 大概是因为UDP发包队列的限制
         for (int i = 0; i != 5; ++i)
         {
             uint8_t* frame_data = NULL;

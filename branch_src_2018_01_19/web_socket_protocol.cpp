@@ -8,6 +8,7 @@
 #include "global.h"
 #include "web_socket_protocol.h"
 #include "io_buffer.h"
+#include "sdp_parse.h"
 #include "tcp_socket.h"
 
 using namespace std;
@@ -214,6 +215,9 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
         if (extended_payload_length >= 2 && data[0] == 'v' && data[1] == '=')
         {
             string remote_sdp((const char*)data, extended_payload_length);
+
+            SdpParse sdp_parse;
+            sdp_parse.Parse(remote_sdp);
 
             vector<string> sdp_line = Util::SepStr(remote_sdp, "\r\n");
 

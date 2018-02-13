@@ -1,4 +1,5 @@
 #include "fd.h"
+#include "udp_socket.h"
 #include "webrtc_mgr.h"
 #include "webrtc_protocol.h"
 
@@ -73,4 +74,20 @@ int WebrtcMgr::HandleTimerInMillSecond(const uint64_t& now_in_ms, const uint32_t
     }   
 
     return kSuccess;
+}
+
+void WebrtcMgr::__DebugBroadcast(const uint8_t* data, const int& len)
+{
+    for (auto& kv : fd_protocol_)
+    {
+        if (kv.second->DtlsHandshakeDone())
+        {
+            uint8_t protect_rtp[1500];
+            int protect_rtp_len = len;
+            if (kv.second->ProtectRtp(data, len, protect_rtp, protect_rtp_len) == 0)
+            {
+                kv.second->GetUdpSocket()->Send(protect_rtp, protect_rtp_len);
+            }
+        }
+    }
 }

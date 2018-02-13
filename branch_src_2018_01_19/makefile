@@ -16,7 +16,8 @@ LIB_DIR        += ../depend/build/lib/libfdk-aac.a
 LIB_DIR        += ../depend/build/lib/libvpx.a
 LIB_DIR        += ../depend/build/lib/libx264.a
 LIB_DIR        += ../depend/build/lib/libx265.a
-LIB_DIR        += -lpthread -ldl -lbz2 -lz -lva -lX11 -lva-x11 -lvdpau -lva-drm
+#LIB_DIR        += -lpthread -ldl -lbz2 -lz -lva -lX11 -lva-x11 -lvdpau -lva-drm
+LIB_DIR        += -lpthread -ldl -lbz2 -lz
 
 # ==========================================================
 CC             = gcc
@@ -24,9 +25,10 @@ CXX 		   = g++
 #CXX 		   = clang
 CFLAGS         = -g -W -Wall -Werror -O2 -pg
 CXXFLAGS       = -g -std=c++0x -DWEBRTC_POSIX -W -Wall -Werror -O2 -pg -Wno-strict-aliasing -Wno-missing-field-initializers -Wno-unused-function -Wno-deprecated-declarations \
-				 -Wno-unused-variable -Wno-unused-parameter -Wno-unused-value \
-				 -DUSE_VP8_WEBM \
-				 -DPUBLISH_BACK
+				 -Wno-unused-variable -Wno-unused-parameter -Wno-unused-value
+
+CXXFLAGS       += -DUSE_VP8_WEBM
+CXXFLAGS       += -DPUBLISH_BACK
 # ==========================================================
 SOURCES += $(wildcard ./*.cpp)
 SOURCES += $(wildcard ../common/*.cpp)

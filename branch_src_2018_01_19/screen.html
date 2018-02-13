@@ -1,0 +1,248 @@
+<html>
+<body>
+Local: <br>
+<video id="localVideo" autoplay></video><br>
+Remote: <br>
+<video id="remoteVideo" autoplay></video>
+<script>
+(function() {
+    window.getScreenId = function(callback) {
+        // for Firefox:
+        // sourceId == 'firefox'
+        // screen_constraints = {...}
+        if (!!navigator.mozGetUserMedia) {
+            callback(null, 'firefox', {
+                video: {
+                    mozMediaSource: 'window',
+                    mediaSource: 'window'
+                }
+            });
+            return;
+        }
+
+        postMessage();
+
+        window.addEventListener('message', onIFrameCallback);
+
+        function onIFrameCallback(event) {
+            if (!event.data) return;
+
+            if (event.data.chromeMediaSourceId) {
+                if (event.data.chromeMediaSourceId === 'PermissionDeniedError') {
+                    callback('permission-denied');
+                } else callback(null, event.data.chromeMediaSourceId, getScreenConstraints(null, event.data.chromeMediaSourceId));
+            }
+
+            if (event.data.chromeExtensionStatus) {
+                callback(event.data.chromeExtensionStatus, null, getScreenConstraints(event.data.chromeExtensionStatus));
+            }
+
+            // this event listener is no more needed
+            window.removeEventListener('message', onIFrameCallback);
+        }
+    };
+
+    function getScreenConstraints(error, sourceId) {
+        var screen_constraints = {
+            audio: false,
+            video: {
+                mandatory: {
+                    chromeMediaSource: error ? 'screen' : 'desktop',
+                    maxWidth: window.screen.width > 800 ? 800 : window.screen.width,
+                    maxHeight: window.screen.height > 600 ? 600: window.screen.height,
+                    minFrameRate:30
+                },
+                optional: []
+            }
+        };
+
+        if (sourceId) {
+            screen_constraints.video.mandatory.chromeMediaSourceId = sourceId;
+        }
+
+        return screen_constraints;
+    }
+
+    function postMessage() {
+        if (!iframe) {
+            loadIFrame(postMessage);
+            return;
+        }
+
+        if (!iframe.isLoaded) {
+            setTimeout(postMessage, 100);
+            return;
+        }
+
+        iframe.contentWindow.postMessage({
+            captureSourceId: true
+        }, '*');
+    }
+
+    function loadIFrame(loadCallback) {
+        if (iframe) {
+            loadCallback();
+            return;
+        }
+
+        iframe = document.createElement('iframe');
+        iframe.onload = function() {
+            iframe.isLoaded = true;
+
+            loadCallback();
+        };
+        iframe.src = 'https://www.webrtc-experiment.com/getSourceId/'; // https://wwww.yourdomain.com/getScreenId.html
+        iframe.style.display = 'none';
+        (document.body || document.documentElement).appendChild(iframe);
+    }
+
+    var iframe;
+
+    // this function is used in v3.0
+    window.getScreenConstraints = function(callback) {
+        loadIFrame(function() {
+            getScreenId(function(error, sourceId, screen_constraints) {
+                callback(error, screen_constraints.video);
+            });
+        });
+    };
+})();
+// 仅仅用于控制哪一端的浏览器发起offer，#号后面有值的一方发起
+var isCaller = true;
+
+// 与信令服务器的WebSocket连接
+var socket = new WebSocket("wss://john.com:8943/screen.sdp");
+console.log('websocket start');
+
+    var isFirefox = !!navigator.mozGetUserMedia;
+    var isChrome = !!navigator.webkitGetUserMedia;
+    var isMobileDevice = !!navigator.userAgent.match(/Android|iPhone|iPad|iPod|BlackBerry|IEMobile/i);
+
+socket.onerror=function(event)
+{
+    console.log('Failure callback');
+};
+socket.onclose = function (event) 
+{
+    console.log('websocket close' + event.code);
+};
+
+function setBandwidth(sdp) {
+    sdp = sdp.replace(/a=mid:audio\r\n/g, 'a=mid:audio\r\nb=AS:' + 60+ '\r\n');
+    sdp = sdp.replace(/a=mid:video\r\n/g, 'a=mid:video\r\nb=AS:' + 3000+ '\r\n');
+    return sdp;
+}
+
+// 创建PeerConnection实例 (参数为null则没有iceserver，即使没有stunserver和turnserver，仍可在局域网下通讯)
+var pc = new webkitRTCPeerConnection(null);
+
+//发送ICE候选到其他客户端
+
+pc.onicecandidate = function(event){
+    if (event.candidate !== null) {
+        socket.send(JSON.stringify({
+                    "id": "onIceCandidate",
+                    "candidate": event.candidate
+                    }));
+    }
+};
+
+// 如果检测到媒体流连接到本地，将其绑定到一个video标签上输出
+pc.onaddstream = function(event){
+    var url = event.stream ? URL.createObjectURL(event.stream) : ''
+    var remoteVideo = document.getElementById('remoteVideo');
+    remoteVideo.pause();
+    remoteVideo.src = url;
+    console.log('onaddstream callback: ' + url);
+    remoteVideo.load();
+};
+
+var sendPresenterOfferFn = function(desc){
+    desc.sdp = setBandwidth(desc.sdp);
+    console.log('sendOfferFn: ', desc);
+    pc.setLocalDescription(desc);
+    socket.send(desc.sdp);
+};
+
+var sendViewerOfferFn = function(desc){
+    desc.sdp = setBandwidth(desc.sdp);
+    console.log('sendOfferFn: ', desc);
+    pc.setLocalDescription(desc);
+    socket.send(JSON.stringify({ 
+                "id": "viewer",
+                "sdpOffer": desc.sdp
+                }));
+};
+
+
+
+
+if(isCaller){
+    socket.onopen=function()
+    {
+    // 发送offer和answer的函数，发送本地session描述
+    // 获取本地音频和视频流
+getScreenId(function(error, sourceId, screen_constraints) {
+                screen_constraints.video.mandatory.minFrameRate=30;
+                //screen_constraints.video.mandatory.maxHeight=800;
+                //screen_constraints.video.mandatory.maxWidth=480;
+                console.log('screen_constraints', JSON.stringify(screen_constraints, null, '\t'));
+                navigator.getUserMedia = navigator.mozGetUserMedia || navigator.webkitGetUserMedia;
+
+                navigator.getUserMedia(screen_constraints, function(stream) {
+                    stream.onended = function() {
+                        if (self.onuserleft) self.onuserleft('self');
+                    };
+
+                    self.stream = stream;
+
+                    var video = document.getElementById('localVideo');
+                    video.id = 'self';
+                    video[isFirefox ? 'mozSrcObject' : 'src'] = isFirefox ? stream : window.webkitURL.createObjectURL(stream);
+                    video.autoplay = true;
+                    video.controls = true;
+                    video.play();
+
+        pc.addStream(stream);
+            console.log('getUserMedia  ' + stream);
+            //如果是发起方则发送一个offer信令
+
+            pc.createOffer(sendPresenterOfferFn, function (error) {
+                console.log('Failure callback: ' + error);
+                });
+
+                }, function(error) {
+                    console.error('getUserMedia error: ' +error);
+                });
+    });
+};
+}
+else
+{
+    socket.onopen=function()
+    {
+        var constraints =  {
+            mandatory: 
+            {
+                OfferToReceiveAudio: true,
+                OfferToReceiveVideo: true            
+            }
+        };
+        pc.createOffer(sendViewerOfferFn, function (error) {
+            console.log('Failure callback: ' + error);
+            }, constraints);
+
+    };
+}
+
+//处理到来的信令
+socket.onmessage = function(event){
+    var json = JSON.parse(event.data);
+    console.log('onmessage: ', json);
+    pc.setRemoteDescription(new RTCSessionDescription({type:'answer',sdp:json.sdpAnswer}));
+};
+
+
+</script>
+</body>
+</html>

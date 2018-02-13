@@ -38,6 +38,8 @@ public:
         remote_ufrags_.insert(remote_ufrag);
     }
 
+    void __DebugBroadcast(const uint8_t* data, const int& len);
+
 public:
     WebrtcProtocol* GetOrCreateProtocol(Fd& socket);
 

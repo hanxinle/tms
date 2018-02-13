@@ -57,18 +57,28 @@ public:
         remote_pwd_ = pwd;
     }
 
+    int ProtectRtp(const uint8_t* un_protect_rtp, const int& un_protect_rtp_len, uint8_t* protect_rtp, int& protect_rtp_len);
+    int UnProtectRtp(const uint8_t* protect_rtp, const int& protect_rtp_len, uint8_t* un_protect_rtp, int& un_protect_rtp_len);
+
+    int ProtectRtcp(const uint8_t* un_protect_rtp, const int& un_protect_rtp_len, uint8_t* protect_rtp, int& protect_rtp_len);
+    int UnProtectRtcp(const uint8_t* protect_rtp, const int& protect_rtp_len, uint8_t* un_protect_rtp, int& un_protect_rtp_len);
+
+    bool DtlsHandshakeDone()
+    {
+        return dtls_handshake_done_;
+    }
+
+    UdpSocket* GetUdpSocket()
+    {   
+        return (UdpSocket*)socket_;
+    }
+
 private:
     int OnStun(const uint8_t* data, const size_t& len);
     int OnDtls(const uint8_t* data, const size_t& len);
     int OnRtpRtcp(const uint8_t* data, const size_t& len);
 
     int Handshake();
-
-private:
-    UdpSocket* GetUdpSocket()
-    {   
-        return (UdpSocket*)socket_;
-    }
 
 private:
     Epoller* epoller_;
@@ -106,6 +116,7 @@ private:
     webrtc::RtpDepacketizerVp9 vp9_depacket_;
 
     uint32_t video_publisher_ssrc_;
+    uint32_t audio_publisher_ssrc_;
 };
 
 #endif // __WEBRTC_PROTOCOL_H__

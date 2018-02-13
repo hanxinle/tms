@@ -71,6 +71,7 @@ int MediaInput::ReadFrame(uint8_t*& data, int& size, int& flags, bool& is_video,
         if (ret == AVERROR_EOF)
         {   
             cout << LMSG << "end of file" << endl;
+            return 0;
         }   
         else
         {   
@@ -96,5 +97,5 @@ int MediaInput::ReadFrame(uint8_t*& data, int& size, int& flags, bool& is_video,
     flags = packet_.flags;
     timestamp = packet_.dts;
 
-    return 0;
+    return size;
 }

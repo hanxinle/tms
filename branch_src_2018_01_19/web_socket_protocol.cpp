@@ -64,144 +64,40 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
 
     if (! upgrade_)
     {
-		uint8_t* data = NULL;
+        int ret = http_parse_.Decode(io_buffer);
+        if (ret == kSuccess)
+        {
+            upgrade_ = true;
 
-    	int size = io_buffer.Peek(data, 0, io_buffer.Size());
+            string web_socket_key = "";
 
-    	int r_pos = -1; // '\r'
-    	int n_pos = -1; // '\n'
-    	int m_pos = -1; // ':'
+            if (! http_parse_.GetHeaderKeyValue("Sec-WebSocket-Key", web_socket_key))
+            {
+                return kClose;
+            }
 
-    	bool key_value = false; // false:key, true:value
+            web_socket_key += "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
-    	string key;
-    	string value;
+			string web_socket_rsp = "HTTP/1.1 101 Switching Protocols\r\n"
+									"Server: trs\r\n"
+									"Connection: upgrade\r\n"
+									"Sec-WebSocket-Accept: ";
 
-    	map<string, string> header;
+            string web_socket_key_sha;
+            web_socket_key_sha.resize(20);
 
-    	for (int i = 0; i != size; ++i)
-    	{
-    	    if (data[i] == '\r')
-    	    {
-    	        r_pos = i;
-    	    }
-    	    else if (data[i] == '\n')
-    	    {
-    	        if (i == r_pos + 1)
-    	        {
-    	            if (i == n_pos + 2) // \r\n\r\n
-    	            {
-    	                cout << LMSG << "http done" << endl;
+            SHA1((const unsigned char*)(web_socket_key.data()), web_socket_key.length(), (unsigned char*)web_socket_key_sha.data());
 
-                        upgrade_ = true;
-                        http_size = i + 1;
-
-                        io_buffer.Skip(http_size);
-
-                        auto iter_ws_key = header.find("Sec-WebSocket-Key");
-                        if (iter_ws_key == header.end())
-                        {
-                            return kClose;
-                        }
-
-                        string web_socket_key = iter_ws_key->second + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-
-						string web_socket_rsp = "HTTP/1.1 101 Switching Protocols\r\n"
-												"Server: trs\r\n"
-												"Connection: upgrade\r\n"
-												"Sec-WebSocket-Accept: ";
-
-                    	string web_socket_key_sha;
-                    	web_socket_key_sha.resize(20);
-
-                        SHA1((const unsigned char*)(web_socket_key.data()), web_socket_key.length(), (unsigned char*)web_socket_key_sha.data());
-
-                    	string web_socket_key_sha_base64;
-                        Base64::Encode(web_socket_key_sha, web_socket_key_sha_base64);
-                        web_socket_rsp += web_socket_key_sha_base64;
-                        web_socket_rsp += "\r\nUpgrade: websocket\r\n\r\n";
+            string web_socket_key_sha_base64;
+            Base64::Encode(web_socket_key_sha, web_socket_key_sha_base64);
+            web_socket_rsp += web_socket_key_sha_base64;
+            web_socket_rsp += "\r\nUpgrade: websocket\r\n\r\n";
 
 
-						GetTcpSocket()->Send((const uint8_t*)web_socket_rsp.data(), web_socket_rsp.size());
+			GetTcpSocket()->Send((const uint8_t*)web_socket_rsp.data(), web_socket_rsp.size());
+        }
 
-    	                return kSuccess;
-    	            }
-    	            else // \r\n
-    	            {
-    	                key_value = false;
-
-    	                cout << LMSG << key << ":" << value << endl;
-
-    	                if (key.find("GET") != string::npos)
-    	                {
-    	                    //GET /test.flv HTTP/1.1
-    	                    int s_count = 0;
-    	                    int x_count = 0; // /
-    	                    int d_count = 0; // .
-    	                    for (const auto& ch : key)
-    	                    {
-    	                        if (ch == ' ')
-    	                        {
-    	                            ++s_count;
-    	                        }
-    	                        else if (ch == '/')
-    	                        {
-    	                            ++x_count;
-    	                        }
-    	                        else if (ch == '.')
-    	                        {
-    	                            ++d_count;
-    	                        }
-    	                        else
-    	                        {
-    	                        }
-    	                    }
-    	                }
-
-    	                header[key] = value;
-    	                key.clear();
-    	                value.clear();
-    	            }
-    	        }
-
-    	        n_pos = i;
-    	    }
-    	    else if (data[i] == ':')
-    	    {
-    	        m_pos = i;
-    	        key_value = true;
-    	    }
-    	    else if (data[i] == ' ')
-    	    {
-    	        if (m_pos + 1 == i)
-    	        {
-    	        }
-    	        else
-    	        {
-    	            if (key_value)
-    	            {
-    	                value += (char)data[i];
-    	            }
-    	            else
-    	            {
-    	                key += (char)data[i];
-    	            }
-    	        }
-    	    }
-    	    else
-    	    {
-    	        if (key_value)
-    	        {
-    	            value += (char)data[i];
-    	        }
-    	        else
-    	        {
-    	            key += (char)data[i];
-    	        }
-    	    }
-    	}
-
-    	return kNoEnoughData;
+        return ret;
     }
     else
     {
@@ -311,7 +207,7 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
         {
         }
 
-        cout << LMSG << "payload:" << Util::Bin2Hex(data, extended_payload_length) << endl;
+        cout << LMSG << "websocket payload:\n" << Util::Bin2Hex(data, extended_payload_length) << endl;
 
 
         // FIXME: sdp 
@@ -349,7 +245,11 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
             cout << LMSG << "g_remote_ice_ufrag:" << Util::Bin2Hex(g_remote_ice_ufrag) << endl;
             cout << LMSG << "g_remote_ice_pwd:" << Util::Bin2Hex(g_remote_ice_pwd) << endl;
 
-            string webrtc_test_sdp = Util::ReadFile("webrtc_test.sdp");
+            string sdp_file = http_parse_.GetFileName() + "." +http_parse_.GetFileType();
+
+            cout << LMSG << "sdp:" << sdp_file << endl;
+
+            string webrtc_test_sdp = Util::ReadFile(sdp_file);
 
             if (webrtc_test_sdp.empty())
             {
@@ -366,9 +266,18 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
 
             Util::Replace(webrtc_test_sdp, "a=ice-ufrag:xxx\r\n", "a=ice-ufrag:" + g_local_ice_ufrag + "\r\n");
             Util::Replace(webrtc_test_sdp, "a=ice-pwd:xxx\r\n", "a=ice-pwd:" + g_local_ice_pwd + "\r\n");
-            Util::Replace(webrtc_test_sdp, "xxx.xxx.xxx.xxx:what", "192.168.247.128 11445");
+            Util::Replace(webrtc_test_sdp, "xxx.xxx.xxx.xxx:what", g_server_ip + " 11445");
+            Util::Replace(webrtc_test_sdp, "xxx.xxx.xxx.xxx", g_server_ip);
+            Util::Replace(webrtc_test_sdp, "xxx_port", "11445");
 
+            // a=sendrecv sdp中这个影响chrome推流
+#if 0
+            string candidate = R"(candidate":"candidate:10 1 udp 2115783679 xxx.xxx.xxx.xxx:what typ host generation 0 ufrag )" + g_local_ice_ufrag + R"( netwrok-id 1", "sdpMid":"video","sdpMLineIndex":1)";
+            Util::Replace(candidate, "xxx.xxx.xxx.xxx:what", g_server_ip + " 11445");
+            string sdp_answer = "{\"sdpAnswer\":\"" + webrtc_test_sdp + "\", \"candidate\":{" + "\"" + candidate + "}}";
+#else
             string sdp_answer = "{\"sdpAnswer\":\"" + webrtc_test_sdp + "\"}";
+#endif
 
             cout << LMSG << "==================== local sdp ====================" << endl;
             sdp_line = Util::SepStr(webrtc_test_sdp, "\r\n");
@@ -383,6 +292,9 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
             cout << LMSG << sdp_answer << endl;
 
             Send((const uint8_t*)sdp_answer.data(), sdp_answer.size());
+        }
+        else
+        {
         }
 
         return kSuccess;

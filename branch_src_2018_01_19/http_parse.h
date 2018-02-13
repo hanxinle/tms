@@ -36,6 +36,20 @@ public:
         return file_type_;
     }
 
+    bool GetHeaderKeyValue(const string& key, string& value)
+    {
+        auto iter = header_kv_.find(key);
+
+        if (iter == header_kv_.end())
+        {
+            return false;
+        }
+
+        value = iter->second;
+
+        return true;
+    }
+
 private:
     map<string, string> header_kv_;
     string host_;

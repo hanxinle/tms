@@ -81,18 +81,30 @@ static int HmacEncode(const string& algo, const char* key, const int& key_length
     return 0;  
 }  
 
+
+static uint32_t get_host_priority(uint16_t local_pref, bool is_rtp)
+{   
+    uint32_t pref = 126;
+    return (pref << 24) + (local_pref << 8) + ((256 - (is_rtp ? 1 : 2)) << 0); 
+}
+
 WebrtcProtocol::WebrtcProtocol(Epoller* epoller, Fd* socket)
     :
     epoller_(epoller),
     socket_(socket),
     dtls_hello_send_(false),
     dtls_(NULL),
-    dtls_handshake_done_(false)
+    dtls_handshake_done_(false),
+    media_input_(NULL),
+    timestamp_base_(0),
+    timestamp_(0),
+    media_input_open_count_(0)
 {
 }
 
 WebrtcProtocol::~WebrtcProtocol()
 {
+    close(socket_->GetFd());
 }
 
 int WebrtcProtocol::Parse(IoBuffer& io_buffer)
@@ -102,23 +114,23 @@ int WebrtcProtocol::Parse(IoBuffer& io_buffer)
 
     if (len > 0)
     {
-        cout << LMSG << Util::Bin2Hex(data, len) << endl;
+        cout << LMSG << "webrtc recv\n" << Util::Bin2Hex(data, len) << endl;
 
 		if ((data[0] == 0) || (data[0] == 1)) 
    		{   
             // RFC 5389
             OnStun(data, len);
-            cout << LMSG << "stun" << endl;
+            cout << LMSG << (long)this << ", stun" << endl;
    		}   
    		else if ((data[0] >= 128) && (data[0] <= 191))
    		{   
             OnRtpRtcp(data, len);
-            cout << LMSG << "rtp/rtcp" << endl;
+            cout << LMSG << (long)this << ", rtp/rtcp" << endl;
    		}   
    		else if ((data[0] >= 20) && (data[0] <= 64))
    		{   
             OnDtls(data, len);
-            cout << LMSG << "dtls" << endl;
+            cout << LMSG << (long)this << ", dtls" << endl;
    		}
     }
 
@@ -163,6 +175,8 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
     cout << LMSG << TRACE << endl;
 
     string username = "";
+    string local_ufrag = "";
+    string remote_ufrag = "";
 
     while (true)
     {
@@ -239,6 +253,15 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
                 cout << LMSG << "USERNAME" << endl;
                 cout << LMSG << value << endl;
                 username = value;
+
+                auto pos = username.find(":");
+                if (pos != string::npos)
+                {
+                    local_ufrag = username.substr(0, pos);
+                    remote_ufrag = username.substr(pos + 1);
+
+                    cout << LMSG << "local_ufrag:" << local_ufrag << ",remote_ufrag:" << remote_ufrag << endl;
+                }
             } 
             break;
 
@@ -290,6 +313,12 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
             };
             break;
 
+            case 0x0025:
+            {
+                cout << LMSG << "PRIORITY" << endl;
+            };
+            break;
+
             case 0x8022:
             {
                 cout << LMSG << "SOFTWARE" << endl;
@@ -305,6 +334,18 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
             case 0x8028:
             {
                 cout << LMSG << "FINGERPRINT" << endl;
+            };
+            break;
+
+            case 0x8029:
+            {
+                cout << LMSG << "ICE_CONTROLLED" << endl;
+            };
+            break;
+
+            case 0x802A:
+            {
+                cout << LMSG << "ICE_CONTROLLING" << endl;
             };
             break;
 
@@ -350,9 +391,9 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
                 hmac_input.WriteData(transcation_id.size(), (const uint8_t*)transcation_id.data());
                 hmac_input.WriteData(binding_response.SizeInBytes(), binding_response.GetData());
                 unsigned int out_len = 0;
-                HmacEncode("sha1", g_local_ice_pwd.data(), g_local_ice_pwd.size(), (const char*)hmac_input.GetData(), hmac_input.SizeInBytes(), hmac, out_len);
+                HmacEncode("sha1", local_pwd_.data(), local_pwd_.size(), (const char*)hmac_input.GetData(), hmac_input.SizeInBytes(), hmac, out_len);
 
-                cout << LMSG << "g_local_ice_pwd:" << g_local_ice_pwd << endl;
+                cout << LMSG << "local_pwd_:" << local_pwd_ << endl;
                 cout << LMSG << "hamc out_len:" << out_len << endl;
             }
 
@@ -393,68 +434,6 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
             GetUdpSocket()->Send(binding_response_header.GetData(), binding_response_header.SizeInBytes());
 
             // send binding request
-
-            if (true)
-            {
-                BitStream binding_request;
-                string username = g_remote_ice_ufrag + ":" + g_local_ice_ufrag;
-                binding_request.WriteBytes(2, 0x0006); // USERNAME
-                binding_request.WriteBytes(2, username.size());
-                binding_request.WriteData(username.size(), (const uint8_t*)username.data());
-
-                uint8_t hmac[20] = {0};
-                {
-                    BitStream hmac_input;
-                    hmac_input.WriteBytes(2, 0x0001); // Binding Request
-                    hmac_input.WriteBytes(2, binding_request.SizeInBytes() + 4 + 20);
-                    hmac_input.WriteBytes(4, magic_cookie);
-                    hmac_input.WriteData(transcation_id.size(), (const uint8_t*)transcation_id.data());
-                    hmac_input.WriteData(binding_request.SizeInBytes(), binding_request.GetData());
-                    unsigned int out_len = 0;
-                    HmacEncode("sha1", g_remote_ice_pwd.data(), g_remote_ice_pwd.size(), (const char*)hmac_input.GetData(), hmac_input.SizeInBytes(), hmac, out_len);
-
-                    cout << LMSG << "g_remote_ice_pwd:" << g_remote_ice_pwd << endl;
-                    cout << LMSG << "hamc out_len:" << out_len << endl;
-                }
-
-                binding_request.WriteBytes(2, 0x0008);
-                binding_request.WriteBytes(2, 20);
-                binding_request.WriteData(20, hmac);
-
-                uint32_t crc_32 = 0;
-                {
-                    BitStream crc32_input;
-                    crc32_input.WriteBytes(2, 0x0001); // Binding Response
-                    crc32_input.WriteBytes(2, binding_request.SizeInBytes() + 8);
-                    crc32_input.WriteBytes(4, magic_cookie);
-                    crc32_input.WriteData(transcation_id.size(), (const uint8_t*)transcation_id.data());
-                    crc32_input.WriteData(binding_request.SizeInBytes(), binding_request.GetData());
-                    CRC32 crc32;
-                    cout << LMSG << "my crc32 input:" << Util::Bin2Hex(crc32_input.GetData(), crc32_input.SizeInBytes()) << endl;
-                    crc_32 = crc32.GetCrc32(crc32_input.GetData(), crc32_input.SizeInBytes());
-                    cout << LMSG << "crc32:" << crc_32 << endl;
-                    crc_32 = crc_32 ^ 0x5354554E;
-                    cout << LMSG << "crc32:" << crc_32 << endl;
-                }
-
-                binding_request.WriteBytes(2, 0x8028);
-                binding_request.WriteBytes(2, 4);
-                binding_request.WriteBytes(4, crc_32);
-
-                BitStream binding_request_header;
-                binding_request_header.WriteBytes(2, 0x0001); // Binding Request
-                binding_request_header.WriteBytes(2, binding_request.SizeInBytes());
-                binding_request_header.WriteBytes(4, magic_cookie);
-                binding_request_header.WriteData(transcation_id.size(), (const uint8_t*)transcation_id.data());
-                binding_request_header.WriteData(binding_request.SizeInBytes(), binding_request.GetData());
-
-                cout << LMSG << "myself send binding_request\n" 
-                     << Util::Bin2Hex(binding_request_header.GetData(), binding_request_header.SizeInBytes()) << endl;
-
-
-                GetUdpSocket()->Send(binding_request_header.GetData(), binding_request_header.SizeInBytes());
-
-            }
 #else
 			ByteBufferReader byte_buffer_read((const char*)data, len);
     		StunMessage stun_req;
@@ -479,7 +458,7 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
             	SocketAddress addr(htobe32(ip_num), GetUdpSocket()->GetClientPort());
             	stun_rsp.AddAttribute(new StunXorAddressAttribute(STUN_ATTR_XOR_MAPPED_ADDRESS, addr));
             	stun_rsp.AddAttribute(new StunByteStringAttribute(STUN_ATTR_USERNAME, username_attr->GetString()));
-            	stun_rsp.AddMessageIntegrity(g_local_ice_pwd);
+            	stun_rsp.AddMessageIntegrity(local_pwd_);
             	stun_rsp.AddFingerprint();
 
             	ByteBufferWriter byte_buffer_write;
@@ -491,38 +470,40 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
             }
 #endif
 
-            if (! dtls_hello_send_)
+            if (! g_webrtc_mgr->IsRemoteUfragExist(remote_ufrag))
             {
-                cout << LMSG << "dtls send clienthello" << endl;
+                cout << LMSG << "connect udp socket:" << GetUdpSocket()->GetClientIp() << ":" << GetUdpSocket()->GetClientPort() << endl;
+                g_webrtc_mgr->AddRemoteUfrag(remote_ufrag);
 
-                dtls_hello_send_ = true;
+                int fd = CreateNonBlockUdpSocket();
+                ReuseAddr(fd);
+                Bind(fd, "0.0.0.0", 11445);
+                Connect(fd, GetUdpSocket()->GetClientIp(), GetUdpSocket()->GetClientPort());
 
-#ifdef USE_VP8_WEBM
-                media_input_.Open("input_vp8.webm");
-#else
-                media_input_.Open("input_vp9.webm");
-#endif
+                UdpSocket* udp_socket = new UdpSocket(g_epoll, fd, g_webrtc_mgr);
+                udp_socket->SetSrcAddr(GetUdpSocket()->GetSrcAddr());
+                udp_socket->SetSrcAddrLen(GetUdpSocket()->GetSrcAddrLen());
+                udp_socket->EnableRead();
 
-                if (dtls_ == NULL)
-                {
-                    dtls_ = SSL_new(g_dtls_ctx);
-
-					SSL_set_connect_state(dtls_);
-
-        			bio_in_  = BIO_new(BIO_s_mem());
-        			bio_out_ = BIO_new(BIO_s_mem());
-
-        			SSL_set_bio(dtls_, bio_in_, bio_out_);
-
-                    Handshake();
-                }
+                cout << LMSG << "new webrtc protocol:" << (long)(g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)) << endl;
+                g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SetLocalUfrag(g_local_ice_ufrag);
+                g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SetLocalPwd(g_local_ice_pwd);
+                g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SetRemoteUfrag(g_remote_ice_ufrag);
+                g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SetRemotePwd(g_remote_ice_pwd);
+                g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SendClientHello();
+                //g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SendBindingRequest();
             }
-
+            else
+            {
+                //SendBindingRequest();
+            }
         }
         break;
 
         case 0x0101:
         {
+            cout << LMSG << "Binding Response" << endl;
+            SendBindingIndication();
         }
         break;
 
@@ -572,6 +553,30 @@ int WebrtcProtocol::OnDtls(const uint8_t* data, const size_t& len)
 
         Handshake();
     }
+    else
+    {
+		BIO_reset(bio_in_);
+        BIO_reset(bio_out_);
+
+        BIO_write(bio_in_, data, len);
+
+        while (BIO_ctrl_pending(bio_in_) > 0)
+        {
+            uint8_t dtls_read_buf[8092];
+            int ret = SSL_read(dtls_, dtls_read_buf, sizeof(dtls_read_buf));
+
+            if (ret > 0) 
+            {
+                cout << LMSG << "dtls read " << ret << " bytes" << endl;
+                cout << LMSG << Util::Bin2Hex(dtls_read_buf, ret) << endl;
+            }
+            else
+            {
+                int err = SSL_get_error(dtls_, ret); 
+                cout << LMSG << "dtls read " << ret << ", err:" << err << endl;
+            }
+        }
+    }
 
 	return 0;
 }
@@ -585,67 +590,213 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
 
     cout << LMSG << "Rtp Header Peek:" << Util::Bin2Hex(data, 12) << endl;
 
+
     uint8_t unprotect_buf[4096] = {0};
     int unprotect_buf_len = len;
     memcpy(unprotect_buf, data, len);
 
-    BitBuffer bit_buffer(data, len);
+    cout << LMSG << "type:" << (int)data[1] << endl;
 
-    uint8_t version = 0;
-    bit_buffer.GetBits(2, version);
-
-    uint8_t padding = 0;
-    bit_buffer.GetBits(1, padding);
-
-    uint8_t extension = 0;
-    bit_buffer.GetBits(1, extension);
-
-    uint8_t csrc_count = 0;
-    bit_buffer.GetBits(4, csrc_count);
-
-    uint8_t marker = 0;
-    bit_buffer.GetBits(1, marker);
-    
-    uint8_t payload_type = 0;
-    bit_buffer.GetBits(7, payload_type);
-
-    uint16_t sequence_number = 0;
-    bit_buffer.GetBytes(2, sequence_number);
-
-    uint32_t timestamp = 0;
-    bit_buffer.GetBytes(4, timestamp);
-
-    uint32_t ssrc = 0;
-    bit_buffer.GetBytes(4, ssrc);
-
-    for (uint8_t c = 0; c != csrc_count; ++c)
+    if (data[1] == 200 || data[1] == 201 || data[1] == 202 || data[1] == 203 || data[1] == 204)
     {
-        uint32_t csrc = 0;
-        bit_buffer.GetBytes(4, csrc);
-    }
+        int ret = srtp_unprotect_rtcp(srtp_recv_, unprotect_buf, &unprotect_buf_len);
+        if (ret == 0)
+        {
+            cout << LMSG << "srtp_unprotect_rtcp success" << endl;
+        }
+        else
+        {
+            cout << LMSG << "srtp_unprotect_rtcp ret:" << ret << endl;
+        }
 
-    cout << LMSG << "[RTP Header] # version:" << (int)version
-                 << ",padding:" << (int)padding
-                 << ",extension:" << (int)extension
-                 << ",csrc_count:" << (int)csrc_count
-                 << ",marker:" << (int)marker
-                 << ",payload_type:" << (int)payload_type
-                 << ",sequence_number:" << sequence_number
-                 << ",timestamp:" << timestamp
-                 << ",ssrc:" << ssrc
-                 << endl;
+        BitBuffer bit_buffer(unprotect_buf, unprotect_buf_len);
 
-    int ret = srtp_unprotect(srtp_recv_, unprotect_buf, &unprotect_buf_len);
-    if (ret == 0)
-    {
-        cout << LMSG << "srtp_unprotect success" << endl;
+        uint8_t version = 0;
+        bit_buffer.GetBits(2, version);
+
+        uint8_t padding = 0;
+        bit_buffer.GetBits(1, padding);
+
+        uint8_t reception_report_count = 0;
+        bit_buffer.GetBits(5, reception_report_count);
+
+        uint8_t packet_type = 0;
+        bit_buffer.GetBits(8, packet_type);
+
+        uint16_t length = 0;
+        bit_buffer.GetBytes(2, length);
+
+        uint32_t ssrc = 0;
+        bit_buffer.GetBytes(4, ssrc);
+
+        cout << LMSG << "[RTCP Header] # version:" << (int)version
+                     << ",padding:" << (int)padding
+                     << ",length:" << (int)length
+                     << ",packet_type:" << (int)packet_type
+                     << ",ssrc:" << ssrc
+                     << endl;
+
+        if (packet_type == 201)
+        {
+            if (bit_buffer.MoreThanBytes(24))
+            {
+                uint32_t ssrc = 0;
+                bit_buffer.GetBytes(4, ssrc);
+
+                uint8_t fraction_lost = 0;
+                bit_buffer.GetBytes(1, fraction_lost);
+
+                uint32_t cumulative_number_of_packets_lost = 0;
+                bit_buffer.GetBytes(3, cumulative_number_of_packets_lost);
+
+                uint32_t extended_highest_sequence_number_received = 0;
+                bit_buffer.GetBytes(4, extended_highest_sequence_number_received);
+
+                uint32_t interarrival_jitter = 0;
+                bit_buffer.GetBytes(4, interarrival_jitter);
+
+                uint32_t last_SR = 0;
+                bit_buffer.GetBytes(4, last_SR);
+
+                uint32_t delay_since_last_SR = 0;
+                bit_buffer.GetBytes(4, delay_since_last_SR);
+
+                cout << LMSG << "[Receiver Report RTCP Packet]"
+                             << "ssrc:" << ssrc
+                             << ",fraction_lost:" << (int)fraction_lost
+                             << ",cumulative_number_of_packets_lost:" << cumulative_number_of_packets_lost
+                             << ",extended_highest_sequence_number_received:" << extended_highest_sequence_number_received
+                             << ",interarrival_jitter:" << interarrival_jitter
+                             << ",last_SR:" << last_SR
+                             << ",delay_since_last_SR:" << delay_since_last_SR
+                             << endl;
+            }
+        }
     }
     else
     {
-        cout << LMSG << "srtp_unprotect ret:" << ret << endl;
-    }
+        int ret = srtp_unprotect(srtp_recv_, unprotect_buf, &unprotect_buf_len);
+        if (ret == 0)
+        {
+            cout << LMSG << "srtp_unprotect success" << endl;
+        }
+        else
+        {
+            cout << LMSG << "srtp_unprotect ret:" << ret << endl;
+        }
 
-    cout << LMSG << "unprotect_buf_len:" << unprotect_buf_len << endl;
+        BitBuffer bit_buffer(unprotect_buf, unprotect_buf_len);
+
+        cout << LMSG << "unprotect_buf_len:" << unprotect_buf_len << endl;
+        uint8_t version = 0;
+        bit_buffer.GetBits(2, version);
+
+        uint8_t padding = 0;
+        bit_buffer.GetBits(1, padding);
+
+        uint8_t extension = 0;
+        bit_buffer.GetBits(1, extension);
+
+        uint8_t csrc_count = 0;
+        bit_buffer.GetBits(4, csrc_count);
+
+        uint8_t marker = 0;
+        bit_buffer.GetBits(1, marker);
+        
+        uint8_t payload_type = 0;
+        bit_buffer.GetBits(7, payload_type);
+
+        uint16_t sequence_number = 0;
+        bit_buffer.GetBytes(2, sequence_number);
+
+        uint32_t timestamp = 0;
+        bit_buffer.GetBytes(4, timestamp);
+
+        uint32_t ssrc = 0;
+        bit_buffer.GetBytes(4, ssrc);
+
+        for (uint8_t c = 0; c != csrc_count; ++c)
+        {
+            uint32_t csrc = 0;
+            bit_buffer.GetBytes(4, csrc);
+        }
+
+        cout << LMSG << "[RTP Header] # version:" << (int)version
+                     << ",padding:" << (int)padding
+                     << ",extension:" << (int)extension
+                     << ",csrc_count:" << (int)csrc_count
+                     << ",marker:" << (int)marker
+                     << ",payload_type:" << (int)payload_type
+                     << ",sequence_number:" << sequence_number
+                     << ",timestamp:" << timestamp
+                     << ",ssrc:" << ssrc
+                     << endl;
+
+        if (payload_type == 96)
+        {
+            RtpDepacketizer::ParsedPayload parsed_payload;
+
+            if (! vp8_depacket_.Parse(&parsed_payload, unprotect_buf + 12, unprotect_buf_len - 12))
+            {
+                cout << LMSG << "parse vp8 failed" << endl;
+                return kError;
+            }
+
+            cout << LMSG << "parse vp8 success" << endl;
+        }
+        else if (payload_type == 98)
+        {
+            RtpDepacketizer::ParsedPayload parsed_payload;
+
+            if (! vp9_depacket_.Parse(&parsed_payload, unprotect_buf + 12, unprotect_buf_len - 12))
+            {
+                cout << LMSG << "parse vp9 failed" << endl;
+                return kError;
+            }
+
+            cout << LMSG << "parse vp9 success"
+                         << ",payload_length:" << parsed_payload.payload_length
+					  	 << ",frame_type:" << parsed_payload.frame_type
+						 << ",is_first_packet:" << parsed_payload.type.Video.isFirstPacket
+                         << ",picture_id:" << parsed_payload.type.Video.codecHeader.VP9.picture_id
+                         << ",beginning_of_frame:" << parsed_payload.type.Video.codecHeader.VP9.beginning_of_frame
+                         << ",end_of_frame:" << parsed_payload.type.Video.codecHeader.VP9.end_of_frame
+                         << ",timestamp:" << timestamp
+                         << endl;
+
+#ifdef PUBLISH_BACK
+            {   
+                RtpHeader* rtp_header = (RtpHeader*)unprotect_buf;
+
+                video_publisher_ssrc_ = ssrc;
+
+                rtp_header->setSSRC(3233846889);
+
+                char protect_buf[1500];
+                int protect_buf_len = unprotect_buf_len;
+                memcpy(protect_buf, unprotect_buf, protect_buf_len);
+
+                int ret = srtp_protect(srtp_send_, protect_buf, &protect_buf_len);
+                if (ret == 0)
+                {
+                    cout << LMSG << "srtp_protect success" << endl;
+                    GetUdpSocket()->Send((const uint8_t*)protect_buf, protect_buf_len);
+                }
+                else
+                {
+                    cout << LMSG << "srtp_protect faile:" << ret << endl;
+                }
+
+                cout << LMSG << "srtp protect_buf_len:" << protect_buf_len << endl;
+
+                //cout << LMSG << "==> packet rtp success <==" << endl;
+            }
+#endif
+        }
+        else if (payload_type == 111)
+        {
+        }
+    }
 
     return 0;
 }
@@ -786,6 +937,41 @@ int WebrtcProtocol::Handshake()
     return 0;
 }
 
+void WebrtcProtocol::SendClientHello()
+{
+    if (! dtls_hello_send_)
+    {
+        cout << LMSG << "dtls send clienthello" << endl;
+
+        dtls_hello_send_ = true;
+
+        if (media_input_ == NULL)
+        {
+            media_input_ = new MediaInput();
+        }
+
+#ifdef USE_VP8_WEBM
+        media_input_->Open("input_vp8.webm");
+#else
+        media_input_->Open("input_vp9.webm");
+#endif
+        ++media_input_open_count_;
+        if (dtls_ == NULL)
+        {
+            dtls_ = SSL_new(g_dtls_ctx);
+
+			SSL_set_connect_state(dtls_);
+
+        	bio_in_  = BIO_new(BIO_s_mem());
+        	bio_out_ = BIO_new(BIO_s_mem());
+
+        	SSL_set_bio(dtls_, bio_in_, bio_out_);
+
+            Handshake();
+        }
+    }
+}
+
 int WebrtcProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)
 {
     return 0;
@@ -793,9 +979,31 @@ int WebrtcProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& inte
 
 int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)
 {
+#ifdef PUBLISH_BACK
+
+    if (dtls_handshake_done_ && count % 50 == 0)
+    {
+		RtcpHeader rtcp_pli;
+    	rtcp_pli.setPacketType(RTCP_PS_Feedback_PT);
+    	rtcp_pli.setBlockCount(1);
+    	rtcp_pli.setSSRC(3233846889);
+    	rtcp_pli.setSourceSSRC(video_publisher_ssrc_);
+    	rtcp_pli.setLength(2);
+
+    	uint8_t *buf = (uint8_t*)(&rtcp_pli);
+    	size_t len = (rtcp_pli.getLength() + 1)*4;
+
+        GetUdpSocket()->Send(buf, len);
+
+        cout << LMSG << "send pli " << endl;
+    }
+
+    return 0;
+#endif
+
     cout << LMSG << "count:" << count << endl;
 
-    if (dtls_handshake_done_)
+    if (dtls_handshake_done_ && media_input_ != NULL)
     {
         for (int i = 0; i != 5; ++i)
         {
@@ -803,16 +1011,31 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
             int frame_len = 0;
             int flag = 0;
             bool is_video = false;
-            uint64_t timestamp = 0;
 
-            int ret = media_input_.ReadFrame(frame_data, frame_len, flag, is_video, timestamp);
+            int ret = media_input_->ReadFrame(frame_data, frame_len, flag, is_video, timestamp_);
 
-            if (ret != 0)
+            if (ret == 0)
+            {
+                delete media_input_;
+
+                media_input_ = new MediaInput();
+#ifdef USE_VP8_WEBM
+                media_input_->Open("input_vp8.webm");
+#else
+                media_input_->Open("input_vp9.webm");
+#endif
+
+                ++media_input_open_count_;
+
+                cout << LMSG << "timestamp_base_:" << timestamp_base_ << "=>" << (timestamp_base_ + timestamp_) << endl;
+                timestamp_base_ += timestamp_;
+            }
+            else if (ret < 0)
             {
                 return 0;
             }
 
-            cout << LMSG << "is_video:" << is_video << ",timestamp:" << timestamp << endl;
+            cout << LMSG << "is_video:" << is_video << ",timestamp_:" << timestamp_ << endl;
 
             if (is_video)
             {
@@ -879,7 +1102,15 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
 #else
                         rtp_header.setPayloadType(98);
 #endif
-                        rtp_header.setTimestamp((uint32_t)timestamp * 90);
+
+                        if (media_input_open_count_ > 1)
+                        {
+                            rtp_header.setTimestamp((uint32_t)(timestamp_ + timestamp_base_) * 90);
+                        }
+                        else
+                        {
+                            rtp_header.setTimestamp((uint32_t)timestamp_ * 90);
+                        }
 
                         memcpy(rtp, &rtp_header, rtp_header.getHeaderLength()/*rtp head size*/);
 
@@ -921,7 +1152,15 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
             	rtp_header.setSSRC(3233846889+1);
             	rtp_header.setSeqNumber(++audio_seq_);
             	rtp_header.setPayloadType(111);
-            	rtp_header.setTimestamp((uint32_t)timestamp * 48);
+
+                if (media_input_open_count_ > 1)
+                {
+            	    rtp_header.setTimestamp((uint32_t)(timestamp_ + timestamp_base_) * 48);
+                }
+                else
+                {
+            	    rtp_header.setTimestamp((uint32_t)timestamp_ * 48);
+                }
 
             	memcpy(rtp, &rtp_header, 12/*rtp head size*/);
             	memcpy(rtp_packet, frame_data, frame_len);
@@ -947,4 +1186,137 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
     }
 
     return kSuccess;
+}
+
+void WebrtcProtocol::SendBindingRequest()
+{
+    uint32_t magic_cookie = 0x2112A442;
+    string transcation_id = Util::GenRandom(12);
+
+    BitStream binding_request;
+    string username = remote_ufrag_ + ":" + local_ufrag_;
+    binding_request.WriteBytes(2, 0x0006); // USERNAME
+    binding_request.WriteBytes(2, username.size());
+    binding_request.WriteData(username.size(), (const uint8_t*)username.data());
+
+    binding_request.WriteBytes(2, 0x8029); // ICE_CONTROLLED
+    binding_request.WriteBytes(2, 8);
+    uint64_t tie_breaker = 123;
+    binding_request.WriteBytes(8, tie_breaker);
+
+    binding_request.WriteBytes(2, 0x0025); // PRIORITY
+    binding_request.WriteBytes(2, 4);
+    uint32_t priority = get_host_priority(0xFFFF, true);
+    binding_request.WriteBytes(4, priority);
+
+    uint8_t hmac[20] = {0};
+    {
+        BitStream hmac_input;
+        hmac_input.WriteBytes(2, 0x0001); // Binding Request
+        hmac_input.WriteBytes(2, binding_request.SizeInBytes() + 4 + 20);
+        hmac_input.WriteBytes(4, magic_cookie);
+        hmac_input.WriteData(transcation_id.size(), (const uint8_t*)transcation_id.data());
+        hmac_input.WriteData(binding_request.SizeInBytes(), binding_request.GetData());
+        unsigned int out_len = 0;
+        HmacEncode("sha1", remote_pwd_.data(), remote_pwd_.size(), (const char*)hmac_input.GetData(), hmac_input.SizeInBytes(), hmac, out_len);
+
+        cout << LMSG << "remote_pwd_:" << remote_pwd_ << endl;
+        cout << LMSG << "hamc out_len:" << out_len << endl;
+    }
+
+    binding_request.WriteBytes(2, 0x0008);
+    binding_request.WriteBytes(2, 20);
+    binding_request.WriteData(20, hmac);
+
+    uint32_t crc_32 = 0;
+    {
+        BitStream crc32_input;
+        crc32_input.WriteBytes(2, 0x0001); // Binding Response
+        crc32_input.WriteBytes(2, binding_request.SizeInBytes() + 8);
+        crc32_input.WriteBytes(4, magic_cookie);
+        crc32_input.WriteData(transcation_id.size(), (const uint8_t*)transcation_id.data());
+        crc32_input.WriteData(binding_request.SizeInBytes(), binding_request.GetData());
+        CRC32 crc32;
+        cout << LMSG << "my crc32 input:" << Util::Bin2Hex(crc32_input.GetData(), crc32_input.SizeInBytes()) << endl;
+        crc_32 = crc32.GetCrc32(crc32_input.GetData(), crc32_input.SizeInBytes());
+        cout << LMSG << "crc32:" << crc_32 << endl;
+        crc_32 = crc_32 ^ 0x5354554E;
+        cout << LMSG << "crc32:" << crc_32 << endl;
+    }
+
+    binding_request.WriteBytes(2, 0x8028);
+    binding_request.WriteBytes(2, 4);
+    binding_request.WriteBytes(4, crc_32);
+
+    BitStream binding_request_header;
+    binding_request_header.WriteBytes(2, 0x0001); // Binding Request
+    binding_request_header.WriteBytes(2, binding_request.SizeInBytes());
+    binding_request_header.WriteBytes(4, magic_cookie);
+    binding_request_header.WriteData(transcation_id.size(), (const uint8_t*)transcation_id.data());
+    binding_request_header.WriteData(binding_request.SizeInBytes(), binding_request.GetData());
+
+    cout << LMSG << "myself send binding_request\n" 
+         << Util::Bin2Hex(binding_request_header.GetData(), binding_request_header.SizeInBytes()) << endl;
+
+
+    GetUdpSocket()->Send(binding_request_header.GetData(), binding_request_header.SizeInBytes());
+}
+
+void WebrtcProtocol::SendBindingIndication()
+{
+    uint32_t magic_cookie = 0x2112A442;
+    string transcation_id = Util::GenRandom(12);
+
+    BitStream binding_indication;
+
+    uint8_t hmac[20] = {0};
+    {
+        BitStream hmac_input;
+        hmac_input.WriteBytes(2, 0x0011); // Binding Indication
+        hmac_input.WriteBytes(2, 4 + 20);
+        hmac_input.WriteBytes(4, magic_cookie);
+        hmac_input.WriteData(transcation_id.size(), (const uint8_t*)transcation_id.data());
+        unsigned int out_len = 0;
+        HmacEncode("sha1", remote_pwd_.data(), remote_pwd_.size(), (const char*)hmac_input.GetData(), hmac_input.SizeInBytes(), hmac, out_len);
+
+        cout << LMSG << "remote_pwd_:" << remote_pwd_ << endl;
+        cout << LMSG << "hamc out_len:" << out_len << endl;
+    }
+
+    binding_indication.WriteBytes(2, 0x0008);
+    binding_indication.WriteBytes(2, 20);
+    binding_indication.WriteData(20, hmac);
+
+    uint32_t crc_32 = 0;
+    {
+        BitStream crc32_input;
+        crc32_input.WriteBytes(2, 0x0011); // Binding Indication
+        crc32_input.WriteBytes(2, binding_indication.SizeInBytes() + 8);
+        crc32_input.WriteBytes(4, magic_cookie);
+        crc32_input.WriteData(transcation_id.size(), (const uint8_t*)transcation_id.data());
+        crc32_input.WriteData(binding_indication.SizeInBytes(), binding_indication.GetData());
+        CRC32 crc32;
+        cout << LMSG << "my crc32 input:" << Util::Bin2Hex(crc32_input.GetData(), crc32_input.SizeInBytes()) << endl;
+        crc_32 = crc32.GetCrc32(crc32_input.GetData(), crc32_input.SizeInBytes());
+        cout << LMSG << "crc32:" << crc_32 << endl;
+        crc_32 = crc_32 ^ 0x5354554E;
+        cout << LMSG << "crc32:" << crc_32 << endl;
+    }
+
+    binding_indication.WriteBytes(2, 0x8028);
+    binding_indication.WriteBytes(2, 4);
+    binding_indication.WriteBytes(4, crc_32);
+
+    BitStream binding_indication_header;
+    binding_indication_header.WriteBytes(2, 0x0011); // Binding Indication
+    binding_indication_header.WriteBytes(2, binding_indication.SizeInBytes());
+    binding_indication_header.WriteBytes(4, magic_cookie);
+    binding_indication_header.WriteData(transcation_id.size(), (const uint8_t*)transcation_id.data());
+    binding_indication_header.WriteData(binding_indication.SizeInBytes(), binding_indication.GetData());
+
+    cout << LMSG << "myself send binding_indication\n" 
+         << Util::Bin2Hex(binding_indication_header.GetData(), binding_indication_header.SizeInBytes()) << endl;
+
+
+    GetUdpSocket()->Send(binding_indication_header.GetData(), binding_indication_header.SizeInBytes());
 }

@@ -25,7 +25,8 @@ CXX 		   = g++
 CFLAGS         = -g -W -Wall -Werror -O2 -pg
 CXXFLAGS       = -g -std=c++0x -DWEBRTC_POSIX -W -Wall -Werror -O2 -pg -Wno-strict-aliasing -Wno-missing-field-initializers -Wno-unused-function -Wno-deprecated-declarations \
 				 -Wno-unused-variable -Wno-unused-parameter -Wno-unused-value \
-				 -DUSE_VP8_WEBM
+				 -DUSE_VP8_WEBM \
+				 -DPUBLISH_BACK
 # ==========================================================
 SOURCES += $(wildcard ./*.cpp)
 SOURCES += $(wildcard ../common/*.cpp)

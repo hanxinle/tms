@@ -1,121 +1,65 @@
 <html>
 <body>
-Local: <br>
-<video id="localVideo" autoplay></video><br>
-Remote: <br>
-<video id="remoteVideo" autoplay></video>
+    Local: <br>
+    <video id="localVideo" autoplay></video><br>
+    Remote: <br>
+    <video id="remoteVideo" autoplay></video>
 
-<script>
-// 仅仅用于控制哪一端的浏览器发起offer，#号后面有值的一方发起
-//var isCaller = window.location.href.split('#')[1];
-var isCaller = true;
+    <script>
+        // 仅仅用于控制哪一端的浏览器发起offer，#号后面有值的一方发起
+        var isCaller = window.location.href.split('#')[1];
 
-// 与信令服务器的WebSocket连接
-var socket = new WebSocket("wss://john.com:8943/ws");
-console.log('websocket start');
+        // 与信令服务器的WebSocket连接
+		var socket = new WebSocket("wss://john.com:8943/publish.sdp");
+		console.log('websocket start');
 
-socket.onerror=function(event)
-{
-    console.log('Failure callback');
-};
-socket.onclose = function (event) 
-{
-    console.log('websocket close' + event.code);
-};
+        // 创建PeerConnection实例 (参数为null则没有iceserver，即使没有stunserver和turnserver，仍可在局域网下通讯)
+        //var pc = new webkitRTCPeerConnection(iceServer);
+        var pc = new webkitRTCPeerConnection(null);
 
-// 创建PeerConnection实例 (参数为null则没有iceserver，即使没有stunserver和turnserver，仍可在局域网下通讯)
-//var pc = new webkitRTCPeerConnection(iceServer);
-var pc = new webkitRTCPeerConnection(null);
+        //发送ICE候选到其他客户端
+        pc.onicecandidate = function(event){
+            console.log('onicecandidate');
+        };
 
-// 如果检测到媒体流连接到本地，将其绑定到一个video标签上输出
-pc.onaddstream = function(event){
-    var url = event.stream ? URL.createObjectURL(event.stream) : ''
-    var remoteVideo = document.getElementById('remoteVideo');
-    remoteVideo.src = url;
-    console.log('onaddstream callback: ' + url);
-    remoteVideo.load();
-};
+        // 如果检测到媒体流连接到本地，将其绑定到一个video标签上输出
+        pc.onaddstream = function(event){
+            document.getElementById('remoteVideo').src = URL.createObjectURL(event.stream);
+        };
 
-var sendPresenterOfferFn = function(desc){
-    console.log('sendOfferFn: ', desc);
-    pc.setLocalDescription(desc);
-    socket.send(desc.sdp);
-};
+        // 发送offer和answer的函数，发送本地session描述
+        var sendOfferFn = function(desc){
+			console.log('sendOfferFn: ', desc);
+            pc.setLocalDescription(desc);
+            socket.send(desc.sdp) 
+        };
 
-var sendViewerOfferFn = function(desc){
-    console.log('sendOfferFn: ', desc);
-    pc.setLocalDescription(desc);
-    socket.send(JSON.stringify({ 
-                "id": "viewer",
-                "sdpOffer": desc.sdp
-                }));
-};
-
-
-if(isCaller){
-    socket.onopen=function()
-    {
-    // 发送offer和answer的函数，发送本地session描述
-    // 获取本地音频和视频流
-    navigator.webkitGetUserMedia({
-        "audio": true,
-        "video": {
-            "mandatory": {
-              "maxWidth": 1366,
-              "maxHeight": 768,
-              "minWidth": 1366,
-              "minHeight": 768,
-              "minFrameRate": 20,
-              "maxFrameRate": 50
-        },
-  "optional": []
-}
-}, function(stream){
+        // 获取本地音频和视频流
+        navigator.webkitGetUserMedia({
+            "audio": true,
+            "video": true
+        }, function(stream){
             //绑定本地媒体流到video标签用于输出
             document.getElementById('localVideo').src = URL.createObjectURL(stream);
             //向PeerConnection中加入需要发送的流
             pc.addStream(stream);
-            console.log('getUserMedia  ' + stream);
             //如果是发起方则发送一个offer信令
-
-            pc.createOffer(sendPresenterOfferFn, function (error) {
-                console.log('Failure callback: ' + error);
-                });
-
-            }, function(error){
+            //if(isCaller){
+			pc.createOffer(sendOfferFn, function (error) {
+				console.log('Failure callback: ' + error);
+				});
+            //}
+        }, function(error){
             //处理媒体流创建失败错误
             console.log('getUserMedia error: ' + error);
-            });
-    };
-}
-else
-{
-    socket.onopen=function()
-    {
-        var constraints =  {
-            mandatory: 
-            {
-                OfferToReceiveAudio: true,
-                OfferToReceiveVideo: true            
-            }        
+        });
+
+        //处理到来的信令
+        socket.onmessage = function(event){
+            var json = JSON.parse(event.data);
+            console.log('onmessage: ', json);
+			pc.setRemoteDescription(new RTCSessionDescription({type:'answer',sdp:json.sdpAnswer}));
         };
-        pc.createOffer(sendViewerOfferFn, function (error) {
-            console.log('Failure callback: ' + error);
-            }, constraints);
-
-    };
-}
-
-
-//处理到来的信令
-socket.onmessage = function(event){
-    var json = JSON.parse(event.data);
-    console.log('onmessage: ', event);
-    console.log('onmessage: ', event.data);
-    console.log('onmessage: ', json);
-    pc.setRemoteDescription(new RTCSessionDescription({type:'answer',sdp:json.sdpAnswer}));
-    console.log('onmessage presenterResponse: ', json.sdpAnswer);
-};
-</script>
+    </script>
 </body>
 </html>

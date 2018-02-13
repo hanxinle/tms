@@ -30,11 +30,11 @@ int HttpFileProtocol::Parse(IoBuffer& io_buffer)
 
     if (ret == kSuccess)
     {
-        if (http_parse_.GetFileName() == "webrtc_test" && http_parse_.GetFileType() == "html")
+        if (http_parse_.GetFileType() == "html")
         {
-            string webrtc_test = Util::ReadFile("webrtc_test.html");
+            string html = Util::ReadFile(http_parse_.GetFileName() + ".html");
 
-            if (webrtc_test.empty())
+            if (html.empty())
             {
 				HttpSender http_rsp;
                 http_rsp.SetStatus("404");
@@ -52,65 +52,7 @@ int HttpFileProtocol::Parse(IoBuffer& io_buffer)
                 http_rsp.SetStatus("200");
                 http_rsp.SetContentType("html");
                 http_rsp.SetClose();
-                http_rsp.SetContent(webrtc_test);
-
-                string http_response = http_rsp.Encode();
-
-                GetTcpSocket()->Send((const uint8_t*)http_response.data(), http_response.size());
-            }
-        }
-        else if (http_parse_.GetFileName() == "hello" && http_parse_.GetFileType() == "html")
-        {
-            string hello = Util::ReadFile("hello.html");
-
-            if (hello.empty())
-            {
-				HttpSender http_rsp;
-                http_rsp.SetStatus("404");
-                http_rsp.SetContentType("html");
-                http_rsp.SetClose();
-                http_rsp.SetContent("fuck you");
-
-                string http_response = http_rsp.Encode();
-
-                GetTcpSocket()->Send((const uint8_t*)http_response.data(), http_response.size());
-            }
-            else
-            {
-				HttpSender http_rsp;
-                http_rsp.SetStatus("200");
-                http_rsp.SetContentType("html");
-                http_rsp.SetClose();
-                http_rsp.SetContent(hello);
-
-                string http_response = http_rsp.Encode();
-
-                GetTcpSocket()->Send((const uint8_t*)http_response.data(), http_response.size());
-            }
-        }
-        else if (http_parse_.GetFileName() == "publish" && http_parse_.GetFileType() == "html")
-        {
-            string publish = Util::ReadFile("publish.html");
-
-            if (publish.empty())
-            {
-				HttpSender http_rsp;
-                http_rsp.SetStatus("404");
-                http_rsp.SetContentType("html");
-                http_rsp.SetClose();
-                http_rsp.SetContent("fuck you");
-
-                string http_response = http_rsp.Encode();
-
-                GetTcpSocket()->Send((const uint8_t*)http_response.data(), http_response.size());
-            }
-            else
-            {
-				HttpSender http_rsp;
-                http_rsp.SetStatus("200");
-                http_rsp.SetContentType("html");
-                http_rsp.SetClose();
-                http_rsp.SetContent(publish);
+                http_rsp.SetContent(html);
 
                 string http_response = http_rsp.Encode();
 

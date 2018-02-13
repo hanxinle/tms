@@ -28,12 +28,24 @@ public:
 	virtual int HandleTimerInSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
     virtual int HandleTimerInMillSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
 
-private:
+    bool IsRemoteUfragExist(const string& remote_ufrag)
+    {
+        return remote_ufrags_.count(remote_ufrag) > 0;
+    }
+
+    void AddRemoteUfrag(const string& remote_ufrag)
+    {
+        remote_ufrags_.insert(remote_ufrag);
+    }
+
+public:
     WebrtcProtocol* GetOrCreateProtocol(Fd& socket);
 
 private:
     Epoller* epoller_;
     map<int, WebrtcProtocol*> fd_protocol_;
+
+    set<string> remote_ufrags_;
 };
 
 #endif // __WEBRTC_MGR_H__

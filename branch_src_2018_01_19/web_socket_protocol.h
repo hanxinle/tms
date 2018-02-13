@@ -5,6 +5,8 @@
 
 #include <string>
 
+#include "http_parse.h"
+
 class Epoller;
 class Fd;
 class IoBuffer;
@@ -36,6 +38,8 @@ private:
     Fd* socket_;
 
     bool upgrade_;
+
+    HttpParse http_parse_;
 };
 
 #endif // __WEB_SOCKET_PROTOCOL_H__

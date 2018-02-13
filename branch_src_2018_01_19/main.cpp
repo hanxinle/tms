@@ -52,6 +52,7 @@ MediaCenterMgr*         g_media_center_mgr = NULL;
 MediaNodeDiscoveryMgr*  g_media_node_discovery_mgr = NULL;
 RtmpMgr*                g_rtmp_mgr = NULL;
 ServerMgr*              g_server_mgr = NULL;
+WebrtcMgr*              g_webrtc_mgr = NULL;
 SSL_CTX*                g_tls_ctx = NULL;
 SSL_CTX*                g_dtls_ctx = NULL;
 string                  g_dtls_fingerprint = "";
@@ -59,6 +60,7 @@ string                  g_local_ice_pwd = "";
 string                  g_local_ice_ufrag = "";
 string                  g_remote_ice_pwd = "";
 string                  g_remote_ice_ufrag = "";
+string                  g_server_ip = "";
 
 int main(int argc, char* argv[])
 {
@@ -288,7 +290,6 @@ int main(int argc, char* argv[])
     uint16_t http_flv_port          = 8787;
     uint16_t https_hls_port         = 8843;
     uint16_t http_hls_port          = 8888;
-    string server_ip                = "";
     uint16_t server_port            = 10001;
     uint16_t admin_port             = 11000;
     uint16_t web_socket_port        = 8901;
@@ -311,7 +312,7 @@ int main(int argc, char* argv[])
         return 0;
     }
 
-    server_ip = iter_server_ip->second;
+    g_server_ip = iter_server_ip->second;
 
     if (iter_rtmp_port != args_map.end())
     {
@@ -365,7 +366,7 @@ int main(int argc, char* argv[])
         Util::Daemon();
     }
 
-	IpStr2Num(server_ip, g_node_info.ip);
+	IpStr2Num(g_server_ip, g_node_info.ip);
     g_node_info.port.push_back(server_port);
     g_node_info.type          = RTMP_NODE;
     g_node_info.start_time_ms = Util::GetNowMs();
@@ -556,7 +557,6 @@ int main(int argc, char* argv[])
 
     ReuseAddr(echo_fd);
     Bind(echo_fd, "0.0.0.0", echo_port);
-    Listen(echo_fd);
     SetNonBlock(echo_fd);
 
     EchoMgr echo_mgr(&epoller);
@@ -569,10 +569,11 @@ int main(int argc, char* argv[])
 
     ReuseAddr(webrtc_fd);
     Bind(webrtc_fd, "0.0.0.0", webrtc_port);
-    Listen(webrtc_fd);
     SetNonBlock(webrtc_fd);
 
     WebrtcMgr webrtc_mgr(&epoller);
+
+    g_webrtc_mgr = &webrtc_mgr;
 
     timer_in_second.AddTimerSecondHandle(&webrtc_mgr);
     timer_in_millsecond.AddTimerMillSecondHandle(&webrtc_mgr);

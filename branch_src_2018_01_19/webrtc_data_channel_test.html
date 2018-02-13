@@ -14,6 +14,11 @@ Click Here Send Msg
 </button>
 <br>
 
+<button onclick="sendDataChannelData()">
+Click Here Send Data In DataChannel
+</button>
+<br>
+
 Local Media: <br>
 <video id = "local_media" autoplay></video><br>
 Remote Media: <br>
@@ -26,8 +31,34 @@ Remote Media: <br>
 var PeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection;
 var SessionDescription = window.RTCSessionDescription || window.mozRTCSessionDescription || window.webkitRTCSessionDescription;
 
-var socket = new WebSocket("wss://john.com:8943/webrtc_test.sdp");
+var socket = new WebSocket("wss://john.com:8943/webrtc_data_channel_test.sdp");
 var pc = new PeerConnection(null);
+
+var data_channel = pc.createDataChannel("john", {
+    ordered: false,
+    maxRetransmits: 0
+}); 
+
+data_channel.onopen = function() 
+{
+  	console.log("data data_channel ready");
+};  
+
+data_channel.onclose = function() 
+{
+  	this.open = false;
+  	console.log("data data_channel closed");
+};  
+
+data_channel.onerror = function(evt) 
+{
+  	console.log("data data_channel error " + evt.message);
+};
+
+data_channel.onmessage = function(evt) 
+{
+  	console.log("data on message");
+};
 
 pc.onaddstream = function(event)
 {
@@ -41,6 +72,11 @@ pc.onaddstream = function(event)
 pc.onicecandidate = function(event)
 {
     console.log('onicecandidate');
+
+	if (event.candidate !== null) 
+	{
+        socket.send(JSON.stringify({"id": "onIceCandidate", "candidate": event.candidate}));
+    }
 };
 
 pc.onconnectionstatechange = function(event)
@@ -93,17 +129,30 @@ socket.onopen = function(event)
 
 socket.onmessage = function(event)
 {
+    console.log('onmessage: ', event);
     console.log('onmessage: ', event.data);
     var json = JSON.parse(event.data);
 
     pc.setRemoteDescription(new SessionDescription({type:'answer', sdp:json.sdpAnswer}));
     console.log('onmessage viewerResponse: ', json.sdpAnswer);
+
+    <!--
+    var candidate = new RTCIceCandidate(json.candidate);
+    pc.addIceCandidate(candidate);
+    -->
 }
 
 function sendMsg()
 {
     var t = document.getElementById("ws_input").value;
     socket.send(t)
+}
+
+function sendDataChannelData()
+{
+    var t = document.getElementById("ws_input").value;
+    console.log('send using data channel', t);
+    data_channel.send(t)
 }
 
 </script>

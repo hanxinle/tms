@@ -154,8 +154,6 @@ int Epoller::WaitIoEvent(const uint32_t& timeout_ms)
     map<Fd*, uint32_t> socket_event;
     if (num_events > 0)
     {
-        //cout << LMSG << num_events << " event happend" << endl;
-
         for (int n = 0; n != num_events; ++n)
         {
             Fd* fd = (Fd*)events[n].data.ptr;

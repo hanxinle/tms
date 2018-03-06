@@ -31,6 +31,15 @@
 
 #include "openssl/ssl.h"
 
+extern "C"
+{
+#include "libavcodec/avcodec.h"
+#include "libavformat/avformat.h"
+}
+
+// debug
+#include "webrtc_protocol.h"
+
 using namespace any;
 using namespace std;
 using namespace socket_util;
@@ -61,9 +70,24 @@ string                  g_local_ice_ufrag = "";
 string                  g_remote_ice_pwd = "";
 string                  g_remote_ice_ufrag = "";
 string                  g_server_ip = "";
+WebrtcProtocol*         g_debug_webrtc = NULL;
+
+void AvLogCallback(void* ptr, int level, const char* fmt, va_list vl)
+{
+    UNUSED(ptr);
+    UNUSED(level);
+
+    vprintf(fmt, vl);
+}
 
 int main(int argc, char* argv[])
 {
+    av_register_all();
+    avcodec_register_all();
+
+    av_log_set_callback(AvLogCallback);
+    av_log_set_level(AV_LOG_VERBOSE);
+
     CRC32 crc32;
 
     uint8_t crc[] = {1, 2, 3, 4, 5, 6};

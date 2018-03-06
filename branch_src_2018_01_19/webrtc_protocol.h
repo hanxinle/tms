@@ -57,6 +57,9 @@ public:
         remote_pwd_ = pwd;
     }
 
+    void SendVideoData(const uint8_t* data, const int& size, const uint32_t& timestamp, const int& flag);
+    void SendAudioData(const uint8_t* data, const int& size, const uint32_t& timestamp, const int& flag);
+
     int ProtectRtp(const uint8_t* un_protect_rtp, const int& un_protect_rtp_len, uint8_t* protect_rtp, int& protect_rtp_len);
     int UnProtectRtp(const uint8_t* protect_rtp, const int& protect_rtp_len, uint8_t* un_protect_rtp, int& un_protect_rtp_len);
 
@@ -108,6 +111,7 @@ private:
     uint64_t timestamp_;
 
     uint32_t media_input_open_count_;
+    uint64_t media_input_read_video_frame_count;
 
     map<uint16_t, webrtc::RtpDepacketizer::ParsedPayload> video_rtp_queue_;
     map<uint16_t, webrtc::RtpDepacketizer::ParsedPayload> audio_rtp_queue_;
@@ -117,6 +121,8 @@ private:
 
     uint32_t video_publisher_ssrc_;
     uint32_t audio_publisher_ssrc_;
+
+    uint64_t send_begin_time_;
 };
 
 #endif // __WEBRTC_PROTOCOL_H__

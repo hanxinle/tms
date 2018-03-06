@@ -180,13 +180,18 @@ int RtmpProtocol::ParseRtmpUrl(const string& url, RtmpUrl& rtmp_url)
 
 int RtmpProtocol::Parse(IoBuffer& io_buffer)
 {
+    cout << LMSG << io_buffer.Size() << endl;
+
     if (handshake_status_ == kStatus_Done)
     {
         bool one_message_done = false;
         uint32_t cs_id = 0;
 
+        cout << LMSG << io_buffer.Size() << endl;
+
         if (io_buffer.Size() >= 1)
         {
+            cout << LMSG << io_buffer.Size() << endl;
             uint8_t* buf = NULL;
             io_buffer.Peek(buf, 0, 1);
 
@@ -364,6 +369,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
         }
         else
         {
+            cout << LMSG << endl;
             return kNoEnoughData;
         }
 
@@ -373,6 +379,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
             rtmp_msg.cs_id = cs_id;
 
             int ret = OnRtmpMessage(rtmp_msg);
+            cout << LMSG << "ret:" << ret << ",io_buffer size:" << io_buffer.Size() << endl;
 
             free(rtmp_msg.msg);
 
@@ -634,6 +641,10 @@ int RtmpProtocol::OnAudio(RtmpMessage& rtmp_msg)
                 cout << Util::Bin2Hex(audio_header) << endl;
 
                 media_muxer_.OnAudioHeader(audio_header);
+
+#ifdef USE_TRANSCODER
+                audio_transcoder_.InitDecoder(audio_header);
+#endif
             }
             else
             {
@@ -644,6 +655,10 @@ int RtmpProtocol::OnAudio(RtmpMessage& rtmp_msg)
                 audio_payload.SetAudio();
                 audio_payload.SetDts(rtmp_msg.timestamp_calc);
                 audio_payload.SetPts(rtmp_msg.timestamp_calc);
+
+#ifdef USE_TRANSCODER
+                audio_transcoder_.Decode(audio_raw_data + 2, rtmp_msg.len - 2, rtmp_msg.timestamp_calc);
+#endif
 
                 media_muxer_.OnAudio(audio_payload);
 
@@ -719,6 +734,11 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
 
                     uint8_t* data = rtmp_msg.msg + 5;
                     size_t raw_len = rtmp_msg.len - 5;
+
+                    int got_picture = 0;
+#ifdef USE_TRANSCODER
+                    video_transcoder_.Decode(data, raw_len, rtmp_msg.timestamp_calc, rtmp_msg.timestamp_calc, got_picture);
+#endif
 
                     size_t cur_len = 0;
                     while (cur_len < raw_len)
@@ -1334,6 +1354,10 @@ int RtmpProtocol::OnMetaData(RtmpMessage& rtmp_msg)
 int RtmpProtocol::OnVideoHeader(RtmpMessage& rtmp_msg)
 {
     string video_header((const char*)rtmp_msg.msg + 5, rtmp_msg.len - 5);
+
+#ifdef USE_TRANSCODER
+    video_transcoder_.InitDecoder(video_header);
+#endif
 
     cout << LMSG << "recv video_header" << ",size:" << video_header.size() << endl;
     cout << Util::Bin2Hex(video_header) << endl;

@@ -49,8 +49,13 @@ int IoBuffer::ReadFromFdAndWrite(const int& fd)
     MakeSpaceIfNeed(kEnlargeSize);
 
     //VERBOSE << LMSG << "IoBuffer capacity:" << CapacityLeft() << endl;
+    size_t max_read = CapacityLeft();
+    if (max_read > 1024*1024*4)
+    {
+        max_read = 1024*1024*4;
+    }
 
-    int bytes = read(fd, end_, CapacityLeft());
+    int bytes = read(fd, end_, max_read);
 
     if (bytes > 0)
     {

@@ -50,11 +50,15 @@ int TcpSocket::OnRead()
     {
         if (connect_status_ == kConnected)
         {
-            while (true)
+            int count = 0;
+            while (count < 1)
             {
+                ++count;
+
                 int bytes = read_buffer_.ReadFromFdAndWrite(fd_);
                 if (bytes > 0)
                 {
+                    cout << LMSG << "read " << bytes << " bytes" << endl;
                     if (handler_ != NULL)
                     {
                         int ret = handler_->HandleRead(read_buffer_, *this);

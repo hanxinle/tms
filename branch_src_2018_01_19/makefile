@@ -29,6 +29,7 @@ CXXFLAGS       = -g -std=c++0x -DWEBRTC_POSIX -W -Wall -Werror -O2 -pg -Wno-stri
 
 CXXFLAGS       += -DUSE_VP8_WEBM
 CXXFLAGS       += -DPUBLISH_BACK
+CXXFLAGS       += -DUSE_MEDIA_INPUT
 # ==========================================================
 SOURCES += $(wildcard ./*.cpp)
 SOURCES += $(wildcard ../common/*.cpp)

@@ -30,6 +30,8 @@ using namespace webm;
 const int SRTP_MASTER_KEY_KEY_LEN = 16;
 const int SRTP_MASTER_KEY_SALT_LEN = 14;
 
+extern WebrtcProtocol* g_debug_webrtc;
+
 static int HmacEncode(const string& algo, const char* key, const int& key_length,  
                 	  const char* input, const int& input_length,  
                 	  uint8_t* output, unsigned int& output_length) 
@@ -98,7 +100,9 @@ WebrtcProtocol::WebrtcProtocol(Epoller* epoller, Fd* socket)
     media_input_(NULL),
     timestamp_base_(0),
     timestamp_(0),
-    media_input_open_count_(0)
+    media_input_open_count_(0),
+    media_input_read_video_frame_count(0),
+    send_begin_time_(Util::GetNowMs())
 {
 }
 
@@ -135,6 +139,116 @@ int WebrtcProtocol::Parse(IoBuffer& io_buffer)
     }
 
     return kSuccess;
+}
+
+void WebrtcProtocol::SendVideoData(const uint8_t* data, const int& size, const uint32_t& timestamp, const int& flag)
+{
+    cout << LMSG << "send vp8 message, size:" << size << endl;
+
+    static int picture_id_ = 0;
+
+	RTPVideoTypeHeader rtp_video_head;
+
+    RTPVideoHeaderVP8& rtp_header_vp8 = rtp_video_head.VP8;
+    rtp_header_vp8.InitRTPVideoHeaderVP8();
+    rtp_header_vp8.pictureId = ++picture_id_;
+    rtp_header_vp8.nonReference = 0;
+
+    webrtc::FrameType frame_type = kVideoFrameDelta;
+    if (flag & AV_PKT_FLAG_KEY)
+    {
+        frame_type = kVideoFrameKey;
+        rtp_header_vp8.nonReference = 1;
+    }
+
+    // 编码后的视频帧打包为RTP
+    RtpPacketizer* rtp_packetizer = RtpPacketizer::Create(kRtpVideoVp8, 1200, &rtp_video_head, frame_type);
+    rtp_packetizer->SetPayloadData(data, size, NULL);
+
+    bool last_packet = false;
+    do  
+    {   
+        uint8_t rtp[1500] = {0};
+        uint8_t* rtp_packet = rtp + 12; 
+        size_t rtp_packet_len = 0;
+        if (! rtp_packetizer->NextPacket(rtp_packet, &rtp_packet_len, &last_packet))
+        {   
+            cout << LMSG << "packet rtp error" << endl;
+        }   
+        else
+        {   
+            RtpHeader rtp_header;
+
+            rtp_header.setSSRC(3233846889);
+            rtp_header.setMarker(last_packet ? 1 : 0); 
+            static uint32_t video_seq_ = 0;
+            rtp_header.setSeqNumber(++video_seq_);
+            rtp_header.setPayloadType(96);
+            rtp_header.setTimestamp((uint32_t)(timestamp) * 90);
+
+            memcpy(rtp, &rtp_header, rtp_header.getHeaderLength()/*rtp head size*/);
+
+            char protect_buf[1500];
+            int protect_buf_len = rtp_header.getHeaderLength() + rtp_packet_len;
+            memcpy(protect_buf, rtp, protect_buf_len);
+
+            int ret = srtp_protect(srtp_send_, protect_buf, &protect_buf_len);
+            if (ret == 0)
+            {
+                cout << LMSG << "srtp_protect success" << endl;
+                GetUdpSocket()->Send((const uint8_t*)protect_buf, protect_buf_len);
+            }
+            else
+            {
+                cout << LMSG << "srtp_protect faile:" << ret << endl;
+            }
+
+            cout << LMSG << "srtp protect_buf_len:" << protect_buf_len << endl;
+
+            //cout << LMSG << "==> packet rtp success <==" << endl;
+        }   
+    }   
+    while (! last_packet);
+
+	delete rtp_packetizer;
+}
+
+void WebrtcProtocol::SendAudioData(const uint8_t* data, const int& size, const uint32_t& timestamp, const int& flag)
+{
+    cout << LMSG << "send opus message" << endl;
+
+	RtpHeader rtp_header;
+
+    uint8_t rtp[1500];
+    uint8_t* rtp_packet = rtp + 12; 
+
+    static uint32_t audio_seq_ = 0;
+
+    rtp_header.setSSRC(3233846889+1);
+    rtp_header.setSeqNumber(++audio_seq_);
+    rtp_header.setPayloadType(111);
+
+    rtp_header.setTimestamp((uint32_t)timestamp * 48);
+
+    memcpy(rtp, &rtp_header, 12/*rtp head size*/);
+    memcpy(rtp_packet, data, size);
+
+    char protect_buf[1500];
+    int protect_buf_len = 12 + size;;
+    memcpy(protect_buf, rtp, protect_buf_len);
+
+    int ret = srtp_protect(srtp_send_, protect_buf, &protect_buf_len);
+    if (ret == 0)
+    {
+        cout << LMSG << "srtp_protect success" << endl;
+        GetUdpSocket()->Send((const uint8_t*)protect_buf, protect_buf_len);
+    }
+    else
+    {
+        cout << LMSG << "srtp_protect faile:" << ret << endl;
+    }
+
+    cout << LMSG << "srtp protect_buf_len:" << protect_buf_len << endl;
 }
 
 int WebrtcProtocol::ProtectRtp(const uint8_t* un_protect_rtp, const int& un_protect_rtp_len, uint8_t* protect_rtp, int& protect_rtp_len)
@@ -856,6 +970,11 @@ int WebrtcProtocol::Handshake()
         case SSL_ERROR_NONE:
         {   
             dtls_handshake_done_ = true;
+
+            send_begin_time_ = Util::GetNowMs();
+
+            g_debug_webrtc = this;
+
             cout << LMSG << "handshake done" << endl;
 
 			unsigned char material[SRTP_MASTER_KEY_LEN * 2] = {0};  // client(SRTP_MASTER_KEY_KEY_LEN + SRTP_MASTER_KEY_SALT_LEN) + server
@@ -987,6 +1106,7 @@ void WebrtcProtocol::SendClientHello()
 
         dtls_hello_send_ = true;
 
+#ifdef USE_MEDIA_INPUT
         if (media_input_ == NULL)
         {
             media_input_ = new MediaInput();
@@ -998,6 +1118,9 @@ void WebrtcProtocol::SendClientHello()
         media_input_->Open("input_vp9.webm");
 #endif
         ++media_input_open_count_;
+        media_input_read_video_frame_count = 0;
+#endif 
+
         if (dtls_ == NULL)
         {
             dtls_ = SSL_new(g_dtls_ctx);
@@ -1021,6 +1144,8 @@ int WebrtcProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& inte
 
 int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)
 {
+#ifdef USE_MEDIA_INPUT
+
 #ifdef PUBLISH_BACK
 
     if (dtls_handshake_done_ && count % 50 == 0)
@@ -1102,8 +1227,6 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
             GetUdpSocket()->Send(bs_fir.GetData(), bs_fir.SizeInBytes());
         }
 
-        return 0;
-
 		RtcpHeader rtcp_pli;
     	rtcp_pli.setPacketType(RTCP_PS_Feedback_PT);
     	rtcp_pli.setBlockCount(1);
@@ -1124,15 +1247,18 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
         cout << LMSG << "send pli " << endl;
     }
 
-    return 0;
 #endif
 
     cout << LMSG << "count:" << count << endl;
 
     if (dtls_handshake_done_ && media_input_ != NULL)
     {
+        uint64_t send_delta = now_in_ms - send_begin_time_;
+
+        cout << LMSG << "send_delta:" << send_delta << ",timestamp_:" << timestamp_ << endl;
+
         // FIXME:这种用法如果webrtc_mgr里面有多个webrtc_protocol的话, 会卡死, 大概是因为UDP发包队列的限制
-        for (int i = 0; i != 5; ++i)
+        while (send_delta >= timestamp_)
         {
             uint8_t* frame_data = NULL;
             int frame_len = 0;
@@ -1153,6 +1279,7 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
 #endif
 
                 ++media_input_open_count_;
+                media_input_read_video_frame_count = 0;
 
                 cout << LMSG << "timestamp_base_:" << timestamp_base_ << "=>" << (timestamp_base_ + timestamp_) << endl;
                 timestamp_base_ += timestamp_;
@@ -1161,6 +1288,14 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
             {
                 return 0;
             }
+
+            if (timestamp_ > UINT32_MAX)
+            {
+                cout << LMSG << "first media frame, timestamp_:" << timestamp_ << endl;
+                timestamp_ = 0;
+            }
+
+            ++media_input_read_video_frame_count;
 
             cout << LMSG << "is_video:" << is_video << ",timestamp_:" << timestamp_ << endl;
 
@@ -1313,6 +1448,7 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
     }
 
     return kSuccess;
+#endif
 }
 
 void WebrtcProtocol::SendBindingRequest()

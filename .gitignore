@@ -8,3 +8,8 @@ rtmp_1936
 *.txt
 gmon.out
 *.log
+*.flv
+*.webm
+*.mp4
+media_center/media_center
+media_node_discovery/media_node_discovery

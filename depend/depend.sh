@@ -122,7 +122,7 @@ libvpx_dir="libvpx"
 if [[ ! -d "${depend_dir}/download/${libvpx_dir}" ]]; then
     echo "no libsrtp dir and tar file found"
     mkdir ./download/${libvpx_dir}
-    git clone --depth 1 https://chromium.googlesource.com/webm/libvpx.git ./download/${libvpx_dir}
+    git clone --depth 1 https://github.com/webmproject/libvpx.git ./download/${libvpx_dir}
 fi
 
 if [[ ! -f ${depend_dir}/lib/libvpx.a ]]; then

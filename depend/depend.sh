@@ -106,7 +106,8 @@ libx264_dir="libx264"
 if [[ ! -d "${depend_dir}/download/${libx264_dir}" ]]; then
     echo "no libsrtp dir and tar file found"
     mkdir ./download/${libx264_dir}
-    git clone http://git.videolan.org/git/x264.git ./download/${libx264_dir}
+    #git clone http://git.videolan.org/git/x264.git ./download/${libx264_dir}
+    git clone https://github.com/mirror/x264.git ./download/${libx264_dir}
 fi
 
 if [[ ! -f ${depend_dir}/lib/libx264.a ]]; then

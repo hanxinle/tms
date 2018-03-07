@@ -1,5 +1,5 @@
 # =========================================================
-INCLUDE_DIR    += -I. -I./include/ -I../rpc -I../common -I../depend/include -I../
+INCLUDE_DIR    += -I. -I./include/ -I../rpc -I../common -I../common/ssl/ -I../depend/include -I../
 
 LIB_DIR        += ../depend/lib/libssl.a
 LIB_DIR        += ../depend/lib/libcrypto.a
@@ -32,6 +32,7 @@ CXXFLAGS       += -DUSE_MEDIA_INPUT
 # ==========================================================
 SOURCES += $(wildcard ./*.cpp)
 SOURCES += $(wildcard ../common/*.cpp)
+SOURCES += $(wildcard ../common/ssl/*.cpp)
 SOURCES += $(wildcard ../webrtc/p2p/base/*.cpp)
 SOURCES += $(wildcard ../webrtc/base/*.cpp)
 SOURCES += $(wildcard ../webrtc/modules/rtp_rtcp/source/*.cpp)

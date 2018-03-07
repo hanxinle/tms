@@ -14,8 +14,6 @@
 
 #include "openssl/srtp.h"
 
-#include "webm/file_reader.h"
-
 #include "webrtc/base/bytebuffer.h"
 #include "webrtc/modules/rtp_rtcp/source/rtp_format.h"
 #include "webrtc/p2p/base/stun.h"
@@ -25,7 +23,6 @@ using namespace rtc;
 using namespace socket_util;
 using namespace std;
 using namespace webrtc;
-using namespace webm;
 
 const int SRTP_MASTER_KEY_KEY_LEN = 16;
 const int SRTP_MASTER_KEY_SALT_LEN = 14;

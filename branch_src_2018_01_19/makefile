@@ -1,25 +1,24 @@
 # =========================================================
-INCLUDE_DIR    += -I. -I./include/ -I../rpc -I../common -I../depend/build/include -I../
+INCLUDE_DIR    += -I. -I./include/ -I../rpc -I../common -I../depend/include -I../
 
-LIB_DIR        += ../depend/build/lib/libssl.a
-LIB_DIR        += ../depend/build/lib/libcrypto.a
-LIB_DIR        += ../depend/build/lib/libsrtp2.a
-LIB_DIR        += ../depend/build/lib/libavformat.a
-LIB_DIR        += ../depend/build/lib/libavfilter.a
-LIB_DIR        += ../depend/build/lib/libavcodec.a
-LIB_DIR        += ../depend/build/lib/libswresample.a
-LIB_DIR        += ../depend/build/lib/libswscale.a
-LIB_DIR        += ../depend/build/lib/libavutil.a
-#LIB_DIR        += ../depend/build/lib/libavdevice.a
-LIB_DIR        += ../depend/build/lib/libopus.a
-LIB_DIR        += ../depend/build/lib/libfdk-aac.a
-LIB_DIR        += ../depend/build/lib/libvpx.a
-LIB_DIR        += ../depend/build/lib/libx264.a
-LIB_DIR        += ../depend/build/lib/libx265.a
-#LIB_DIR        += -lpthread -ldl -lbz2 -lz -lva -lX11 -lva-x11 -lvdpau -lva-drm
-LIB_DIR        += -lpthread -ldl -lbz2 -lz
+LIB_DIR        += ../depend/lib/libssl.a
+LIB_DIR        += ../depend/lib/libcrypto.a
+LIB_DIR        += ../depend/lib/libsrtp2.a
+LIB_DIR        += ../depend/lib/libavformat.a
+LIB_DIR        += ../depend/lib/libavfilter.a
+LIB_DIR        += ../depend/lib/libavcodec.a
+LIB_DIR        += ../depend/lib/libswresample.a
+LIB_DIR        += ../depend/lib/libswscale.a
+LIB_DIR        += ../depend/lib/libavutil.a
+#LIB_DIR        += ../depend/lib/libavdevice.a
+LIB_DIR        += ../depend/lib/libopus.a
+LIB_DIR        += ../depend/lib/libfdk-aac.a
+LIB_DIR        += ../depend/lib/libvpx.a
+LIB_DIR        += ../depend/lib/libx264.a
+#LIB_DIR        += -lpthread-lbz2 -lz -lva -lX11 -lva-x11 -lvdpau -lva-drm
+LIB_DIR        += -lpthread -lbz2 -lz -ldl
 
-# ==========================================================
+# ====================================================
 CC             = gcc
 CXX 		   = g++
 #CXX 		   = clang

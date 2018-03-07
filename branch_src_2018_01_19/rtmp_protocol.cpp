@@ -180,18 +180,13 @@ int RtmpProtocol::ParseRtmpUrl(const string& url, RtmpUrl& rtmp_url)
 
 int RtmpProtocol::Parse(IoBuffer& io_buffer)
 {
-    cout << LMSG << io_buffer.Size() << endl;
-
     if (handshake_status_ == kStatus_Done)
     {
         bool one_message_done = false;
         uint32_t cs_id = 0;
 
-        cout << LMSG << io_buffer.Size() << endl;
-
         if (io_buffer.Size() >= 1)
         {
-            cout << LMSG << io_buffer.Size() << endl;
             uint8_t* buf = NULL;
             io_buffer.Peek(buf, 0, 1);
 

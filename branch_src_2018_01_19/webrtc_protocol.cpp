@@ -1444,8 +1444,8 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
         }
     }
 
-    return kSuccess;
 #endif
+    return kSuccess;
 }
 
 void WebrtcProtocol::SendBindingRequest()

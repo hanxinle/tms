@@ -50,9 +50,9 @@ int IoBuffer::ReadFromFdAndWrite(const int& fd)
 
     //VERBOSE << LMSG << "IoBuffer capacity:" << CapacityLeft() << endl;
     size_t max_read = CapacityLeft();
-    if (max_read > 1024*1024*4)
+    if (max_read > 1024*64)
     {
-        max_read = 1024*1024*4;
+        max_read = 1024*64;
     }
 
     int bytes = read(fd, end_, max_read);

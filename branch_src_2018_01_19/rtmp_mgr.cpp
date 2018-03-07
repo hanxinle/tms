@@ -22,14 +22,6 @@ int RtmpMgr::HandleRead(IoBuffer& io_buffer, Fd& socket)
 
     while ((ret = rtmp_protocol->Parse(io_buffer)) == kSuccess)
     {
-        cout << LMSG << io_buffer.Size() << endl;
-    }
-
-    cout << LMSG << "ret:" << ret << endl;
-
-    if (ret != kNoEnoughData)
-    {
-        cout << LMSG << "ret:" << ret << endl;
     }
 
     return ret;

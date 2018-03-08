@@ -26,6 +26,7 @@
 #include "trace_tool.h"
 #include "udp_socket.h"
 #include "util.h"
+#include "video_define.h"
 #include "webrtc_mgr.h"
 #include "web_socket_mgr.h"
 
@@ -71,6 +72,7 @@ string                  g_remote_ice_pwd = "";
 string                  g_remote_ice_ufrag = "";
 string                  g_server_ip = "";
 WebrtcProtocol*         g_debug_webrtc = NULL;
+deque<MediaPacket>      g_media_queue;
 
 void AvLogCallback(void* ptr, int level, const char* fmt, va_list vl)
 {

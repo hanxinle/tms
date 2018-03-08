@@ -1,5 +1,6 @@
 #include <math.h>
 
+#include <deque>
 #include <iostream>
 
 #include "amf_0.h"
@@ -19,6 +20,7 @@
 #include "server_mgr.h"
 #include "tcp_socket.h"
 #include "util.h"
+#include "video_define.h"
 
 #define CDN "ws.upstream.huya.com"
 //#define CDN "tx.direct.huya.com"
@@ -38,6 +40,7 @@ using any::Map;
 using any::Null;
 
 extern LocalStreamCenter g_local_stream_center;
+extern deque<MediaPacket> g_media_queue;
 
 static uint32_t s0_len = 1;
 static uint32_t s1_len = 4/*time*/ + 4/*zero*/ + 1528/*random*/;
@@ -652,7 +655,10 @@ int RtmpProtocol::OnAudio(RtmpMessage& rtmp_msg)
                 audio_payload.SetPts(rtmp_msg.timestamp_calc);
 
 #ifdef USE_TRANSCODER
-                audio_transcoder_.Decode(audio_raw_data + 2, rtmp_msg.len - 2, rtmp_msg.timestamp_calc);
+                if (g_media_queue.size() <= 6000)
+                {
+                    audio_transcoder_.Decode(audio_raw_data + 2, rtmp_msg.len - 2, rtmp_msg.timestamp_calc);
+                }
 #endif
 
                 media_muxer_.OnAudio(audio_payload);
@@ -732,7 +738,10 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
 
                     int got_picture = 0;
 #ifdef USE_TRANSCODER
-                    video_transcoder_.Decode(data, raw_len, rtmp_msg.timestamp_calc, rtmp_msg.timestamp_calc, got_picture);
+                    if (g_media_queue.size() <= 6000)
+                    {
+                        video_transcoder_.Decode(data, raw_len, rtmp_msg.timestamp_calc, rtmp_msg.timestamp_calc, got_picture);
+                    }
 #endif
 
                     size_t cur_len = 0;

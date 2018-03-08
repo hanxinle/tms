@@ -1,6 +1,11 @@
 #include "common_define.h"
 #include "video_encoder.h"
 
+extern "C" 
+{
+#include "libavutil/opt.h"
+}
+
 VideoEncoder::VideoEncoder()
     :
     av_encode_ctx_(NULL)
@@ -12,7 +17,7 @@ VideoEncoder::~VideoEncoder()
 {
 }
 
-int VideoEncoder::Init(const string& encoder_name, const int& width, const int& height, const int& fps, const int& bitrate)
+int VideoEncoder::Init(const string& encoder_name, const int& width, const int& height, const int& fps, const int& bitrate, const AVCodecContext* decode_ctx)
 {
     AVCodec* codec = avcodec_find_encoder_by_name(encoder_name.c_str());
 
@@ -32,12 +37,29 @@ int VideoEncoder::Init(const string& encoder_name, const int& width, const int& 
 
     av_encode_ctx_->time_base.num = 1;
     av_encode_ctx_->time_base.den = 1000;
+
     av_encode_ctx_->width = width;
     av_encode_ctx_->height = height;
-    av_encode_ctx_->bit_rate = bitrate;
     av_encode_ctx_->gop_size = fps * 3;
+
+    av_encode_ctx_->bit_rate = bitrate;
+    av_encode_ctx_->rc_min_rate = bitrate;
+    av_encode_ctx_->rc_max_rate = bitrate;
+    av_encode_ctx_->bit_rate_tolerance = bitrate;
+	av_encode_ctx_->rc_buffer_size = bitrate * 9 / 20; //Adjust every 45% of bitrate, simulate cbr  
+	av_encode_ctx_->rc_initial_buffer_occupancy = av_encode_ctx_->rc_buffer_size * 4 / 5; //0.9
+	av_encode_ctx_->qcompress = 1.0; /* 0.0 => cbr, 1.0 => constant qp */
+
+    av_encode_ctx_->color_range = decode_ctx->color_range;
+    av_encode_ctx_->colorspace = decode_ctx->colorspace;
+    av_encode_ctx_->color_primaries = decode_ctx->color_primaries;
+    av_encode_ctx_->color_trc = decode_ctx->color_trc;
+    av_encode_ctx_->sample_aspect_ratio = decode_ctx->sample_aspect_ratio;
+
     av_encode_ctx_->pix_fmt = AV_PIX_FMT_YUV420P;
     av_encode_ctx_->thread_count = 8;
+
+	av_opt_set(av_encode_ctx_->priv_data, "b-pyramid", "0", 0);
 
 	int ret = avcodec_open2(av_encode_ctx_, codec, NULL);
 

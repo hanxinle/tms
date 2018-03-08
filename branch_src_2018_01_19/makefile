@@ -8,6 +8,7 @@ LIB_DIR        += ../depend/lib/libavformat.a
 LIB_DIR        += ../depend/lib/libavfilter.a
 LIB_DIR        += ../depend/lib/libavcodec.a
 LIB_DIR        += ../depend/lib/libswresample.a
+LIB_DIR        += ../depend/lib/libavresample.a
 LIB_DIR        += ../depend/lib/libswscale.a
 LIB_DIR        += ../depend/lib/libavutil.a
 #LIB_DIR        += ../depend/lib/libavdevice.a
@@ -15,7 +16,8 @@ LIB_DIR        += ../depend/lib/libopus.a
 LIB_DIR        += ../depend/lib/libfdk-aac.a
 LIB_DIR        += ../depend/lib/libvpx.a
 LIB_DIR        += ../depend/lib/libx264.a
-#LIB_DIR        += -lpthread-lbz2 -lz -lva -lX11 -lva-x11 -lvdpau -lva-drm
+LIB_DIR        += ../depend/lib/libmfx.a
+#LIB_DIR        += -lpthread -lbz2 -lz -lva -ldl -lva-drm
 LIB_DIR        += -lpthread -lbz2 -lz -ldl
 
 # ====================================================
@@ -30,6 +32,7 @@ CXXFLAGS       += -DUSE_VP8_WEBM
 CXXFLAGS       += -DPUBLISH_BACK
 #CXXFLAGS       += -DUSE_MEDIA_INPUT
 CXXFLAGS       += -DUSE_TRANSCODER
+CXXFLAGS       += -D__STDC_CONSTANT_MACROS
 # ==========================================================
 SOURCES += $(wildcard ./*.cpp)
 SOURCES += $(wildcard ../common/*.cpp)

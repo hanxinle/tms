@@ -8,6 +8,7 @@
 #include "io_buffer.h"
 #include "socket_util.h"
 #include "udp_socket.h"
+#include "video_define.h"
 #include "webrtc_protocol.h"
 
 #include "rtp_header.h"
@@ -28,6 +29,7 @@ const int SRTP_MASTER_KEY_KEY_LEN = 16;
 const int SRTP_MASTER_KEY_SALT_LEN = 14;
 
 extern WebrtcProtocol* g_debug_webrtc;
+extern deque<MediaPacket> g_media_queue;
 
 static int HmacEncode(const string& algo, const char* key, const int& key_length,  
                 	  const char* input, const int& input_length,  
@@ -1445,6 +1447,46 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
     }
 
 #endif
+
+#ifdef USE_TRANSCODER
+    if (dtls_handshake_done_)
+    {
+        uint64_t send_delta = now_in_ms - send_begin_time_;
+
+        cout << LMSG << "send_delta:" << send_delta << ",timestamp_:" << timestamp_ << endl;
+
+        if (g_media_queue.size() >= 600)
+        {
+            cout << LMSG << "g_media_queue.size() = " << g_media_queue.size() << endl;
+
+            while (send_delta >= timestamp_)
+            {
+                static int index = 0;
+                MediaPacket& media_packet = g_media_queue[index % g_media_queue.size()];
+                ++index;
+                timestamp_ = media_packet.dts_;
+
+                if (timestamp_ > UINT32_MAX)
+                {
+                    cout << LMSG << "first media frame, timestamp_:" << timestamp_ << endl;
+                    timestamp_ = 0;
+                }
+
+                if (media_packet.IsVideo())
+                {
+                    SendVideoData((const uint8_t*)(media_packet.data_.data()), media_packet.data_.size(), media_packet.dts_, media_packet.flag_);
+                }
+                else if (media_packet.IsAudio())
+                {
+                    SendAudioData((const uint8_t*)(media_packet.data_.data()), media_packet.data_.size(), media_packet.dts_, media_packet.flag_);
+                }
+
+                //g_media_queue.pop_front();
+            }
+        }
+    }
+#endif
+
     return kSuccess;
 }
 

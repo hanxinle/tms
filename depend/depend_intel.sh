@@ -181,7 +181,7 @@ if [[ ! -f ${depend_dir}/lib/libavcodec.a ]]; then
     cd download/${ffmpeg_dir}
     echo $PKG_CONFIG_PATH
     PKG_CONFIG_PATH="${depend_dir}/lib/pkgconfig" ./configure --prefix=${depend_dir} --pkg-config-flags="--static" --extra-cflags="-I${depend_dir}/include" --extra-ldflags="-L${depend_dir}/lib" \
-                --extra-libs="-lpthread -lm" --bindir="${depend_dir}/bin" --enable-gpl --enable-libfdk-aac --enable-avresample \
+                --extra-libs="-lpthread -lm" --bindir="${depend_dir}/bin" --enable-gpl --enable-libfdk-aac --enable-libmfx \
                 --enable-libopus --enable-libvpx --enable-libx264 --enable-nonfree --disable-vaapi --disable-vdpau && make -j 8 && make install
     echo $?
     cd -

@@ -1,7 +1,13 @@
+#include <deque>
+
+#include "video_define.h"
 #include "video_transcode.h"
 #include "webrtc_protocol.h"
 
+using namespace std;
+
 extern WebrtcProtocol* g_debug_webrtc;
+extern deque<MediaPacket> g_media_queue;
 
 VideoTransCoder::VideoTransCoder()
     :
@@ -34,9 +40,9 @@ int VideoTransCoder::Decode(uint8_t* data, const int& size, const int64_t& dts, 
                 //video_encoder_.Init("libvpx-vp9", decode_frame->width, decode_frame->height, 30, 4000);
                 video_encoder_.Init("libvpx", decode_frame->width, decode_frame->height, 30, 4000);
 #else
-                video_scale_.Init(decode_frame, 768, 432);
+                video_scale_.Init(decode_frame, 1440, 900);
                 //video_encoder_.Init("libvpx-vp9", decode_frame->width, decode_frame->height, 30, 4000);
-                video_encoder_.Init("libvpx", 768, 432, 30, 1200);
+                video_encoder_.Init("libvpx", 1440, 900, 30, 1500*1000, video_decoder_.GetCodecContext());
 #endif
             }
 
@@ -59,10 +65,14 @@ int VideoTransCoder::Decode(uint8_t* data, const int& size, const int64_t& dts, 
                     {
                         AVPacket* encode_packet = video_encoder_.GetEncodePacket();
 
-                        if (g_debug_webrtc != NULL)
-                        {
-                            g_debug_webrtc->SendVideoData(encode_packet->data, encode_packet->size, encode_packet->dts, encode_packet->flags);
-                        }
+                        cout << LMSG << "g_media_queue[" << g_media_queue.size() << "]:" << encode_packet->size << endl;
+
+                        g_media_queue.emplace_back((const uint8_t*)encode_packet->data, (int)encode_packet->size, (int64_t)encode_packet->dts, 
+                                                   (int64_t)encode_packet->dts, (int)encode_packet->flags, MediaVideo);
+                        //if (g_debug_webrtc != NULL)
+                        //{
+                        //    g_debug_webrtc->SendVideoData(encode_packet->data, encode_packet->size, encode_packet->dts, encode_packet->flags);
+                        //}
                     }
                 }
             }
@@ -86,7 +96,7 @@ int VideoTransCoder::Scale()
 
 int VideoTransCoder::InitEncoder(const string& encoder_name, const int& width, const int& height, const int& fps, const int& bitrate)
 {
-    return video_encoder_.Init(encoder_name, width, height, fps, bitrate);
+    return video_encoder_.Init(encoder_name, width, height, fps, bitrate, video_decoder_.GetCodecContext());
 }
 
 int VideoTransCoder::Encode(const AVFrame* frame, int& got_packet)

@@ -3,8 +3,9 @@
 
 extern "C" 
 {
-#include "libavresample/avresample.h"
+#include "libswresample/swresample.h"
 }
+
 
 class AudioResample
 {
@@ -26,7 +27,7 @@ public:
     int OpenPcmFd();
 
 private:
-    AVAudioResampleContext* resample_ctx_;
+    SwrContext* swr_ctx_;
     AVFrame* resample_frame_;
 
 	int in_channel_layout_;

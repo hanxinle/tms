@@ -1,8 +1,14 @@
-#include "audio_transcode.h"
+#include <deque>
 
+#include "audio_transcode.h"
+#include "video_define.h"
 #include "webrtc_protocol.h"
 
+using namespace std;
+
 extern WebrtcProtocol* g_debug_webrtc;
+extern deque<MediaPacket> g_media_queue;
+
 
 AudioTransCoder::AudioTransCoder()
     :
@@ -33,6 +39,7 @@ int AudioTransCoder::Decode(uint8_t* data, const int& size, const int64_t& pts)
             if (decode_frame_count_ == 0)
             {
                 audio_resample_.Init(decode_frame->channel_layout, AV_CH_LAYOUT_STEREO, decode_frame->sample_rate, 48000, decode_frame->format, AV_SAMPLE_FMT_S16);
+                audio_resample_.OpenPcmFd();
                 audio_encoder_.Init();
             }
 
@@ -52,10 +59,15 @@ int AudioTransCoder::Decode(uint8_t* data, const int& size, const int64_t& pts)
                     {
 						AVPacket* encode_packet = audio_encoder_.GetEncodePacket();
 
-                        if (g_debug_webrtc != NULL)
-                        {   
-                            g_debug_webrtc->SendAudioData(encode_packet->data, encode_packet->size, encode_packet->dts, encode_packet->flags);
-                        }
+                        cout << LMSG << "g_media_queue[" << g_media_queue.size() << "]:" << encode_packet->size << endl;
+
+                        g_media_queue.emplace_back((const uint8_t*)encode_packet->data, (int)encode_packet->size, (int64_t)encode_packet->dts,
+                                                   (int64_t)encode_packet->dts, (int)encode_packet->flags, MediaAudio);
+
+                        //if (g_debug_webrtc != NULL)
+                        //{   
+                        //    g_debug_webrtc->SendAudioData(encode_packet->data, encode_packet->size, encode_packet->dts, encode_packet->flags);
+                        //}
                     }
                 }
             }

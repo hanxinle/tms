@@ -12,7 +12,7 @@ public:
     VideoEncoder();
     ~VideoEncoder();
 
-    int Init(const string& encoder_name, const int& width, const int& height, const int& fps, const int& bitrate);
+    int Init(const string& encoder_name, const int& width, const int& height, const int& fps, const int& bitrate, const AVCodecContext* decode_ctx);
     int Encode(const AVFrame* frame, int& got_packet);
 
     AVPacket* GetEncodePacket()

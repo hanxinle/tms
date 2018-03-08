@@ -24,6 +24,11 @@ public:
         return av_frame_;
     }
 
+    AVCodecContext* GetCodecContext()
+    {
+        return av_decode_ctx_;
+    }
+
 private:
     AVCodecContext* av_decode_ctx_;
     AVPacket av_packet_;

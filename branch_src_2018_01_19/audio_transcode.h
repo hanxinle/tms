@@ -4,6 +4,7 @@
 #include "audio_decoder.h"
 #include "audio_encoder.h"
 #include "audio_resample.h"
+#include "media_output.h"
 
 class AudioTransCoder
 {
@@ -20,12 +21,19 @@ public:
     int InitEncoder();
     int Encode();
 
+    void SetMediaOutput(MediaOutput* media_output)
+    {
+        media_output_ = media_output;
+    }
+
 private:
     AudioDecoder    audio_decoder_;
     AudioEncoder    audio_encoder_;
     AudioResample   audio_resample_;
 
     uint64_t decode_frame_count_;
+
+    MediaOutput* media_output_;
 };
 
 #endif // __AUDIO_TRANS_CODER_H__

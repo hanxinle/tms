@@ -20,6 +20,11 @@ public:
         return &av_packet_;
     }
 
+    AVCodecContext* GetCodecContext()
+    {
+        return av_encode_ctx_;
+    }
+
 private:
     AVPacket av_packet_;
     AVCodecContext* av_encode_ctx_;

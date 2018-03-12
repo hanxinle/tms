@@ -10,6 +10,7 @@
 
 #include "audio_transcode.h"
 #include "crc32.h"
+#include "media_output.h"
 #include "media_publisher.h"
 #include "media_subscriber.h"
 #include "ref_ptr.h"
@@ -334,6 +335,7 @@ private:
 #ifdef USE_TRANSCODER
     VideoTransCoder video_transcoder_;
     AudioTransCoder audio_transcoder_;
+    MediaOutput     media_output_;
 #endif
 };
 

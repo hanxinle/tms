@@ -12,7 +12,8 @@ extern deque<MediaPacket> g_media_queue;
 
 AudioTransCoder::AudioTransCoder()
     :
-    decode_frame_count_(0)
+    decode_frame_count_(0),
+    media_output_(NULL)
 {
 }
 
@@ -41,6 +42,11 @@ int AudioTransCoder::Decode(uint8_t* data, const int& size, const int64_t& pts)
                 audio_resample_.Init(decode_frame->channel_layout, AV_CH_LAYOUT_STEREO, decode_frame->sample_rate, 48000, decode_frame->format, AV_SAMPLE_FMT_S16);
                 audio_resample_.OpenPcmFd();
                 audio_encoder_.Init();
+
+                if (media_output_ != NULL)
+                {
+                    media_output_->InitAudioStream(audio_encoder_.GetCodecContext());
+                }
             }
 
             int got_resample = 0;
@@ -64,6 +70,10 @@ int AudioTransCoder::Decode(uint8_t* data, const int& size, const int64_t& pts)
                         g_media_queue.emplace_back((const uint8_t*)encode_packet->data, (int)encode_packet->size, (int64_t)encode_packet->dts,
                                                    (int64_t)encode_packet->dts, (int)encode_packet->flags, MediaAudio);
 
+                        if (media_output_ != NULL)
+                        {
+                            media_output_->WriteAudio(encode_packet);
+                        }
                         //if (g_debug_webrtc != NULL)
                         //{   
                         //    g_debug_webrtc->SendAudioData(encode_packet->data, encode_packet->size, encode_packet->dts, encode_packet->flags);

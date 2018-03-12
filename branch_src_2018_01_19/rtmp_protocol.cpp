@@ -71,6 +71,7 @@ RtmpProtocol::RtmpProtocol(Epoller* epoller, Fd* fd)
     last_message_type_id_(0)
 {
     cout << LMSG << endl;
+    media_output_.Init("test.webm");
 }
 
 RtmpProtocol::~RtmpProtocol()
@@ -641,6 +642,7 @@ int RtmpProtocol::OnAudio(RtmpMessage& rtmp_msg)
                 media_muxer_.OnAudioHeader(audio_header);
 
 #ifdef USE_TRANSCODER
+                audio_transcoder_.SetMediaOutput(&media_output_);
                 audio_transcoder_.InitDecoder(audio_header);
 #endif
             }
@@ -1360,6 +1362,7 @@ int RtmpProtocol::OnVideoHeader(RtmpMessage& rtmp_msg)
     string video_header((const char*)rtmp_msg.msg + 5, rtmp_msg.len - 5);
 
 #ifdef USE_TRANSCODER
+    video_transcoder_.SetMediaOutput(&media_output_);
     video_transcoder_.InitDecoder(video_header);
 #endif
 

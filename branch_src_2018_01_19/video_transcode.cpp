@@ -11,7 +11,8 @@ extern deque<MediaPacket> g_media_queue;
 
 VideoTransCoder::VideoTransCoder()
     :
-    decode_frame_count_(0)
+    decode_frame_count_(0),
+    media_output_(NULL)
 {
 }
 
@@ -43,6 +44,10 @@ int VideoTransCoder::Decode(uint8_t* data, const int& size, const int64_t& dts, 
                 video_scale_.Init(decode_frame, 1440, 900);
                 //video_encoder_.Init("libvpx-vp9", decode_frame->width, decode_frame->height, 30, 4000);
                 video_encoder_.Init("libvpx", 1440, 900, 30, 1500*1000, video_decoder_.GetCodecContext());
+                if (media_output_ != NULL)
+                {
+                    media_output_->InitVideoStream(video_encoder_.GetCodecContext());
+                }
 #endif
             }
 
@@ -69,6 +74,10 @@ int VideoTransCoder::Decode(uint8_t* data, const int& size, const int64_t& dts, 
 
                         g_media_queue.emplace_back((const uint8_t*)encode_packet->data, (int)encode_packet->size, (int64_t)encode_packet->dts, 
                                                    (int64_t)encode_packet->dts, (int)encode_packet->flags, MediaVideo);
+                        if (media_output_ != NULL)
+                        {
+                            media_output_->WriteVideo(encode_packet);
+                        }
                         //if (g_debug_webrtc != NULL)
                         //{
                         //    g_debug_webrtc->SendVideoData(encode_packet->data, encode_packet->size, encode_packet->dts, encode_packet->flags);

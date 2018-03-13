@@ -7,7 +7,13 @@ MediaOutput::MediaOutput()
     :
     avformat_ctx_(NULL),
     avstream_audio_(NULL),
-    avstream_video_(NULL)
+    avstream_video_(NULL),
+    use_buffer_(true),
+    fake_dts_(true),
+    audio_dts_(0),
+    video_dts_(0),
+    video_fps_(30),
+    audio_fps_(50)
 {
 }
 
@@ -63,24 +69,7 @@ int MediaOutput::OpenFile()
     {
         for (const auto& video : video_cache_)
         {
-            AVPacket packet;
-            av_init_packet(&packet);
-
-            packet.stream_index = avstream_video_->index;
-            packet.dts = video.dts_;
-            packet.data = (uint8_t*)video.data_.data();
-            packet.size = video.data_.size();
-
-            int ret = av_write_frame(avformat_ctx_, &packet);
-
-            if (ret < 0)
-            {
-                cout << LMSG << "av_write_frame failed" << endl;
-            }
-            else
-            {
-                cout << LMSG << "success" << endl;
-            }
+            InternalWriteMedia(video);
         }
 
         video_cache_.clear();
@@ -90,24 +79,7 @@ int MediaOutput::OpenFile()
     {
         for (const auto& audio : audio_cache_)
         {
-            AVPacket packet;
-            av_init_packet(&packet);
-
-            packet.stream_index = avstream_audio_->index;
-            packet.dts = audio.dts_;
-            packet.data = (uint8_t*)audio.data_.data();
-            packet.size = audio.data_.size();
-
-            int ret = av_write_frame(avformat_ctx_, &packet);
-
-            if (ret < 0)
-            {
-                cout << LMSG << "av_write_frame failed" << endl;
-            }
-            else
-            {
-                cout << LMSG << "success" << endl;
-            }
+            InternalWriteMedia(audio);
         }
 
         audio_cache_.clear();
@@ -187,20 +159,76 @@ int MediaOutput::WriteVideo(AVPacket* packet)
         return 0;
     }
 
-    packet->stream_index = avstream_video_->index;
-
-    int ret = av_write_frame(avformat_ctx_, packet);
-
-    if (ret < 0)
+    if (use_buffer_)
     {
-        cout << LMSG << "av_write_frame failed" << endl;
+        if (media_buffer_.empty())
+        {
+            media_buffer_.emplace_back((const uint8_t*)packet->data, (int)packet->size, (int64_t)packet->dts,
+                                      (int64_t)packet->dts, (int)packet->flags, MediaVideo);
+        }
+        else
+        {
+            MediaPacket media_packet((const uint8_t*)packet->data, (int)packet->size, (int64_t)packet->dts,
+                                     (int64_t)packet->dts, (int)packet->flags, MediaVideo);
+
+            bool inserted = false;
+    
+            for (auto iter = media_buffer_.rbegin(); iter != media_buffer_.rend(); ++iter)
+            {
+                if (iter->dts_ < packet->dts)
+                {
+                    media_buffer_.insert(iter.base(), media_packet);
+                    inserted = true;
+                    break;
+                }
+            }
+
+            if (! inserted)
+            {
+                cout << LMSG << "insert to begin" << endl;
+                media_buffer_.insert(media_buffer_.begin(), media_packet);
+            }
+        }
+    
+        if (media_buffer_.size() >= 50)
+        {
+            auto iter = media_buffer_.begin();
+    
+            for (auto iter = media_buffer_.begin(); iter != media_buffer_.end(); ++iter)
+            {
+                cout << "IsAudio:" << iter->IsAudio() << ",dts:" << iter->dts_ << endl;
+            }
+    
+            while (media_buffer_.size() >= 10 && media_buffer_.rbegin()->dts_ - media_buffer_.begin()->dts_ >= 5000)
+            {
+                cout << LMSG << "diff:" << (media_buffer_.rbegin()->dts_ - media_buffer_.begin()->dts_) << endl;
+
+                InternalWriteMedia(*iter);
+    
+                iter = media_buffer_.erase(iter);
+            }
+        }
+
+        return 0;
     }
     else
     {
-        cout << LMSG << "success" << endl;
+        packet->stream_index = avstream_video_->index;
+        int ret = av_write_frame(avformat_ctx_, packet);
+    
+        if (ret < 0)
+        {
+            cout << LMSG << "av_write_frame failed" << endl;
+        }
+        else
+        {
+            cout << LMSG << "success" << endl;
+        }
+
+        return ret;
     }
 
-    return ret;
+    return -1;
 }
 
 int MediaOutput::WriteAudio(AVPacket* packet)
@@ -213,10 +241,79 @@ int MediaOutput::WriteAudio(AVPacket* packet)
         return 0;
     }
 
-    packet->stream_index = avstream_audio_->index;
+    if (use_buffer_)
+    {
+        if (media_buffer_.empty())
+        {
+            media_buffer_.emplace_back((const uint8_t*)packet->data, (int)packet->size, (int64_t)packet->dts,
+                                      (int64_t)packet->dts, (int)packet->flags, MediaAudio);
+        }
+        else
+        {
+            MediaPacket media_packet((const uint8_t*)packet->data, (int)packet->size, (int64_t)packet->dts,
+                                     (int64_t)packet->dts, (int)packet->flags, MediaAudio);
 
-    int ret = av_write_frame(avformat_ctx_, packet);
+            bool inserted = false;
+            for (auto iter = media_buffer_.rbegin(); iter != media_buffer_.rend(); ++iter)
+            {
+                if (iter->dts_ < packet->dts)
+                {
+                    media_buffer_.insert(iter.base(), media_packet);
+                    inserted = true;
+                    break;
+                }
+            }
 
+            if (! inserted)
+            {
+                cout << LMSG << "insert to begin" << endl;
+                media_buffer_.insert(media_buffer_.begin(), media_packet);
+            }
+        }
+
+
+        if (media_buffer_.size() >= 50)
+        {
+            auto iter = media_buffer_.begin();
+
+            for (auto iter = media_buffer_.begin(); iter != media_buffer_.end(); ++iter)
+            {
+                cout << "IsAudio:" << iter->IsAudio() << ",dts:" << iter->dts_ << endl;
+            }
+
+            while (media_buffer_.size() >= 10 && media_buffer_.rbegin()->dts_ - media_buffer_.begin()->dts_ >= 5000)
+            {
+                cout << LMSG << "diff:" << (media_buffer_.rbegin()->dts_ - media_buffer_.begin()->dts_) << endl;
+                InternalWriteMedia(*iter);
+
+                iter = media_buffer_.erase(iter);
+            }
+        }
+
+        return 0;
+    }
+    else
+    {
+        InternalWriteMedia(packet, true);
+    }
+
+    return -1;
+}
+
+int MediaOutput::InternalWriteMedia(AVPacket* av_packet, const bool& is_audio)
+{
+    if (is_audio)
+    {
+        return 0;
+        av_packet->stream_index = avstream_audio_->index;
+    }
+    else
+    {
+        av_packet->stream_index = avstream_video_->index;
+    }
+
+    int ret = av_write_frame(avformat_ctx_, av_packet);
+    
     if (ret < 0)
     {
         cout << LMSG << "av_write_frame failed" << endl;
@@ -225,6 +322,45 @@ int MediaOutput::WriteAudio(AVPacket* packet)
     {
         cout << LMSG << "success" << endl;
     }
-
+    
     return ret;
+}
+
+int MediaOutput::InternalWriteMedia(MediaPacket media_packet)
+{
+    AVPacket packet;
+    av_init_packet(&packet);
+
+    if (media_packet.IsAudio())
+    {
+        packet.stream_index = avstream_audio_->index;
+    }
+    else
+    {
+        packet.stream_index = avstream_video_->index;
+    }
+
+    if (! fake_dts_)
+    {
+        packet.dts = media_packet.dts_;
+    }
+    else
+    {
+        if (media_packet.IsAudio())
+        {
+            packet.dts = audio_dts_;
+            audio_dts_ += 1000 / audio_fps_;
+        }
+        else if (media_packet.IsVideo())
+        {
+            packet.dts = video_dts_;
+            video_dts_ += 1000 / video_fps_;
+        }
+    }
+
+    packet.pts = media_packet.dts_;
+    packet.data = (uint8_t*)media_packet.data_.data();
+    packet.size = media_packet.data_.size();
+
+    return InternalWriteMedia(&packet, media_packet.IsAudio());
 }

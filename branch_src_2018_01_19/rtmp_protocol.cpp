@@ -657,7 +657,7 @@ int RtmpProtocol::OnAudio(RtmpMessage& rtmp_msg)
                 audio_payload.SetPts(rtmp_msg.timestamp_calc);
 
 #ifdef USE_TRANSCODER
-                if (g_media_queue.size() <= 6000)
+                if (g_media_queue.size() <= 60000)
                 {
                     audio_transcoder_.Decode(audio_raw_data + 2, rtmp_msg.len - 2, rtmp_msg.timestamp_calc);
                 }
@@ -740,7 +740,7 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
 
                     int got_picture = 0;
 #ifdef USE_TRANSCODER
-                    if (g_media_queue.size() <= 6000)
+                    if (g_media_queue.size() <= 60000)
                     {
                         video_transcoder_.Decode(data, raw_len, rtmp_msg.timestamp_calc, rtmp_msg.timestamp_calc, got_picture);
                     }

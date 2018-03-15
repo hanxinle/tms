@@ -55,6 +55,8 @@ int VideoScale::Scale(const AVFrame* src_frame)
     }
 
     sws_frame_->pts = src_frame->pts;
+    sws_frame_->pkt_pts = src_frame->pkt_pts;
+    sws_frame_->pkt_dts = src_frame->pkt_dts;
 
     cout << LMSG << "scale success" << endl;
 

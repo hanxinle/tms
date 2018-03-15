@@ -74,7 +74,7 @@ int AudioDecoder::Decode(uint8_t* data, const int& size, const int64_t& dts, int
 
     if (got_audio)
     {   
-        cout << LMSG << "decode audio success" << endl;
+        cout << LMSG << "decode audio success,pkt_dts:" << av_frame_->pkt_dts << ", pts:" << av_frame_->pts << ",pkt_pts:" << av_frame_->pkt_pts << ",nb_samples:" << av_frame_->nb_samples << endl;
     }
 
     return ret;

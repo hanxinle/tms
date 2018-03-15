@@ -76,7 +76,7 @@ int AudioEncoder::Encode(const AVFrame* frame, int& got_packet)
 
     got_packet = 1;
 
-    cout << LMSG << "encode audio success, size:" << av_packet_.size << ",pts:" <<av_packet_.pts << ",dts:" << av_packet_.dts << endl;
+    cout << LMSG << "encode audio success, size:" << av_packet_.size << ",pts:" << av_packet_.pts << ",dts:" << av_packet_.dts << endl;
 
     return 0;
 }

@@ -74,7 +74,6 @@ int VideoDecoder::Decode(uint8_t* data, const int& size, const int64_t& dts, con
         peek_len = size;
     }
 
-
     cout << LMSG << "peek \n" << Util::Bin2Hex(data, peek_len) << endl;
 
     int ret = avcodec_decode_video2(av_decode_ctx_, av_frame_, &got_picture, &av_packet_);

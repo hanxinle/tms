@@ -335,7 +335,7 @@ private:
 #ifdef USE_TRANSCODER
     VideoTransCoder video_transcoder_;
     AudioTransCoder audio_transcoder_;
-    MediaOutput     media_output_;
+    MediaOutput     transcode_output_;
 #endif
 };
 

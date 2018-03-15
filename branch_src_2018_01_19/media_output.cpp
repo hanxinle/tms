@@ -119,6 +119,90 @@ int MediaOutput::InitAudioStream(const AVCodecContext* audio_encode_ctx)
     return ret;
 }
 
+int MediaOutput::InitAudioStream()
+{
+    avstream_audio_ = avformat_new_stream(avformat_ctx_, NULL);
+
+    if (avstream_audio_ == NULL)
+    {
+        cout << LMSG << "avformat_new_stream failed" << endl;
+        return -1;
+    }
+
+    avstream_audio_->time_base = (AVRational){1, 44100};
+
+	avstream_audio_->codecpar->codec_type 				= AVMEDIA_TYPE_AUDIO;
+    avstream_audio_->codecpar->codec_id   				= AV_CODEC_ID_AAC;
+    //avstream_audio_->codecpar->codec_tag  				= codec->codec_tag;
+
+    avstream_audio_->codecpar->bit_rate              	= 192*1000;
+    //avstream_audio_->codecpar->bits_per_coded_sample 	= codec->bits_per_coded_sample;
+    //avstream_audio_->codecpar->bits_per_raw_sample   	= codec->bits_per_raw_sample;
+    avstream_audio_->codecpar->profile               	= FF_PROFILE_AAC_SSR;
+    //avstream_audio_->codecpar->level                 	= codec->level;
+
+	avstream_audio_->codecpar->format           		= AV_SAMPLE_FMT_S16;
+    avstream_audio_->codecpar->channel_layout   		= AV_CH_LAYOUT_STEREO;
+    avstream_audio_->codecpar->channels         		= 2;
+    avstream_audio_->codecpar->sample_rate      		= 44100;
+    //avstream_audio_->codecpar->block_align      		= codec->block_align;
+    //avstream_audio_->codecpar->frame_size       		= codec->frame_size;
+    //avstream_audio_->codecpar->initial_padding  		= codec->initial_padding;
+    //avstream_audio_->codecpar->trailing_padding 		= codec->trailing_padding;
+    //avstream_audio_->codecpar->seek_preroll     		= codec->seek_preroll;
+
+    if (avstream_video_ != NULL)
+    {
+        OpenFile();
+    }
+
+
+    return 0;
+}
+
+int MediaOutput::InitVideoStream()
+{
+    avstream_video_ = avformat_new_stream(avformat_ctx_, NULL);
+
+    if (avstream_video_ == NULL)
+    {
+        cout << LMSG << "avformat_new_stream failed" << endl;
+        return -1;
+    }
+
+    avstream_video_->time_base = AVRational{1, 30};
+
+	avstream_video_->codecpar->codec_type               = AVMEDIA_TYPE_VIDEO;
+    avstream_video_->codecpar->codec_id                 = AV_CODEC_ID_H264;
+    //avstream_video_->codecpar->codec_tag                = codec->codec_tag;
+
+    avstream_video_->codecpar->bit_rate                 = 3000*1000;
+    //avstream_video_->codecpar->bits_per_coded_sample    = codec->bits_per_coded_sample;
+    //avstream_video_->codecpar->bits_per_raw_sample      = codec->bits_per_raw_sample;
+    avstream_video_->codecpar->profile                  = FF_PROFILE_H264_MAIN;
+    //avstream_video_->codecpar->level                    = codec->level;
+
+    avstream_video_->codecpar->format                   = AV_PIX_FMT_YUV420P;
+    avstream_video_->codecpar->width                    = 1920;
+    avstream_video_->codecpar->height                   = 1080;
+    //avstream_video_->codecpar->field_order              = codec->field_order;
+    //avstream_video_->codecpar->color_range              = codec->color_range;
+    //avstream_video_->codecpar->color_primaries          = codec->color_primaries;
+    //avstream_video_->codecpar->color_trc                = codec->color_trc;
+    //avstream_video_->codecpar->color_space              = codec->colorspace;
+    //avstream_video_->codecpar->chroma_location          = codec->chroma_sample_location;
+    //avstream_video_->codecpar->sample_aspect_ratio      = codec->sample_aspect_ratio;
+    //avstream_video_->codecpar->video_delay              = codec->has_b_frames;
+
+    if (avstream_audio_ != NULL)
+    {
+        OpenFile();
+    }
+
+    return 0;
+}
+
+
 int MediaOutput::InitVideoStream(const AVCodecContext* video_encode_ctx)
 {
     avstream_video_ = avformat_new_stream(avformat_ctx_, NULL);
@@ -300,11 +384,33 @@ int MediaOutput::WriteAudio(AVPacket* packet)
     return -1;
 }
 
+int MediaOutput::WriteMedia(const uint8_t* data, const int& len, const bool& is_audio, const int64_t& dts)
+{
+    AVPacket av_packet;
+
+    av_init_packet(&av_packet);
+
+    av_packet.data = (uint8_t*)data;
+    av_packet.size = len;
+    av_packet.dts = dts;
+    av_packet.pts = dts;
+
+    if (is_audio)
+    {
+        return WriteAudio(&av_packet);
+    }
+    else
+    {
+        return WriteVideo(&av_packet);
+    }
+
+    return -1;
+}
+
 int MediaOutput::InternalWriteMedia(AVPacket* av_packet, const bool& is_audio)
 {
     if (is_audio)
     {
-        return 0;
         av_packet->stream_index = avstream_audio_->index;
     }
     else
@@ -358,7 +464,7 @@ int MediaOutput::InternalWriteMedia(MediaPacket media_packet)
         }
     }
 
-    packet.pts = media_packet.dts_;
+    packet.pts = packet.dts;
     packet.data = (uint8_t*)media_packet.data_.data();
     packet.size = media_packet.data_.size();
 

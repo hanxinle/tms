@@ -71,7 +71,7 @@ RtmpProtocol::RtmpProtocol(Epoller* epoller, Fd* fd)
     last_message_type_id_(0)
 {
     cout << LMSG << endl;
-    media_output_.Init("test.webm");
+    transcode_output_.Init("test.webm");
 }
 
 RtmpProtocol::~RtmpProtocol()
@@ -642,7 +642,7 @@ int RtmpProtocol::OnAudio(RtmpMessage& rtmp_msg)
                 media_muxer_.OnAudioHeader(audio_header);
 
 #ifdef USE_TRANSCODER
-                audio_transcoder_.SetMediaOutput(&media_output_);
+                audio_transcoder_.SetMediaOutput(&transcode_output_);
                 audio_transcoder_.InitDecoder(audio_header);
 #endif
             }
@@ -657,7 +657,7 @@ int RtmpProtocol::OnAudio(RtmpMessage& rtmp_msg)
                 audio_payload.SetPts(rtmp_msg.timestamp_calc);
 
 #ifdef USE_TRANSCODER
-                if (g_media_queue.size() <= 60000)
+                if (g_media_queue.size() <= 1000000)
                 {
                     audio_transcoder_.Decode(audio_raw_data + 2, rtmp_msg.len - 2, rtmp_msg.timestamp_calc);
                 }
@@ -740,9 +740,9 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
 
                     int got_picture = 0;
 #ifdef USE_TRANSCODER
-                    if (g_media_queue.size() <= 60000)
+                    if (g_media_queue.size() <= 1000000)
                     {
-                        video_transcoder_.Decode(data, raw_len, rtmp_msg.timestamp_calc, rtmp_msg.timestamp_calc, got_picture);
+                        video_transcoder_.Decode(data, raw_len, rtmp_msg.timestamp_calc, rtmp_msg.timestamp_calc + compositio_time_offset, got_picture);
                     }
 #endif
 
@@ -1362,7 +1362,7 @@ int RtmpProtocol::OnVideoHeader(RtmpMessage& rtmp_msg)
     string video_header((const char*)rtmp_msg.msg + 5, rtmp_msg.len - 5);
 
 #ifdef USE_TRANSCODER
-    video_transcoder_.SetMediaOutput(&media_output_);
+    video_transcoder_.SetMediaOutput(&transcode_output_);
     video_transcoder_.InitDecoder(video_header);
 #endif
 

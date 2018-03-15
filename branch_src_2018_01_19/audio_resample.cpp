@@ -84,6 +84,8 @@ int AudioResample::Resample(const AVFrame* frame, int& got_resample)
         return ret;
     }
 
+    cout << LMSG << "src pts:" << frame->pts << endl;
+
 	resample_frame_->nb_samples = out_nb_samples;
     resample_frame_->format = out_sample_fmt_;
     resample_frame_->sample_rate = out_sample_rate_;
@@ -105,9 +107,12 @@ int AudioResample::Resample(const AVFrame* frame, int& got_resample)
                 cout << LMSG << "write resample pcm " << bytes << " bytes" << endl;
             }
 
+            // FIXME:
             resample_frame_->pts = frame->pts;
+            resample_frame_->pkt_dts = frame->pkt_dts;
+            resample_frame_->pkt_pts = frame->pkt_pts;
             
-            cout << "resample audio success" << endl;
+            cout << "resample audio success, pts:" << resample_frame_->pts << ",dts:" << resample_frame_->pkt_dts << endl;
 
             got_resample = 1;
 

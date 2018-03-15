@@ -89,6 +89,8 @@ int VideoEncoder::Encode(const AVFrame* frame, int& got_packet)
     av_init_packet(&av_packet_);
     av_packet_.data = NULL;
     av_packet_.size = 0;
+    av_packet_.pts = 0;
+    av_packet_.dts = 0;
 
     ret = avcodec_receive_packet(av_encode_ctx_, &av_packet_);
     if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)

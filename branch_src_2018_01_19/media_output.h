@@ -27,8 +27,13 @@ public:
     int InitAudioStream(const AVCodecContext* audio_encode_ctx);
     int InitVideoStream(const AVCodecContext* audio_encode_ctx);
 
+    int InitAudioStream();
+    int InitVideoStream();
+
     int WriteAudio(AVPacket* packet);
     int WriteVideo(AVPacket* packet);
+
+    int WriteMedia(const uint8_t* data, const int& len, const bool& is_audio, const int64_t& dts);
 
 private:
     int InternalWriteMedia(AVPacket* av_packet, const bool& is_audio);

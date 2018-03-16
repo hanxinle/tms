@@ -34,6 +34,10 @@ int AudioEncoder::Init()
     av_encode_ctx_->sample_fmt = AV_SAMPLE_FMT_S16;
     av_encode_ctx_->frame_size = 960;
     av_encode_ctx_->channel_layout = AV_CH_LAYOUT_STEREO;
+    av_encode_ctx_->bit_rate = 192000;
+    av_encode_ctx_->time_base = AVRational{1, 1000};
+
+    cout << LMSG << "av_encode_ctx_->frame_size = " << av_encode_ctx_->frame_size << endl;
 
     int ret = avcodec_open2(av_encode_ctx_, codec, NULL);
 
@@ -51,6 +55,7 @@ int AudioEncoder::Init()
 int AudioEncoder::Encode(const AVFrame* frame, int& got_packet)
 {
 	cout << LMSG << "dts:" << frame->pkt_dts << ",pts:" << frame->pts << endl;
+    cout << LMSG << "nb_samples in frame:" << frame->nb_samples << ", ctx frame_size:" << av_encode_ctx_->frame_size << endl;
 
     int ret = avcodec_send_frame(av_encode_ctx_, frame);
     if (ret < 0)  

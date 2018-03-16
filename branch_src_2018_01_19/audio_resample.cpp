@@ -19,7 +19,9 @@ AudioResample::AudioResample()
 	out_channel_layout_(-1),
     out_sample_rate_(-1),
     out_sample_fmt_(-1),
-    resample_pcm_fd_(-1)
+    resample_pcm_fd_(-1),
+    samples_count_(0),
+    fake_dts_(true)
 {
 }
 
@@ -72,25 +74,31 @@ int AudioResample::Init(const int& in_channel_layout, const int& out_channel_lay
     return 0;
 }
 
-int AudioResample::Resample(const AVFrame* frame, int& got_resample)
+int AudioResample::Resample(const AVFrame* frame)
 {
-    const int out_nb_samples = 960;
+    cout << LMSG << "src pts:" << frame->pts << endl;
 
     int ret = avresample_convert(resample_ctx_, NULL, 0, 0, frame->data, frame->linesize[0], frame->nb_samples);
 
     if (ret < 0)
     {
         cout << LMSG << "swr_convert_frame failed" << endl;
-        return ret;
     }
 
-    cout << LMSG << "src pts:" << frame->pts << endl;
+    return ret;
+}
+
+int AudioResample::GetFrameFromFifo(int& got_resample)
+{
+    //const int out_nb_samples = av_rescale_rnd(frame->nb_samples, out_sample_rate_, in_sample_rate_, AV_ROUND_UP);
+    const int out_nb_samples = 960;
 
 	resample_frame_->nb_samples = out_nb_samples;
     resample_frame_->format = out_sample_fmt_;
     resample_frame_->sample_rate = out_sample_rate_;
     resample_frame_->channel_layout = out_channel_layout_;
 
+    cout << LMSG << "avresample_available(resample_ctx_) = " << avresample_available(resample_ctx_) << endl;
     if (avresample_available(resample_ctx_) > resample_frame_->nb_samples)
     {   
         if (av_frame_get_buffer(resample_frame_, 1) < 0)
@@ -107,14 +115,24 @@ int AudioResample::Resample(const AVFrame* frame, int& got_resample)
                 cout << LMSG << "write resample pcm " << bytes << " bytes" << endl;
             }
 
-            // FIXME:
-            resample_frame_->pts = frame->pts;
-            resample_frame_->pkt_dts = frame->pkt_dts;
-            resample_frame_->pkt_pts = frame->pkt_pts;
+            if (fake_dts_)
+            {
+                resample_frame_->pts = (double)samples_count_ / (double)out_sample_rate_ * 1000;
+                resample_frame_->pkt_dts = resample_frame_->pts;
+                resample_frame_->pkt_pts = resample_frame_->pts;
+            }
+            else
+            {
+                resample_frame_->pts = av_rescale_q(samples_count_, (AVRational){1, in_sample_rate_}, (AVRational){1, 1000});
+                //resample_frame_->pkt_dts = frame->pkt_dts;
+                //resample_frame_->pkt_pts = frame->pkt_pts;
+            }
             
             cout << "resample audio success, pts:" << resample_frame_->pts << ",dts:" << resample_frame_->pkt_dts << endl;
 
             got_resample = 1;
+
+            samples_count_ += out_nb_samples;
 
             return 0;
         }   

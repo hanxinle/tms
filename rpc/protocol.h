@@ -493,6 +493,98 @@ namespace protocol
         }
     };
 
+    struct CreateVideoTranscodeReq
+    {
+        enum {protocol_id = 3000};
+
+        uint64_t req_time;
+        string app;
+        string stream;
+        uint32_t bit_rate;
+        uint32_t width;
+        uint32_t height;
+        uint16_t fps;
+
+        void Write(Serialize& serialize) const
+        {
+            serialize.Write(req_time);
+            serialize.Write(app);
+            serialize.Write(stream);
+            serialize.Write(bit_rate);
+            serialize.Write(width);
+            serialize.Write(height);
+            serialize.Write(fps);
+            serialize.WriteHeader(protocol_id);
+        }
+
+        int Read(Deserialize& deserialize)
+        {
+            IF(deserialize.Read(req_time));
+            IF(deserialize.Read(app));
+            IF(deserialize.Read(stream));
+            IF(deserialize.Read(bit_rate));
+            IF(deserialize.Read(width));
+            IF(deserialize.Read(height));
+            IF(deserialize.Read(fps));
+
+            return 0;
+        }
+
+        void Dump(ostringstream& os) const
+        {
+            os << "CreateVideoTranscodeReq: {"
+               << "req_time:" << req_time
+               << ",app:" << app
+               << ",stream:" << stream
+               << ",bit_rate:" << bit_rate
+               << ",width:" << width
+               << ",height:" << height
+               << ",fps:" << fps;
+
+            os << "}";
+        }
+    };
+
+    struct CreateVideoTranscodeRsp
+    {
+        enum {protocol_id = 3001};
+
+        uint64_t rsp_time;
+        string app;
+        string stream;
+        uint32_t rsp_code;
+
+        void Write(Serialize& serialize) const
+        {
+            serialize.Write(rsp_time);
+            serialize.Write(app);
+            serialize.Write(stream);
+            serialize.Write(rsp_code);
+            serialize.WriteHeader(protocol_id);
+        }
+
+        int Read(Deserialize& deserialize)
+        {
+            IF(deserialize.Read(rsp_time));
+            IF(deserialize.Read(app));
+            IF(deserialize.Read(stream));
+            IF(deserialize.Read(rsp_code));
+
+            return 0;
+        }
+
+        void Dump(ostringstream& os) const
+        {
+            os << "CreateVideoTranscodeReq: {"
+               << "rsp_time:" << rsp_time
+               << ",app:" << app
+               << ",stream:" << stream
+               << ",rsp_code:" << rsp_code;
+
+            os << "}";
+        }
+    };
+
 } // namespace protocol
 
 

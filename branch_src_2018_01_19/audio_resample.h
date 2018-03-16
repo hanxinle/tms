@@ -16,7 +16,9 @@ public:
              const int& in_sample_rate, const int& out_sample_rate,
              const int& in_sample_fmt, const int& out_sample_fmt);
 
-    int Resample(const AVFrame* frame, int& got_resample);
+    int Resample(const AVFrame* frame);
+
+    int GetFrameFromFifo(int& got_resample);
 
     AVFrame* GetResampleFrame()
     {
@@ -37,6 +39,10 @@ private:
     int out_sample_fmt_;
 
     int resample_pcm_fd_;
+
+    uint64_t samples_count_;
+
+    bool fake_dts_;
 };
 
 #endif // __AUDIO_RESAMPLE_H__

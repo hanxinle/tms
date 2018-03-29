@@ -22,10 +22,13 @@
 #include "util.h"
 #include "video_define.h"
 
-#define CDN "ws.upstream.huya.com"
-//#define CDN "tx.direct.huya.com"
-//#define CDN "al.direct.huya.com"
-//#define CDN "112.90.174.121"
+#define WS "ws.upstream.huya.com"
+#define TX "tx.direct.huya.com"
+#define AL "al.direct.huya.com"
+#define WS_PUSH "ws1.upstream.huya.com"
+#define TX_PUSH "tx.push.huya.com"
+#define AL_PUSH "al.push.huya.com"
+
 #define CDN_PORT 1935
 
 using namespace std;
@@ -71,7 +74,9 @@ RtmpProtocol::RtmpProtocol(Epoller* epoller, Fd* fd)
     last_message_type_id_(0)
 {
     cout << LMSG << endl;
+#ifdef USE_TRANSCODER
     transcode_output_.Init("test.webm");
+#endif
 }
 
 RtmpProtocol::~RtmpProtocol()
@@ -837,9 +842,9 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
                         {
                             if (media_muxer_.GetForwardToggleBit())
                             {
-                                //ConnectForwardRtmpServer(CDN, CDN_PORT);
-                                //SetDomain(CDN);
-                                //ConnectFollowServer("127.0.0.1", 10002);
+                                ConnectForwardRtmpServer(WS_PUSH, CDN_PORT);
+                                ConnectForwardRtmpServer(AL_PUSH, CDN_PORT);
+                                ConnectForwardRtmpServer(TX_PUSH, CDN_PORT);
                             }
 
                             media_muxer_.OnVideo(video_payload);
@@ -2128,6 +2133,7 @@ int RtmpProtocol::ConnectForwardRtmpServer(const string& ip, const uint16_t& por
     rtmp_forward->SetApp(app_);
     rtmp_forward->SetStreamName(stream_);
     rtmp_forward->SetPushServer();
+    rtmp_forward->SetDomain(ip);
 
     if (errno == EINPROGRESS)
     {

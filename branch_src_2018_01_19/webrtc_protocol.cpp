@@ -8,7 +8,6 @@
 #include "io_buffer.h"
 #include "socket_util.h"
 #include "udp_socket.h"
-#include "video_define.h"
 #include "webrtc_protocol.h"
 
 #include "rtp_header.h"
@@ -29,7 +28,6 @@ const int SRTP_MASTER_KEY_KEY_LEN = 16;
 const int SRTP_MASTER_KEY_SALT_LEN = 14;
 
 extern WebrtcProtocol* g_debug_webrtc;
-extern deque<MediaPacket> g_media_queue;
 
 static int HmacEncode(const string& algo, const char* key, const int& key_length,  
                 	  const char* input, const int& input_length,  
@@ -628,6 +626,30 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
                 ReuseAddr(fd);
                 Bind(fd, "0.0.0.0", 11445);
                 Connect(fd, GetUdpSocket()->GetClientIp(), GetUdpSocket()->GetClientPort());
+
+                int old_send_buf_size = 0;
+                int old_recv_buf_size = 0;
+
+                int ret = GetSendBufSize(fd, old_send_buf_size);
+                cout << LMSG << "GetSendBufSize fd:" << fd << ",ret:" << ret << ",old_send_buf_size:" << old_send_buf_size << endl;
+
+                ret = GetRecvBufSize(fd, old_recv_buf_size);
+                cout << LMSG << "GetRecvBufSize fd:" << fd << ",ret:" << ret << ",old_recv_buf_size:" << old_recv_buf_size << endl;
+
+                int new_send_buf_size = 1024*1024*10; // 10MB
+                int new_recv_buf_size = 1024*1024*10; // 10MB
+
+                ret = SetSendBufSize(fd, new_send_buf_size, true);
+                cout << LMSG << "SetSendBufSize fd:" << fd << ",ret:" << ret << ",new_send_buf_size:" << new_send_buf_size << endl;
+
+                ret = SetRecvBufSize(fd, new_recv_buf_size, true);
+                cout << LMSG << "SetRecvBufSize fd:" << fd << ",ret:" << ret << ",new_recv_buf_size:" << new_recv_buf_size << endl;
+
+                ret = GetSendBufSize(fd, new_send_buf_size);
+                cout << LMSG << "GetSendBufSize fd:" << fd << ",ret:" << ret << ",new_send_buf_size:" << new_send_buf_size << endl;
+
+                ret = GetRecvBufSize(fd, new_recv_buf_size);
+                cout << LMSG << "GetRecvBufSize fd:" << fd << ",ret:" << ret << ",new_recv_buf_size:" << new_recv_buf_size << endl;
 
                 UdpSocket* udp_socket = new UdpSocket(g_epoll, fd, g_webrtc_mgr);
                 udp_socket->SetSrcAddr(GetUdpSocket()->GetSrcAddr());

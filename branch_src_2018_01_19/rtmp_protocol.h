@@ -8,16 +8,13 @@
 #include <sstream>
 #include <set>
 
-#include "audio_transcode.h"
 #include "crc32.h"
-#include "media_output.h"
 #include "media_publisher.h"
 #include "media_subscriber.h"
 #include "ref_ptr.h"
 #include "server_protocol.h"
 #include "socket_util.h"
 #include "trace_tool.h"
-#include "video_transcode.h"
 
 using std::map;
 using std::string;
@@ -331,12 +328,6 @@ private:
     uint32_t last_video_message_length_;
     uint32_t last_audio_message_length_;
     uint8_t last_message_type_id_;
-
-#ifdef USE_TRANSCODER
-    VideoTransCoder video_transcoder_;
-    AudioTransCoder audio_transcoder_;
-    MediaOutput     transcode_output_;
-#endif
 };
 
 #endif // __RTMP_PROTOCOL_H__

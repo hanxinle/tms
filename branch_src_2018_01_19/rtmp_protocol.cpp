@@ -20,7 +20,6 @@
 #include "server_mgr.h"
 #include "tcp_socket.h"
 #include "util.h"
-#include "video_define.h"
 
 #define WS "ws.upstream.huya.com"
 #define TX "tx.direct.huya.com"
@@ -43,7 +42,6 @@ using any::Map;
 using any::Null;
 
 extern LocalStreamCenter g_local_stream_center;
-extern deque<MediaPacket> g_media_queue;
 
 static uint32_t s0_len = 1;
 static uint32_t s1_len = 4/*time*/ + 4/*zero*/ + 1528/*random*/;
@@ -74,9 +72,6 @@ RtmpProtocol::RtmpProtocol(Epoller* epoller, Fd* fd)
     last_message_type_id_(0)
 {
     cout << LMSG << endl;
-#ifdef USE_TRANSCODER
-    transcode_output_.Init("test.webm");
-#endif
 }
 
 RtmpProtocol::~RtmpProtocol()
@@ -646,10 +641,6 @@ int RtmpProtocol::OnAudio(RtmpMessage& rtmp_msg)
 
                 media_muxer_.OnAudioHeader(audio_header);
 
-#ifdef USE_TRANSCODER
-                audio_transcoder_.SetMediaOutput(&transcode_output_);
-                audio_transcoder_.InitDecoder(audio_header);
-#endif
             }
             else
             {
@@ -660,13 +651,6 @@ int RtmpProtocol::OnAudio(RtmpMessage& rtmp_msg)
                 audio_payload.SetAudio();
                 audio_payload.SetDts(rtmp_msg.timestamp_calc);
                 audio_payload.SetPts(rtmp_msg.timestamp_calc);
-
-#ifdef USE_TRANSCODER
-                if (g_media_queue.size() <= 1000000)
-                {
-                    audio_transcoder_.Decode(audio_raw_data + 2, rtmp_msg.len - 2, rtmp_msg.timestamp_calc);
-                }
-#endif
 
                 media_muxer_.OnAudio(audio_payload);
 
@@ -744,12 +728,6 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
                     size_t raw_len = rtmp_msg.len - 5;
 
                     int got_picture = 0;
-#ifdef USE_TRANSCODER
-                    if (g_media_queue.size() <= 1000000)
-                    {
-                        video_transcoder_.Decode(data, raw_len, rtmp_msg.timestamp_calc, rtmp_msg.timestamp_calc + compositio_time_offset, got_picture);
-                    }
-#endif
 
                     size_t cur_len = 0;
                     while (cur_len < raw_len)
@@ -1365,11 +1343,6 @@ int RtmpProtocol::OnMetaData(RtmpMessage& rtmp_msg)
 int RtmpProtocol::OnVideoHeader(RtmpMessage& rtmp_msg)
 {
     string video_header((const char*)rtmp_msg.msg + 5, rtmp_msg.len - 5);
-
-#ifdef USE_TRANSCODER
-    video_transcoder_.SetMediaOutput(&transcode_output_);
-    video_transcoder_.InitDecoder(video_header);
-#endif
 
     cout << LMSG << "recv video_header" << ",size:" << video_header.size() << endl;
     cout << Util::Bin2Hex(video_header) << endl;

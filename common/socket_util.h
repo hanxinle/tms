@@ -157,6 +157,70 @@ namespace socket_util
         return ret;
     }
 
+    inline int SetSendBufSize(const int& fd, const int& send_buf_size, const bool& force = false)
+    {
+        int opt_name = SO_SNDBUF;
+        if (force)
+        {
+            opt_name = SO_SNDBUFFORCE;
+        }
+
+        int ret = setsockopt(fd, SOL_SOCKET, opt_name, (void*)&send_buf_size, sizeof(send_buf_size));
+
+        if (ret < 0)
+        {
+            cout << LMSG << "setsockopt err:" << strerror(errno) << endl;
+        }
+
+        return ret;
+    }
+
+    inline int SetRecvBufSize(const int& fd, const int& send_buf_size, const bool& force = false)
+    {
+        int opt_name = SO_RCVBUF;
+        if (force)
+        {
+            opt_name = SO_RCVBUFFORCE;
+        }
+
+        int ret = setsockopt(fd, SOL_SOCKET, opt_name, (void*)&send_buf_size, sizeof(send_buf_size));
+
+        if (ret < 0)
+        {
+            cout << LMSG << "setsockopt err:" << strerror(errno) << endl;
+        }
+
+        return ret;
+    }
+
+    inline int GetSendBufSize(const int& fd, int& send_buf_size)
+    {
+        send_buf_size = 0;
+        socklen_t send_buf_size_len = sizeof(send_buf_size);
+        int ret = getsockopt(fd, SOL_SOCKET, SO_SNDBUF, &send_buf_size, &send_buf_size_len);
+
+        if (ret < 0)
+        {
+            cout << LMSG << "getsockopt err:" << strerror(errno) << endl;
+        }
+
+        return ret;
+    }
+
+    inline int GetRecvBufSize(const int& fd, int& send_buf_size)
+    {
+        send_buf_size = 0;
+        socklen_t send_buf_size_len = sizeof(send_buf_size);
+        int ret = getsockopt(fd, SOL_SOCKET, SO_RCVBUF, &send_buf_size, &send_buf_size_len);
+
+        if (ret < 0)
+        {
+            cout << LMSG << "getsockopt err:" << strerror(errno) << endl;
+        }
+
+        return ret;
+    }
+
     inline string GetIpByHost(const string& host)
     {
         string ret;

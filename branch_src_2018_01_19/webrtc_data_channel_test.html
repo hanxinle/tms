@@ -31,10 +31,15 @@ Remote Media: <br>
 var PeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection;
 var SessionDescription = window.RTCSessionDescription || window.mozRTCSessionDescription || window.webkitRTCSessionDescription;
 
-var socket = new WebSocket("wss://john.com:8943/webrtc_data_channel_test.sdp");
+var socket = new WebSocket("wss://hw.com:8943/webrtc_data_channel_test.sdp");
 var pc = new PeerConnection(null);
 
-var data_channel = pc.createDataChannel("john", {
+pc.ondatachannel = function(evt) {
+    console.log("peer connection on data channel");
+    console.log(evt);
+};
+
+var data_channel = pc.createDataChannel("hw", {
     ordered: false,
     maxRetransmits: 0
 }); 
@@ -119,8 +124,8 @@ socket.onopen = function(event)
     {
         mandatory:
         {
-            OfferToReceiveAudio: true,
-            OfferToReceiveVideo: true
+            OfferToReceiveAudio: false,
+            OfferToReceiveVideo: false
         }
     };
 
@@ -136,10 +141,7 @@ socket.onmessage = function(event)
     pc.setRemoteDescription(new SessionDescription({type:'answer', sdp:json.sdpAnswer}));
     console.log('onmessage viewerResponse: ', json.sdpAnswer);
 
-    <!--
-    var candidate = new RTCIceCandidate(json.candidate);
-    pc.addIceCandidate(candidate);
-    -->
+    pc.addIceCandidate(new RTCIceCandidate(json.candidate));
 }
 
 function sendMsg()

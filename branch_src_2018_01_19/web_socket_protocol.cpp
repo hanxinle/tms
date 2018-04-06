@@ -275,8 +275,8 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
             Util::Replace(webrtc_test_sdp, "xxx_port", "11445");
 
             // a=sendrecv sdp中这个影响chrome推流
-#if 0
-            string candidate = R"(candidate":"candidate:10 1 udp 2115783679 xxx.xxx.xxx.xxx:what typ host generation 0 ufrag )" + g_local_ice_ufrag + R"( netwrok-id 1", "sdpMid":"video","sdpMLineIndex":1)";
+#if 1
+            string candidate = R"(candidate":"candidate:1 1 udp 2115783679 xxx.xxx.xxx.xxx:what typ host generation 0 ufrag )" + g_local_ice_ufrag + R"( netwrok-cost 50", "sdpMid":"data","sdpMLineIndex":0)";
             Util::Replace(candidate, "xxx.xxx.xxx.xxx:what", g_server_ip + " 11445");
             string sdp_answer = "{\"sdpAnswer\":\"" + webrtc_test_sdp + "\", \"candidate\":{" + "\"" + candidate + "}}";
 #else

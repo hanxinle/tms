@@ -34,6 +34,7 @@ public:
     int EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
 
     void SendClientHello();
+    void SetAcceptState();
     void SendBindingRequest();
     void SendBindingIndication();
 

@@ -133,6 +133,10 @@ int WebrtcProtocol::Parse(IoBuffer& io_buffer)
             OnDtls(data, len);
             cout << LMSG << (long)this << ", dtls" << endl;
    		}
+        else
+        {
+            cout << LMSG << (long)this <<", unknown" <<endl;
+        }
     }
 
     return kSuccess;
@@ -661,7 +665,13 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
                 g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SetLocalPwd(g_local_ice_pwd);
                 g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SetRemoteUfrag(g_remote_ice_ufrag);
                 g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SetRemotePwd(g_remote_ice_pwd);
+                // FIXME:这里可能需要根据角色,比如客户端是上行还是下行来做SetConnectState还是SetAcceptState
+#if 0
                 g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SendClientHello();
+#else
+                // datachannel
+                g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SetAcceptState();
+#endif
                 //g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SendBindingRequest();
             }
             else
@@ -1158,6 +1168,45 @@ void WebrtcProtocol::SendClientHello()
     }
 }
 
+void WebrtcProtocol::SetAcceptState()
+{
+    if (! dtls_hello_send_)
+    {
+        cout << LMSG << "dtls send clienthello" << endl;
+
+        dtls_hello_send_ = true;
+
+#ifdef USE_MEDIA_INPUT
+        if (media_input_ == NULL)
+        {
+            media_input_ = new MediaInput();
+        }
+
+#ifdef USE_VP8_WEBM
+        media_input_->Open("input_vp8.webm");
+#else
+        media_input_->Open("input_vp9.webm");
+#endif
+        ++media_input_open_count_;
+        media_input_read_video_frame_count = 0;
+#endif 
+
+        if (dtls_ == NULL)
+        {
+            dtls_ = SSL_new(g_dtls_ctx);
+
+			SSL_set_accept_state(dtls_);
+
+        	bio_in_  = BIO_new(BIO_s_mem());
+        	bio_out_ = BIO_new(BIO_s_mem());
+
+        	SSL_set_bio(dtls_, bio_in_, bio_out_);
+
+            Handshake();
+        }
+    }
+}
+
 int WebrtcProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)
 {
     return 0;
@@ -1165,6 +1214,7 @@ int WebrtcProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& inte
 
 int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)
 {
+    return 0;
 #ifdef USE_MEDIA_INPUT
 
 #ifdef PUBLISH_BACK

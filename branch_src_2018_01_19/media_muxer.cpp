@@ -32,6 +32,7 @@ MediaMuxer::MediaMuxer(MediaPublisher* media_publisher)
     ts_pmt_continuity_counter_(0),
     ts_audio_continuity_counter_(0),
     ts_video_continuity_counter_(0),
+    crc_32_(CRC32_HLS),
     media_publisher_(media_publisher)
 {
     cout << LMSG << endl;

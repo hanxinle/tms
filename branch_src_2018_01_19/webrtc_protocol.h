@@ -124,6 +124,9 @@ private:
     uint32_t audio_publisher_ssrc_;
 
     uint64_t send_begin_time_;
+
+    // Sctp
+    uint32_t initiate_tag_;
 };
 
 #endif // __WEBRTC_PROTOCOL_H__

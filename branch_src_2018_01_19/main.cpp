@@ -88,7 +88,7 @@ int main(int argc, char* argv[])
     av_log_set_callback(AvLogCallback);
     av_log_set_level(AV_LOG_VERBOSE);
 
-    CRC32 crc32;
+    CRC32 crc32(CRC32_STUN);
 
     uint8_t crc[] = {1, 2, 3, 4, 5, 6};
     cout << LMSG << crc32.GetCrc32(crc, 6) << endl;

@@ -64,6 +64,25 @@ public:
     }
 
     template<typename T>
+    int ReplaceBytes(const int& pos, const size_t& bytes, const T& val)
+    {
+        if (pos > (int)cur_pos_/8)
+        {
+            cout << LMSG << "replace in " << pos << " overflow, cur_pos:" << (cur_pos_/8) << endl;
+            return -1;
+        }
+
+        const uint8_t* p = (const uint8_t*)&val;
+
+        for (size_t i = 0; i != bytes; ++i)
+        {
+            buf_[pos + i] = p[bytes-1-i];
+        }
+
+        return 0;
+    }
+
+    template<typename T>
     int WriteBytes(const size_t& bytes, const T& val)
     {
 #if 1

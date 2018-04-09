@@ -99,8 +99,7 @@ WebrtcProtocol::WebrtcProtocol(Epoller* epoller, Fd* socket)
     timestamp_(0),
     media_input_open_count_(0),
     media_input_read_video_frame_count(0),
-    send_begin_time_(Util::GetNowMs()),
-    initiate_tag_(0)
+    send_begin_time_(Util::GetNowMs())
 {
 }
 
@@ -286,6 +285,24 @@ int WebrtcProtocol::UnProtectRtcp(const uint8_t* protect_rtcp, const int& protec
 
     int ret = srtp_unprotect_rtcp(srtp_recv_, un_protect_rtcp, &un_protect_rtcp_len);
     
+    return ret;
+}
+
+int WebrtcProtocol::DtlsSend(const uint8_t* data, const int& len)
+{
+    int ret = SSL_write(dtls_, data, len);
+
+	uint8_t dtls_send_buffer[4096];
+
+  	while (BIO_ctrl_pending(bio_out_) > 0) 
+    {
+  	    int dtls_send_bytes = BIO_read(bio_out_, dtls_send_buffer, sizeof(dtls_send_buffer));
+  	    if (dtls_send_bytes > 0) 
+        {
+		    GetUdpSocket()->Send(dtls_send_buffer, dtls_send_bytes);
+  	    }
+  	}
+
     return ret;
 }
 
@@ -778,249 +795,7 @@ int WebrtcProtocol::OnDtls(const uint8_t* data, const size_t& len)
                 cout << LMSG << "dtls read " << ret << " bytes" << endl;
                 cout << LMSG << Util::Bin2Hex(dtls_read_buf, ret) << endl;
 
-                {
-                    BitBuffer bit_buffer(dtls_read_buf, ret);
-
-                    uint16_t src_port = 0;
-                    bit_buffer.GetBytes(2, src_port);
-
-                    uint16_t dst_port = 0;
-                    bit_buffer.GetBytes(2, dst_port);
-
-                    uint32_t verification_tag = 0;
-                    bit_buffer.GetBytes(4, verification_tag);
-
-                    uint32_t checksum = 0;
-                    bit_buffer.GetBytes(4, checksum);
-
-                    uint8_t chunk_type = 0xff;
-                    bit_buffer.GetBytes(1, chunk_type);
-
-                    uint8_t chunk_flag = 0xff;
-                    bit_buffer.GetBytes(1, chunk_flag);
-
-                    uint16_t chunk_length = 0;
-                    bit_buffer.GetBytes(2, chunk_length);
-
-                    cout << LMSG << "src_port:" << src_port << ",dst_port:" << dst_port << ",verification_tag:" << verification_tag
-                         << ",checksum:" << checksum << ",chunk_type:" << (int)chunk_type << ",chunk_flag:" << (int)chunk_flag
-                         << ",chunk_length:" << chunk_length << endl;
-
-                    switch (chunk_type)
-                    {
-                        case 0:
-                        {
-                            uint32_t tsn = 0;
-                            bit_buffer.GetBytes(4, tsn);
-
-                            uint16_t stream_id_s = 0;
-                            bit_buffer.GetBytes(2, stream_id_s);
-
-                            uint16_t stream_seq_num_n = 0;
-                            bit_buffer.GetBytes(2, stream_seq_num_n);
-
-                            uint32_t payload_protocol_id = 0;
-                            bit_buffer.GetBytes(4, payload_protocol_id);
-
-                            string user_data = "";
-                            bit_buffer.GetString(bit_buffer.BytesLeft(), user_data);
-                            cout << LMSG << "recv datachannel msg:[\n" << Util::Bin2Hex(user_data) << "\n]" << endl;
-                        }
-                        break;
-
-                        case 1:
-                        {
-                            cout << "SCTP INIT" << endl;
-                            bit_buffer.GetBytes(4, initiate_tag_);
-
-                            uint32_t a_rwnd = 0;
-                            bit_buffer.GetBytes(4, a_rwnd);
-
-                            uint16_t number_of_outbound_streams = 0;
-                            bit_buffer.GetBytes(2, number_of_outbound_streams);
-
-                            uint16_t number_of_inbound_streams = 0;
-                            bit_buffer.GetBytes(2, number_of_inbound_streams);
-
-                            uint32_t initial_tsn = 0;
-                            bit_buffer.GetBytes(4, initial_tsn);
-
-                            cout << LMSG << "initiate_tag:" << initiate_tag_ << ",a_rwnd:" << a_rwnd << ",number_of_outbound_streams:" 
-                                 << number_of_outbound_streams << ",number_of_inbound_streams:" << number_of_inbound_streams << ",initial_tsn:" << initial_tsn << endl;
-
-                            // optional
-                            while (bit_buffer.BitsLeft() >= 4)
-                            {
-                                uint16_t parameter_type = 0;
-                                bit_buffer.GetBytes(2, parameter_type);
-
-                                uint16_t parameter_length = 0;
-                                bit_buffer.GetBytes(2, parameter_length);
-
-                                string parameter_value;
-                                bit_buffer.GetString(parameter_length, parameter_value);
-
-                                cout << LMSG << "parameter_type:" << parameter_type << ",parameter_length:" << parameter_length << endl;
-                            }
-
-                            BitStream bs_chunk;
-                            bs_chunk.WriteBytes(4, initiate_tag_);
-                            bs_chunk.WriteBytes(4, a_rwnd);
-                            // 故意反过来的
-                            bs_chunk.WriteBytes(2, number_of_inbound_streams);
-                            bs_chunk.WriteBytes(2, number_of_outbound_streams);
-                            bs_chunk.WriteBytes(4, initial_tsn);
-                            // optional state cookie
-                            bs_chunk.WriteBytes(2, (uint16_t)0x07);
-                            bs_chunk.WriteBytes(2, (uint16_t)8);
-                            bs_chunk.WriteBytes(4, (uint32_t)0xB00B1E5);
-                            bs_chunk.WriteBytes(2, (uint16_t)0xC000);
-                            bs_chunk.WriteBytes(2, (uint16_t)4);
-
-                            BitStream bs;
-                            bs.WriteBytes(2, dst_port);
-                            bs.WriteBytes(2, src_port);
-                            bs.WriteBytes(4, initiate_tag_);// 用initiate_tag替换verification_tag
-                            bs.WriteBytes(4, (uint32_t)0x00);
-                            bs.WriteBytes(1, (uint32_t)0x02);
-                            bs.WriteBytes(1, (uint32_t)0x00);
-                            bs.WriteBytes(2, (uint16_t)bs_chunk.SizeInBytes() + 4);
-                            bs.WriteData(bs_chunk.SizeInBytes(), bs_chunk.GetData());
-
-                            CRC32 crc32(CRC32_SCTP);
-                            //uint32_t crc_32 = crc32.GetCrc32(bs.GetData(), bs.SizeInBytes(), true);
-							uint32_t crc_32 = crc32.GetCrc32(bs.GetData(), bs.SizeInBytes());
-
-                            cout << LMSG << "crc32:" << Util::Bin2Hex((const uint8_t*)&crc_32, sizeof(crc_32)) << endl;
-
-                            cout << LMSG << "SCTP INITACK before \n" << Util::Bin2Hex(bs.GetData(), bs.SizeInBytes()) << endl;
-                            bs.ReplaceBytes(8, 4, crc_32);
-
-                            cout << LMSG << "SCTP INITACK\n" << Util::Bin2Hex(bs.GetData(), bs.SizeInBytes()) << endl;
-
-                            int ret = SSL_write(dtls_, bs.GetData(), bs.SizeInBytes());
-                            cout << LMSG << "ret:" << ret << endl;
-
-							uint8_t dtls_send_buffer[4096];
-
-  							while (BIO_ctrl_pending(bio_out_) > 0) 
-                            {
-  							    int dtls_send_bytes = BIO_read(bio_out_, dtls_send_buffer, sizeof(dtls_send_buffer));
-  							    if (dtls_send_bytes > 0) 
-                                {
-  							        cout << LMSG << "send dtls:" << dtls_send_bytes << endl;
-								    GetUdpSocket()->Send(dtls_send_buffer, dtls_send_bytes);
-  							    }   
-  							}
-                        }
-                        break;
-
-                        case 2:
-                        {
-                        }
-                        break;
-
-                        case 3:
-                        {
-                        }
-                        break;
-
-                        case 4:
-                        {
-                        }
-                        break;
-
-                        case 5:
-                        {
-                        }
-                        break;
-
-                        case 6:
-                        {
-                        }
-                        break;
-
-                        case 7:
-                        {
-                        }
-                        break;
-
-                        case 8:
-                        {
-                        }
-                        break;
-
-                        case 9:
-                        {
-                        }
-                        break;
-
-                        case 10:
-                        {
-                            cout << "SCTP COOKIE" << endl;
-
-                            BitStream bs;
-                            bs.WriteBytes(2, dst_port);
-                            bs.WriteBytes(2, src_port);
-                            bs.WriteBytes(4, initiate_tag_);// 用initiate_tag替换verification_tag
-                            bs.WriteBytes(4, (uint32_t)0x00);
-                            bs.WriteBytes(1, (uint32_t)0x0B);
-                            bs.WriteBytes(1, (uint32_t)0x00);
-                            bs.WriteBytes(2, (uint16_t)4);
-
-                            CRC32 crc32(CRC32_SCTP);
-                            uint32_t crc_32 = crc32.GetCrc32(bs.GetData(), bs.SizeInBytes());
-
-                            cout << LMSG << "crc32:" << Util::Bin2Hex((const uint8_t*)&crc_32, sizeof(crc_32)) << endl;
-
-                            cout << LMSG << "SCTP COOKIE ACK before \n" << Util::Bin2Hex(bs.GetData(), bs.SizeInBytes()) << endl;
-                            bs.ReplaceBytes(8, 4, crc_32);
-
-                            cout << LMSG << "SCTP COOKIE ACK\n" << Util::Bin2Hex(bs.GetData(), bs.SizeInBytes()) << endl;
-
-                            int ret = SSL_write(dtls_, bs.GetData(), bs.SizeInBytes());
-                            cout << LMSG << "ret:" << ret << endl;
-
-							uint8_t dtls_send_buffer[4096];
-
-  							while (BIO_ctrl_pending(bio_out_) > 0) 
-                            {
-  							    int dtls_send_bytes = BIO_read(bio_out_, dtls_send_buffer, sizeof(dtls_send_buffer));
-  							    if (dtls_send_bytes > 0) 
-                                {
-  							        cout << LMSG << "send dtls:" << dtls_send_bytes << endl;
-								    GetUdpSocket()->Send(dtls_send_buffer, dtls_send_bytes);
-  							    }   
-  							}
-                        }
-                        break;
-
-                        case 11:
-                        {
-                        }
-                        break;
-
-                        case 12:
-                        {
-                        }
-                        break;
-
-                        case 13:
-                        {
-                        }
-                        break;
-
-                        case 14:
-                        {
-                        }
-                        break;
-
-                        default:
-                        {
-                        }
-                        break;
-                    }
-                }
+                OnSctp(dtls_read_buf, ret);
             }
             else
             {
@@ -1031,6 +806,277 @@ int WebrtcProtocol::OnDtls(const uint8_t* data, const size_t& len)
     }
 
 	return 0;
+}
+
+int WebrtcProtocol::OnSctp(const uint8_t* data, const size_t& len)
+{
+    BitBuffer bit_buffer(data, len);
+
+    bit_buffer.GetBytes(2, sctp_session_.src_port);
+    bit_buffer.GetBytes(2, sctp_session_.dst_port);
+    bit_buffer.GetBytes(4, sctp_session_.verification_tag);
+    bit_buffer.GetBytes(4, sctp_session_.checksum);
+    bit_buffer.GetBytes(1, sctp_session_.chunk_type);
+    bit_buffer.GetBytes(1, sctp_session_.chunk_flag);
+    bit_buffer.GetBytes(2, sctp_session_.chunk_length);
+
+    cout << LMSG << "src_port:" << sctp_session_.src_port 
+                 << ",dst_port:" << sctp_session_.dst_port 
+                 << ",verification_tag:" << sctp_session_.verification_tag
+                 << ",checksum:" << sctp_session_.checksum 
+                 << ",chunk_type:" << (int)sctp_session_.chunk_type 
+                 << ",chunk_flag:" << (int)sctp_session_.chunk_flag
+                 << ",chunk_length:" << sctp_session_.chunk_length 
+                 << endl;
+
+    switch (sctp_session_.chunk_type)
+    {
+        case SCTP_TYPE_DATA:
+        {
+            uint32_t tsn = 0;
+            bit_buffer.GetBytes(4, tsn);
+
+            uint16_t stream_id_s = 0;
+            bit_buffer.GetBytes(2, stream_id_s);
+
+            uint16_t stream_seq_num_n = 0;
+            bit_buffer.GetBytes(2, stream_seq_num_n);
+
+            uint32_t payload_protocol_id = 0;
+            bit_buffer.GetBytes(4, payload_protocol_id);
+
+            cout << LMSG << "tsn:" << tsn
+                         << ",stream_id_s:" << stream_id_s
+                         << ",stream_seq_num_n:" << stream_seq_num_n
+                         << ",payload_protocol_id:" << payload_protocol_id
+                         << endl;
+
+            // Webrtc DataChannel parse 里层还有一层封装
+
+            switch (payload_protocol_id)
+            {
+            case DataChannelPPID_CONTROL:
+            {
+                uint8_t message_type = 0;
+                bit_buffer.GetBytes(1, message_type);
+
+                cout << LMSG << "message_type:" << (int)message_type << endl;
+
+                if (message_type == DataChannelMsgType_OPEN)
+                {
+                }
+            }
+            break;
+
+            case DataChannelPPID_STRING:
+            {
+            }
+            break;
+
+            case DataChannelPPID_BINARY:
+            {
+            }
+            break;
+
+            case DataChannelPPID_STRING_EMPTY:
+            {
+            }
+            break;
+
+            case DataChannelPPID_BINARY_EMPTY:
+            {
+            }
+            break;
+
+            default:
+            {
+            }
+            break;
+            }
+
+            string user_data = "";
+            bit_buffer.GetString(bit_buffer.BytesLeft(), user_data);
+            cout << LMSG << "recv datachannel msg:[\n" << Util::Bin2Hex(user_data) << "\n]" << endl;
+        }
+        break;
+
+        case SCTP_TYPE_INIT:
+        {
+            cout << "SCTP INIT" << endl;
+            bit_buffer.GetBytes(4, sctp_session_.initiate_tag);
+            bit_buffer.GetBytes(4, sctp_session_.a_rwnd);
+            bit_buffer.GetBytes(2, sctp_session_.number_of_outbound_streams);
+            bit_buffer.GetBytes(2, sctp_session_.number_of_inbound_streams);
+            bit_buffer.GetBytes(4, sctp_session_.initial_tsn);
+
+            cout << LMSG << "initiate_tag:" << sctp_session_.initiate_tag
+                         << ",a_rwnd:" << sctp_session_.a_rwnd 
+                         << ",number_of_outbound_streams:" << sctp_session_.number_of_outbound_streams 
+                         << ",number_of_inbound_streams:" << sctp_session_.number_of_inbound_streams 
+                         << ",initial_tsn:" << sctp_session_.initial_tsn 
+                         << endl;
+
+            // optional
+            while (bit_buffer.BitsLeft() >= 4)
+            {
+                uint16_t parameter_type = 0;
+                bit_buffer.GetBytes(2, parameter_type);
+
+                uint16_t parameter_length = 0;
+                bit_buffer.GetBytes(2, parameter_length);
+
+                string parameter_value;
+                bit_buffer.GetString(parameter_length, parameter_value);
+
+                cout << LMSG << "parameter_type:" << parameter_type << ",parameter_length:" << parameter_length << endl;
+            }
+
+            BitStream bs_chunk;
+            bs_chunk.WriteBytes(4, sctp_session_.initiate_tag);
+            bs_chunk.WriteBytes(4, sctp_session_.a_rwnd);
+            bs_chunk.WriteBytes(2, sctp_session_.number_of_inbound_streams); // 故意反过来的
+            bs_chunk.WriteBytes(2, sctp_session_.number_of_outbound_streams); // 故意反过来的
+            bs_chunk.WriteBytes(4, sctp_session_.initial_tsn);
+            // optional state cookie
+            bs_chunk.WriteBytes(2, (uint16_t)0x07);
+            bs_chunk.WriteBytes(2, (uint16_t)8);
+            bs_chunk.WriteBytes(4, (uint32_t)0xB00B1E5);
+            bs_chunk.WriteBytes(2, (uint16_t)0xC000);
+            bs_chunk.WriteBytes(2, (uint16_t)4);
+
+            BitStream bs;
+            bs.WriteBytes(2, sctp_session_.dst_port);
+            bs.WriteBytes(2, sctp_session_.src_port);
+            bs.WriteBytes(4, sctp_session_.initiate_tag);// 用initiate_tag替换verification_tag
+            bs.WriteBytes(4, (uint32_t)0x00);
+            bs.WriteBytes(1, (uint32_t)SCTP_TYPE_INIT_ACK);
+            bs.WriteBytes(1, (uint32_t)0x00);
+            bs.WriteBytes(2, (uint16_t)bs_chunk.SizeInBytes() + 4/*这个长度包括头*/);
+            bs.WriteData(bs_chunk.SizeInBytes(), bs_chunk.GetData());
+
+            CRC32 crc32(CRC32_SCTP);
+			uint32_t crc_32 = crc32.GetCrc32(bs.GetData(), bs.SizeInBytes());
+            bs.ReplaceBytes(8, 4, crc_32);
+
+            DtlsSend(bs.GetData(), bs.SizeInBytes());
+        }
+        break;
+
+        case 2:
+        {
+        }
+        break;
+
+        case 3:
+        {
+        }
+        break;
+
+        case SCTP_TYPE_HEARTBEAT:
+        {
+            uint16_t hb_info_type = 0;
+            bit_buffer.GetBytes(2, hb_info_type);
+
+            uint16_t hb_info_length = 0;
+            bit_buffer.GetBytes(2, hb_info_length);
+
+            string hb_info = "";
+            bit_buffer.GetString(bit_buffer.BytesLeft(), hb_info);
+
+            BitStream bs_chunk;
+            bs_chunk.WriteBytes(2, hb_info_type);
+            bs_chunk.WriteBytes(2, hb_info_length);
+            bs_chunk.WriteData(hb_info.size(), (const uint8_t*)hb_info.data());
+
+            BitStream bs;
+            bs.WriteBytes(2, sctp_session_.dst_port);
+            bs.WriteBytes(2, sctp_session_.src_port);
+            bs.WriteBytes(4, sctp_session_.initiate_tag);// 用initiate_tag替换verification_tag
+            bs.WriteBytes(4, (uint32_t)0x00);
+            bs.WriteBytes(1, (uint32_t)SCTP_TYPE_HEARTBEAT_ACK);
+            bs.WriteBytes(1, (uint32_t)0x00);
+            bs.WriteBytes(2, (uint16_t)bs_chunk.SizeInBytes() + 4);
+            bs.WriteData(bs_chunk.SizeInBytes(), bs_chunk.GetData());
+
+            CRC32 crc32(CRC32_SCTP);
+            uint32_t crc_32 = crc32.GetCrc32(bs.GetData(), bs.SizeInBytes());
+            bs.ReplaceBytes(8, 4, crc_32);
+            DtlsSend(bs.GetData(), bs.SizeInBytes());
+        }
+        break;
+
+        case 5:
+        {
+        }
+        break;
+
+        case 6:
+        {
+        }
+        break;
+
+        case 7:
+        {
+        }
+        break;
+
+        case 8:
+        {
+        }
+        break;
+
+        case 9:
+        {
+        }
+        break;
+
+        case SCTP_TYPE_COOKIE_ECHO:
+        {
+            cout << "SCTP_TYPE_COOKIE_ECHO" << endl;
+
+            BitStream bs;
+            bs.WriteBytes(2, sctp_session_.dst_port);
+            bs.WriteBytes(2, sctp_session_.src_port);
+            bs.WriteBytes(4, sctp_session_.initiate_tag);// 用initiate_tag替换verification_tag
+            bs.WriteBytes(4, (uint32_t)0x00);
+            bs.WriteBytes(1, (uint32_t)SCTP_TYPE_COOKIE_ACK);
+            bs.WriteBytes(1, (uint32_t)0x00);
+            bs.WriteBytes(2, (uint16_t)4);
+
+            CRC32 crc32(CRC32_SCTP);
+            uint32_t crc_32 = crc32.GetCrc32(bs.GetData(), bs.SizeInBytes());
+            bs.ReplaceBytes(8, 4, crc_32);
+            DtlsSend(bs.GetData(), bs.SizeInBytes());
+        }
+        break;
+
+        case 11:
+        {
+        }
+        break;
+
+        case 12:
+        {
+        }
+        break;
+
+        case 13:
+        {
+        }
+        break;
+
+        case 14:
+        {
+        }
+        break;
+
+        default:
+        {
+        }
+        break;
+    }
+
+    return 0;
 }
 
 int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)

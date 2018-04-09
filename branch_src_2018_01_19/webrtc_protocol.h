@@ -23,6 +23,74 @@ class UdpSocket;
 
 using std::string;
 
+enum SctpChunkType
+{
+    SCTP_TYPE_DATA = 0,
+    SCTP_TYPE_INIT = 1,
+    SCTP_TYPE_INIT_ACK = 2,
+    SCTP_TYPE_SACK = 3,
+    SCTP_TYPE_HEARTBEAT = 4,
+    SCTP_TYPE_HEARTBEAT_ACK = 5,
+    SCTP_TYPE_ABORT = 6,
+    SCTP_TYPE_SHUTDOWN = 7,
+    SCTP_TYPE_SHUTDOWN_ACK = 8,
+    SCTP_TYPE_ERROR = 9,
+    SCTP_TYPE_COOKIE_ECHO = 10,
+    SCTP_TYPE_COOKIE_ACK = 11,
+    SCTP_TYPE_ECNE = 12,
+    SCTP_TYPE_CWR = 13,
+    SCTP_TYPE_SHUTDOWN_COMPLETE = 14,
+};
+
+enum DataChannelPPID
+{
+    DataChannelPPID_CONTROL = 50,
+    DataChannelPPID_STRING = 51,
+    DataChannelPPID_BINARY = 53,
+    DataChannelPPID_STRING_EMPTY = 56,
+    DataChannelPPID_BINARY_EMPTY = 57,
+};
+
+enum DataChannelMsgType
+{
+    DataChannelMsgType_ACK = 2,
+    DataChannelMsgType_OPEN = 3,
+};
+
+struct SctpSession
+{
+    SctpSession()
+        :
+        src_port(0),
+        dst_port(0),
+        verification_tag(0),
+	    checksum(0),
+        chunk_type(0),
+        chunk_flag(0),
+        chunk_length(0),
+        initiate_tag(0),
+        a_rwnd(0),
+        number_of_outbound_streams(0),
+        number_of_inbound_streams(0),
+        initial_tsn(0)
+    {
+    }
+
+    uint16_t src_port;
+    uint16_t dst_port;
+    uint32_t verification_tag;
+	uint32_t checksum; 
+    uint8_t chunk_type;
+    uint8_t chunk_flag;
+    uint16_t chunk_length; 
+
+    uint32_t initiate_tag;
+    uint32_t a_rwnd;
+    uint16_t number_of_outbound_streams;
+    uint16_t number_of_inbound_streams;
+    uint32_t initial_tsn;
+};
+
 class WebrtcProtocol
 {
 public:
@@ -77,10 +145,13 @@ public:
         return (UdpSocket*)socket_;
     }
 
+    int DtlsSend(const uint8_t* data, const int& size);
+
 private:
     int OnStun(const uint8_t* data, const size_t& len);
     int OnDtls(const uint8_t* data, const size_t& len);
     int OnRtpRtcp(const uint8_t* data, const size_t& len);
+    int OnSctp(const uint8_t* data, const size_t& len);
 
     int Handshake();
 
@@ -125,8 +196,7 @@ private:
 
     uint64_t send_begin_time_;
 
-    // Sctp
-    uint32_t initiate_tag_;
+    SctpSession sctp_session_;
 };
 
 #endif // __WEBRTC_PROTOCOL_H__

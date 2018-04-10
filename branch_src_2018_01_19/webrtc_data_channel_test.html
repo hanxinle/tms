@@ -52,17 +52,17 @@ data_channel.onopen = function()
 data_channel.onclose = function() 
 {
   	this.open = false;
-  	console.log("data data_channel closed");
+  	console.log("data_channel closed");
 };  
 
 data_channel.onerror = function(evt) 
 {
-  	console.log("data data_channel error " + evt.message);
+  	console.log("data_channel error " + evt.message);
 };
 
 data_channel.onmessage = function(evt) 
 {
-  	console.log("data on message");
+  	console.log("data_channel on message:" + evt.data);
 };
 
 pc.onaddstream = function(event)

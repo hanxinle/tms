@@ -99,7 +99,8 @@ WebrtcProtocol::WebrtcProtocol(Epoller* epoller, Fd* socket)
     timestamp_(0),
     media_input_open_count_(0),
     media_input_read_video_frame_count(0),
-    send_begin_time_(Util::GetNowMs())
+    send_begin_time_(Util::GetNowMs()),
+    datachannel_open_(false)
 {
 }
 
@@ -833,21 +834,16 @@ int WebrtcProtocol::OnSctp(const uint8_t* data, const size_t& len)
     {
         case SCTP_TYPE_DATA:
         {
-            uint32_t tsn = 0;
-            bit_buffer.GetBytes(4, tsn);
-
-            uint16_t stream_id_s = 0;
-            bit_buffer.GetBytes(2, stream_id_s);
-
-            uint16_t stream_seq_num_n = 0;
-            bit_buffer.GetBytes(2, stream_seq_num_n);
+            bit_buffer.GetBytes(4, sctp_session_.remote_tsn);
+            bit_buffer.GetBytes(2, sctp_session_.stream_id_s);
+            bit_buffer.GetBytes(2, sctp_session_.stream_seq_num_n);
 
             uint32_t payload_protocol_id = 0;
             bit_buffer.GetBytes(4, payload_protocol_id);
 
-            cout << LMSG << "tsn:" << tsn
-                         << ",stream_id_s:" << stream_id_s
-                         << ",stream_seq_num_n:" << stream_seq_num_n
+            cout << LMSG << "tsn:" << sctp_session_.remote_tsn
+                         << ",stream_id_s:" << sctp_session_.stream_id_s
+                         << ",stream_seq_num_n:" << sctp_session_.stream_seq_num_n
                          << ",payload_protocol_id:" << payload_protocol_id
                          << endl;
 
@@ -864,12 +860,66 @@ int WebrtcProtocol::OnSctp(const uint8_t* data, const size_t& len)
 
                 if (message_type == DataChannelMsgType_OPEN)
                 {
+                    BitStream bs_chunk;
+                    bs_chunk.WriteBytes(4, sctp_session_.GetAndAddTsn());
+                    bs_chunk.WriteBytes(2, sctp_session_.stream_id_s);
+                    bs_chunk.WriteBytes(2, 0);
+                    bs_chunk.WriteBytes(4, DataChannelPPID_CONTROL);
+                    bs_chunk.WriteBytes(1, DataChannelMsgType_ACK);
+
+                    BitStream bs;
+                    bs.WriteBytes(2, sctp_session_.dst_port);
+                    bs.WriteBytes(2, sctp_session_.src_port);
+                    bs.WriteBytes(4, sctp_session_.initiate_tag);// 用initiate_tag替换verification_tag
+                    bs.WriteBytes(4, (uint32_t)0x00);
+                    bs.WriteBytes(1, (uint32_t)SCTP_TYPE_DATA);
+                    bs.WriteBytes(1, (uint32_t)0x07);
+                    bs.WriteBytes(2, (uint16_t)bs_chunk.SizeInBytes() + 4/*这个长度包括头*/);
+                    bs.WriteData(bs_chunk.SizeInBytes(), bs_chunk.GetData());
+                    bs.WriteBytes(3, (uint32_t)0x00); // padding
+
+                    CRC32 crc32(CRC32_SCTP);
+			        uint32_t crc_32 = crc32.GetCrc32(bs.GetData(), bs.SizeInBytes());
+                    bs.ReplaceBytes(8, 4, crc_32);
+
+                    // FIXME:这样会导致chrome data channel close
+                    DtlsSend(bs.GetData(), bs.SizeInBytes());
+
+                    datachannel_open_ = true;
+
+
+                    // SACK
+                    {
+                        BitStream bs_chunk;
+                        bs_chunk.WriteBytes(4, sctp_session_.remote_tsn);
+                        bs_chunk.WriteBytes(4, sctp_session_.a_rwnd);
+                        bs_chunk.WriteBytes(2, 0);
+                        bs_chunk.WriteBytes(2, 0);
+
+                        BitStream bs;
+                        bs.WriteBytes(2, sctp_session_.dst_port);
+                        bs.WriteBytes(2, sctp_session_.src_port);
+                        bs.WriteBytes(4, sctp_session_.initiate_tag);// 用initiate_tag替换verification_tag
+                        bs.WriteBytes(4, (uint32_t)0x00);
+                        bs.WriteBytes(1, (uint32_t)SCTP_TYPE_SACK);
+                        bs.WriteBytes(1, (uint32_t)0x00);
+                        bs.WriteBytes(2, (uint16_t)bs_chunk.SizeInBytes() + 4/*这个长度包括头*/);
+                        bs.WriteData(bs_chunk.SizeInBytes(), bs_chunk.GetData());
+
+                        CRC32 crc32(CRC32_SCTP);
+			            uint32_t crc_32 = crc32.GetCrc32(bs.GetData(), bs.SizeInBytes());
+                        bs.ReplaceBytes(8, 4, crc_32);
+
+                        DtlsSend(bs.GetData(), bs.SizeInBytes());
+                    }
                 }
             }
             break;
 
             case DataChannelPPID_STRING:
             {
+                string usr_data = Util::GetNowMsStr();
+                SendSctpData((const uint8_t*)usr_data.data(), usr_data.size(), DataChannelPPID_STRING);
             }
             break;
 
@@ -936,7 +986,7 @@ int WebrtcProtocol::OnSctp(const uint8_t* data, const size_t& len)
             bs_chunk.WriteBytes(4, sctp_session_.a_rwnd);
             bs_chunk.WriteBytes(2, sctp_session_.number_of_inbound_streams); // 故意反过来的
             bs_chunk.WriteBytes(2, sctp_session_.number_of_outbound_streams); // 故意反过来的
-            bs_chunk.WriteBytes(4, sctp_session_.initial_tsn);
+            bs_chunk.WriteBytes(4, sctp_session_.GetAndAddTsn());
             // optional state cookie
             bs_chunk.WriteBytes(2, (uint16_t)0x07);
             bs_chunk.WriteBytes(2, (uint16_t)8);
@@ -967,8 +1017,54 @@ int WebrtcProtocol::OnSctp(const uint8_t* data, const size_t& len)
         }
         break;
 
-        case 3:
+        case SCTP_TYPE_SACK:
         {
+            uint32_t cumulative_tsn_ack = 0;
+            bit_buffer.GetBytes(4, cumulative_tsn_ack);
+
+            uint32_t a_rwnd = 0;
+            bit_buffer.GetBytes(4, a_rwnd);
+
+            uint16_t number_of_gap_ack_blocks = 0;
+            bit_buffer.GetBytes(2, number_of_gap_ack_blocks);
+
+            uint16_t number_of_duplicate_tsn = 0;
+            bit_buffer.GetBytes(2, number_of_duplicate_tsn);
+
+            for (uint32_t i = 0; i < number_of_gap_ack_blocks; ++i)
+            {
+                uint16_t start = 0;
+                uint16_t end = 0;
+                bit_buffer.GetBytes(2, start);
+                bit_buffer.GetBytes(2, end);
+            }
+
+            for (uint32_t i = 0; i < number_of_duplicate_tsn; ++i)
+            {
+                uint32_t duplicate_tsn = 0;
+                bit_buffer.GetBytes(4, duplicate_tsn);
+            }
+
+            {
+                BitStream bs_chunk;
+                bs_chunk.WriteBytes(4, sctp_session_.local_tsn);
+
+                BitStream bs;
+                bs.WriteBytes(2, sctp_session_.dst_port);
+                bs.WriteBytes(2, sctp_session_.src_port);
+                bs.WriteBytes(4, sctp_session_.initiate_tag);// 用initiate_tag替换verification_tag
+                bs.WriteBytes(4, (uint32_t)0x00);
+                bs.WriteBytes(1, (uint32_t)SCTP_TYPE_CWR);
+                bs.WriteBytes(1, (uint32_t)0x00);
+                bs.WriteBytes(2, (uint16_t)bs_chunk.SizeInBytes() + 4/*这个长度包括头*/);
+                bs.WriteData(bs_chunk.SizeInBytes(), bs_chunk.GetData());
+
+                CRC32 crc32(CRC32_SCTP);
+			    uint32_t crc_32 = crc32.GetCrc32(bs.GetData(), bs.SizeInBytes());
+                bs.ReplaceBytes(8, 4, crc_32);
+
+                DtlsSend(bs.GetData(), bs.SizeInBytes());
+            }
         }
         break;
 
@@ -1001,6 +1097,7 @@ int WebrtcProtocol::OnSctp(const uint8_t* data, const size_t& len)
             CRC32 crc32(CRC32_SCTP);
             uint32_t crc_32 = crc32.GetCrc32(bs.GetData(), bs.SizeInBytes());
             bs.ReplaceBytes(8, 4, crc_32);
+
             DtlsSend(bs.GetData(), bs.SizeInBytes());
         }
         break;
@@ -1524,8 +1621,54 @@ void WebrtcProtocol::SetAcceptState()
     }
 }
 
+int WebrtcProtocol::SendSctpData(const uint8_t* data, const int& len, const int& type)
+{
+    if (! datachannel_open_)
+    {
+        return -1;
+    }
+
+    BitStream bs_chunk;
+    bs_chunk.WriteBytes(4, sctp_session_.GetAndAddTsn());
+    bs_chunk.WriteBytes(2, sctp_session_.stream_id_s);
+    bs_chunk.WriteBytes(2, sctp_session_.stream_seq_num_n);
+    bs_chunk.WriteBytes(4, (uint32_t)type);
+    bs_chunk.WriteData(len, data);
+
+    BitStream bs;
+    bs.WriteBytes(2, sctp_session_.dst_port);
+    bs.WriteBytes(2, sctp_session_.src_port);
+    bs.WriteBytes(4, sctp_session_.initiate_tag);// 用initiate_tag替换verification_tag
+    bs.WriteBytes(4, (uint32_t)0x00);
+    bs.WriteBytes(1, (uint32_t)SCTP_TYPE_DATA);
+    bs.WriteBytes(1, (uint32_t)0x07);
+    bs.WriteBytes(2, (uint16_t)bs_chunk.SizeInBytes() + 4/*这个长度包括头*/);
+    bs.WriteData(bs_chunk.SizeInBytes(), bs_chunk.GetData());
+
+    if (len % 4 != 0)
+    {
+        int bytes_padding = 4 - (len % 4);
+        bs.WriteBytes(bytes_padding, 0x00); // padding
+    }
+
+    CRC32 crc32(CRC32_SCTP);
+	uint32_t crc_32 = crc32.GetCrc32(bs.GetData(), bs.SizeInBytes());
+    bs.ReplaceBytes(8, 4, crc_32);
+
+    return DtlsSend(bs.GetData(), bs.SizeInBytes());
+}
+
 int WebrtcProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)
 {
+    //return 0;
+
+    cout << LMSG << "datachannel_open_:" << datachannel_open_ << endl;
+    if (datachannel_open_)
+    {
+        string usr_data = "xiaozhihong_" + Util::GetNowMsStr() + ",tsn:" + Util::Num2Str(sctp_session_.local_tsn);
+        SendSctpData((const uint8_t*)usr_data.data(), usr_data.size(), DataChannelPPID_STRING);
+    }
+
     return 0;
 }
 

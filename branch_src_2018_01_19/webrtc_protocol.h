@@ -72,8 +72,19 @@ struct SctpSession
         a_rwnd(0),
         number_of_outbound_streams(0),
         number_of_inbound_streams(0),
-        initial_tsn(0)
+        initial_tsn(0),
+        remote_tsn(0),
+        local_tsn(0),
+        stream_id_s(0),
+        stream_seq_num_n(0)
     {
+    }
+
+    uint32_t GetAndAddTsn()
+    {
+        uint32_t ret = local_tsn;
+        ++local_tsn;
+        return ret;
     }
 
     uint16_t src_port;
@@ -89,6 +100,11 @@ struct SctpSession
     uint16_t number_of_outbound_streams;
     uint16_t number_of_inbound_streams;
     uint32_t initial_tsn;
+    // data
+    uint32_t remote_tsn;
+    uint32_t local_tsn;
+    uint16_t stream_id_s;
+    uint16_t stream_seq_num_n;
 };
 
 class WebrtcProtocol
@@ -146,6 +162,7 @@ public:
     }
 
     int DtlsSend(const uint8_t* data, const int& size);
+    int SendSctpData(const uint8_t* data, const int& len, const int& type);
 
 private:
     int OnStun(const uint8_t* data, const size_t& len);
@@ -197,6 +214,7 @@ private:
     uint64_t send_begin_time_;
 
     SctpSession sctp_session_;
+    bool datachannel_open_;
 };
 
 #endif // __WEBRTC_PROTOCOL_H__

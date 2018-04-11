@@ -117,7 +117,7 @@ public:
     int EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
     int EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
 
-    void SendClientHello();
+    void SetConnectState();
     void SetAcceptState();
     void SendBindingRequest();
     void SendBindingIndication();

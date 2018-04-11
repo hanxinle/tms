@@ -10,7 +10,7 @@
         var isCaller = window.location.href.split('#')[1];
 
         // 与信令服务器的WebSocket连接
-		var socket = new WebSocket("wss://john.com:8943/publish.sdp");
+		var socket = new WebSocket("wss://hw.com:8943/publish.sdp");
 		console.log('websocket start');
 
         // 创建PeerConnection实例 (参数为null则没有iceserver，即使没有stunserver和turnserver，仍可在局域网下通讯)

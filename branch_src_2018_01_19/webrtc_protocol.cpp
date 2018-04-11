@@ -102,6 +102,15 @@ WebrtcProtocol::WebrtcProtocol(Epoller* epoller, Fd* socket)
     send_begin_time_(Util::GetNowMs()),
     datachannel_open_(false)
 {
+#if defined(USE_PUBLISH)
+    cout << LMSG << "WebRTC USE_PUBLISH" << endl;
+#elif define(USE_VP8_WEBM)
+    cout << LMSG << "WebRTC USE_VP8_WEBM" << endl;
+#elif define(USE_VP9_WEBM)
+    cout << LMSG << "WebRTC USE_VP9_WEBM" << endl;
+#elif define(USE_TRANSCODER)
+    cout << LMSG << "WebRTC USE_TRANSCODER" << endl;
+#endif
 }
 
 WebrtcProtocol::~WebrtcProtocol()
@@ -685,8 +694,8 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
                 g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SetRemoteUfrag(g_remote_ice_ufrag);
                 g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SetRemotePwd(g_remote_ice_pwd);
                 // FIXME:这里可能需要根据角色,比如客户端是上行还是下行来做SetConnectState还是SetAcceptState
-#if 0
-                g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SendClientHello();
+#if 1
+                g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SetConnectState();
 #else
                 // datachannel
                 g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SetAcceptState();
@@ -1359,7 +1368,7 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
                          << ",timestamp:" << timestamp
                          << endl;
 
-#ifdef PUBLISH_BACK
+#ifdef USE_PUBLISH
             {   
                 RtpHeader* rtp_header = (RtpHeader*)unprotect_buf;
 
@@ -1368,22 +1377,6 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
                 rtp_header->setSSRC(3233846889);
 
                 g_webrtc_mgr->__DebugBroadcast(unprotect_buf, unprotect_buf_len);
-
-                /*
-                uint8_t protect_buf[1500];
-                int protect_buf_len = unprotect_buf_len;
-                int ret = ProtectRtp(unprotect_buf, unprotect_buf_len, protect_buf, protect_buf_len);
-
-                if (ret == 0)
-                {
-                    cout << LMSG << "srtp_protect success" << endl;
-                    GetUdpSocket()->Send((const uint8_t*)protect_buf, protect_buf_len);
-                }
-                else
-                {
-                    cout << LMSG << "srtp_protect faile:" << ret << endl;
-                }
-                */
             }
 #endif
         }
@@ -1543,7 +1536,7 @@ int WebrtcProtocol::Handshake()
     return 0;
 }
 
-void WebrtcProtocol::SendClientHello()
+void WebrtcProtocol::SetConnectState()
 {
     if (! dtls_hello_send_)
     {
@@ -1551,7 +1544,7 @@ void WebrtcProtocol::SendClientHello()
 
         dtls_hello_send_ = true;
 
-#ifdef USE_MEDIA_INPUT
+#if defined(USE_VP8_WEBM) || defined(USE_VP9_WEBM)
         if (media_input_ == NULL)
         {
             media_input_ = new MediaInput();
@@ -1559,12 +1552,14 @@ void WebrtcProtocol::SendClientHello()
 
 #ifdef USE_VP8_WEBM
         media_input_->Open("input_vp8.webm");
-#else
+#elif defined USE_VP9_WEBM
         media_input_->Open("input_vp9.webm");
 #endif
+
         ++media_input_open_count_;
         media_input_read_video_frame_count = 0;
-#endif 
+
+#endif  // USE_VP8_WEBM || USE_VP9_WEBM
 
         if (dtls_ == NULL)
         {
@@ -1582,28 +1577,12 @@ void WebrtcProtocol::SendClientHello()
     }
 }
 
+// Data Channel Only
 void WebrtcProtocol::SetAcceptState()
 {
     if (! dtls_hello_send_)
     {
-        cout << LMSG << "dtls send clienthello" << endl;
-
         dtls_hello_send_ = true;
-
-#ifdef USE_MEDIA_INPUT
-        if (media_input_ == NULL)
-        {
-            media_input_ = new MediaInput();
-        }
-
-#ifdef USE_VP8_WEBM
-        media_input_->Open("input_vp8.webm");
-#else
-        media_input_->Open("input_vp9.webm");
-#endif
-        ++media_input_open_count_;
-        media_input_read_video_frame_count = 0;
-#endif 
 
         if (dtls_ == NULL)
         {
@@ -1660,8 +1639,6 @@ int WebrtcProtocol::SendSctpData(const uint8_t* data, const int& len, const int&
 
 int WebrtcProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)
 {
-    //return 0;
-
     cout << LMSG << "datachannel_open_:" << datachannel_open_ << endl;
     if (datachannel_open_)
     {
@@ -1674,11 +1651,7 @@ int WebrtcProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& inte
 
 int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)
 {
-    return 0;
-#ifdef USE_MEDIA_INPUT
-
-#ifdef PUBLISH_BACK
-
+#ifdef USE_PUBLISH
     if (dtls_handshake_done_ && count % 50 == 0)
     {
         uint32_t pli_ssrc[4][2];
@@ -1703,6 +1676,7 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
             bs_pli.WriteBytes(4, pli_ssrc[i][0]);
             bs_pli.WriteBytes(4, pli_ssrc[i][1]);
 
+            // TODO: ProtectRtcp
             GetUdpSocket()->Send(bs_pli.GetData(), bs_pli.SizeInBytes());
         }
 
@@ -1761,13 +1735,8 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
 		RtcpHeader rtcp_pli;
     	rtcp_pli.setPacketType(RTCP_PS_Feedback_PT);
     	rtcp_pli.setBlockCount(1);
-#if 0
-    	rtcp_pli.setSSRC(3233846889);
-    	rtcp_pli.setSourceSSRC(video_publisher_ssrc_);
-#else
     	rtcp_pli.setSSRC(video_publisher_ssrc_);
     	rtcp_pli.setSourceSSRC(3233846889);
-#endif
     	rtcp_pli.setLength(2);
 
     	uint8_t *buf = (uint8_t*)(&rtcp_pli);
@@ -1778,7 +1747,7 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
         cout << LMSG << "send pli " << endl;
     }
 
-#endif
+#elif defined(USE_VP8_WEBM) || defined(USE_VP9_WEBM)
 
     cout << LMSG << "count:" << count << endl;
 
@@ -1805,7 +1774,7 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
                 media_input_ = new MediaInput();
 #ifdef USE_VP8_WEBM
                 media_input_->Open("input_vp8.webm");
-#else
+#elif defined USE_VP9_WEBM
                 media_input_->Open("input_vp9.webm");
 #endif
 
@@ -1853,7 +1822,7 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
 
                 // 编码后的视频帧打包为RTP
                 RtpPacketizer* rtp_packetizer = RtpPacketizer::Create(kRtpVideoVp8, 1200, &rtp_video_head, frame_type);
-#else
+#elif defined USE_VP9_WEBM
                 RTPVideoHeaderVP9& rtp_header_vp9 = rtp_video_head.VP9;
                 rtp_header_vp9.InitRTPVideoHeaderVP9();
                 rtp_header_vp9.picture_id = ++picture_id_;
@@ -1892,7 +1861,7 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
                         rtp_header.setSeqNumber(++video_seq_);
 #ifdef USE_VP8_WEBM
                         rtp_header.setPayloadType(96);
-#else
+#elif defined USE_VP9_WEBM
                         rtp_header.setPayloadType(98);
 #endif
 
@@ -1911,6 +1880,7 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
                         int protect_buf_len = rtp_header.getHeaderLength() + rtp_packet_len;
                         memcpy(protect_buf, rtp, protect_buf_len);
 
+                        // TODO:改成统一的函数: ProtectRtp
                         int ret = srtp_protect(srtp_send_, protect_buf, &protect_buf_len);
                         if (ret == 0)
                         {
@@ -1977,10 +1947,7 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
             }
         }
     }
-
-#endif
-
-#ifdef USE_TRANSCODER
+#elif defined USE_TRANSCODER
     if (dtls_handshake_done_)
     {
         uint64_t send_delta = now_in_ms - send_begin_time_;

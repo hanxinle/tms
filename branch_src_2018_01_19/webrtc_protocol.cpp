@@ -104,11 +104,11 @@ WebrtcProtocol::WebrtcProtocol(Epoller* epoller, Fd* socket)
 {
 #if defined(USE_PUBLISH)
     cout << LMSG << "WebRTC USE_PUBLISH" << endl;
-#elif define(USE_VP8_WEBM)
+#elif defined(USE_VP8_WEBM)
     cout << LMSG << "WebRTC USE_VP8_WEBM" << endl;
-#elif define(USE_VP9_WEBM)
+#elif defined(USE_VP9_WEBM)
     cout << LMSG << "WebRTC USE_VP9_WEBM" << endl;
-#elif define(USE_TRANSCODER)
+#elif defined(USE_TRANSCODER)
     cout << LMSG << "WebRTC USE_TRANSCODER" << endl;
 #endif
 }
@@ -199,24 +199,18 @@ void WebrtcProtocol::SendVideoData(const uint8_t* data, const int& size, const u
 
             memcpy(rtp, &rtp_header, rtp_header.getHeaderLength()/*rtp head size*/);
 
-            char protect_buf[1500];
+            uint8_t protect_buf[1500];
             int protect_buf_len = rtp_header.getHeaderLength() + rtp_packet_len;
-            memcpy(protect_buf, rtp, protect_buf_len);
 
-            int ret = srtp_protect(srtp_send_, protect_buf, &protect_buf_len);
+            int ret = ProtectRtp(rtp, protect_buf_len, protect_buf, protect_buf_len);
             if (ret == 0)
             {
-                cout << LMSG << "srtp_protect success" << endl;
                 GetUdpSocket()->Send((const uint8_t*)protect_buf, protect_buf_len);
             }
             else
             {
                 cout << LMSG << "srtp_protect faile:" << ret << endl;
             }
-
-            cout << LMSG << "srtp protect_buf_len:" << protect_buf_len << endl;
-
-            //cout << LMSG << "==> packet rtp success <==" << endl;
         }   
     }   
     while (! last_packet);
@@ -244,22 +238,19 @@ void WebrtcProtocol::SendAudioData(const uint8_t* data, const int& size, const u
     memcpy(rtp, &rtp_header, 12/*rtp head size*/);
     memcpy(rtp_packet, data, size);
 
-    char protect_buf[1500];
+    uint8_t protect_buf[1500];
     int protect_buf_len = 12 + size;;
     memcpy(protect_buf, rtp, protect_buf_len);
 
-    int ret = srtp_protect(srtp_send_, protect_buf, &protect_buf_len);
+    int ret = ProtectRtp(rtp, protect_buf_len, protect_buf, protect_buf_len);
     if (ret == 0)
     {
-        cout << LMSG << "srtp_protect success" << endl;
         GetUdpSocket()->Send((const uint8_t*)protect_buf, protect_buf_len);
     }
     else
     {
         cout << LMSG << "srtp_protect faile:" << ret << endl;
     }
-
-    cout << LMSG << "srtp protect_buf_len:" << protect_buf_len << endl;
 }
 
 int WebrtcProtocol::ProtectRtp(const uint8_t* un_protect_rtp, const int& un_protect_rtp_len, uint8_t* protect_rtp, int& protect_rtp_len)
@@ -284,7 +275,7 @@ int WebrtcProtocol::ProtectRtcp(const uint8_t* un_protect_rtcp, const int& un_pr
 {
     memcpy(protect_rtcp, un_protect_rtcp, un_protect_rtcp_len);
 
-    int ret = srtp_unprotect_rtcp(srtp_send_, protect_rtcp, &protect_rtcp_len);
+    int ret = srtp_protect_rtcp(srtp_send_, protect_rtcp, &protect_rtcp_len);
 
     return ret;
 }
@@ -1654,97 +1645,118 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
 #ifdef USE_PUBLISH
     if (dtls_handshake_done_ && count % 50 == 0)
     {
-        uint32_t pli_ssrc[4][2];
-        pli_ssrc[0][0] = video_publisher_ssrc_;
-        pli_ssrc[0][1] = video_publisher_ssrc_;
-        pli_ssrc[1][0] = 3233846889;
-        pli_ssrc[1][1] = 3233846889;
-        pli_ssrc[2][0] = video_publisher_ssrc_;
-        pli_ssrc[2][1] = 3233846889;
-        pli_ssrc[3][0] = 3233846889;
-        pli_ssrc[3][1] = video_publisher_ssrc_;
-
-        for (int i = 0; i != 4; ++i)
+        // PLI当前先不用,代码留着
         {
-            BitStream bs_pli;
+            uint32_t pli_ssrc[4][2];
+            pli_ssrc[0][0] = video_publisher_ssrc_;
+            pli_ssrc[0][1] = video_publisher_ssrc_;
+            pli_ssrc[1][0] = 3233846889;
+            pli_ssrc[1][1] = 3233846889;
+            pli_ssrc[2][0] = video_publisher_ssrc_;
+            pli_ssrc[2][1] = 3233846889;
+            pli_ssrc[3][0] = 3233846889;
+            pli_ssrc[3][1] = video_publisher_ssrc_;
 
-            bs_pli.WriteBits(2, 0x02);
-            bs_pli.WriteBits(1, 0x00);
-            bs_pli.WriteBits(5, 0x01);
-            bs_pli.WriteBytes(1, 206);
-            bs_pli.WriteBytes(2, 2);
-            bs_pli.WriteBytes(4, pli_ssrc[i][0]);
-            bs_pli.WriteBytes(4, pli_ssrc[i][1]);
+            for (int i = 0; i != 4; ++i)
+            {
+                BitStream bs_pli;
 
-            // TODO: ProtectRtcp
-            GetUdpSocket()->Send(bs_pli.GetData(), bs_pli.SizeInBytes());
+                bs_pli.WriteBits(2, 0x02);
+                bs_pli.WriteBits(1, 0x00);
+                bs_pli.WriteBits(5, 0x01);
+                bs_pli.WriteBytes(1, 206);
+                bs_pli.WriteBytes(2, 2);
+                bs_pli.WriteBytes(4, pli_ssrc[i][0]);
+                bs_pli.WriteBytes(4, pli_ssrc[i][1]);
+
+                uint8_t protect_buf[1500];
+                int protect_buf_len = bs_pli.SizeInBytes();
+                int ret = ProtectRtcp(bs_pli.GetData(), bs_pli.SizeInBytes(), protect_buf, protect_buf_len);
+
+                if (ret == 0)
+                {
+                    cout << LMSG << "ProtectRtcp success" << endl;
+                    //GetUdpSocket()->Send(protect_buf, protect_buf_len);
+                }
+            }
         }
 
-        uint32_t fir_ssrc[8][3];
-        fir_ssrc[0][0] = video_publisher_ssrc_;
-        fir_ssrc[0][1] = video_publisher_ssrc_;
-        fir_ssrc[0][2] = video_publisher_ssrc_;
-
-        fir_ssrc[1][0] = video_publisher_ssrc_;
-        fir_ssrc[1][1] = video_publisher_ssrc_;
-        fir_ssrc[1][2] = 3233846889;
-
-        fir_ssrc[2][0] = video_publisher_ssrc_;
-        fir_ssrc[2][1] = 3233846889;
-        fir_ssrc[2][2] = 3233846889;
-
-        fir_ssrc[3][0] = video_publisher_ssrc_;
-        fir_ssrc[3][1] = 3233846889;
-        fir_ssrc[3][2] = video_publisher_ssrc_;
-
-        fir_ssrc[4][0] = 3233846889;
-        fir_ssrc[4][1] = 3233846889;
-        fir_ssrc[4][2] = 3233846889;
-
-        fir_ssrc[5][0] = 3233846889;
-        fir_ssrc[5][1] = 3233846889;
-        fir_ssrc[5][2] = video_publisher_ssrc_;
-
-        fir_ssrc[6][0] = 3233846889;
-        fir_ssrc[6][1] = video_publisher_ssrc_;
-        fir_ssrc[6][2] = 3233846889;
-
-        fir_ssrc[7][0] = 3233846889;
-        fir_ssrc[7][1] = video_publisher_ssrc_;
-        fir_ssrc[7][2] = video_publisher_ssrc_;
-
-        for (int i = 0; i != 8; ++i)
+        // FIR,当前生效
         {
-            BitStream bs_fir;
+            uint32_t fir_ssrc[8][3];
+            fir_ssrc[0][0] = video_publisher_ssrc_;
+            fir_ssrc[0][1] = video_publisher_ssrc_;
+            fir_ssrc[0][2] = video_publisher_ssrc_;
 
-            bs_fir.WriteBits(2, 0x02);
-            bs_fir.WriteBits(1, 0x00);
-            bs_fir.WriteBits(5, 0x04);  // FIR
-            bs_fir.WriteBytes(1, 206);
-            bs_fir.WriteBytes(2, 4);
-            bs_fir.WriteBytes(4, fir_ssrc[i][0]);
-            bs_fir.WriteBytes(4, fir_ssrc[i][1]);
-            bs_fir.WriteBytes(4, fir_ssrc[i][2]);
-            static uint8_t seq_nr = 1;
-            bs_fir.WriteBytes(1, ++seq_nr);
-            bs_fir.WriteBytes(3, 0x000000);
+            fir_ssrc[1][0] = video_publisher_ssrc_;
+            fir_ssrc[1][1] = video_publisher_ssrc_;
+            fir_ssrc[1][2] = 3233846889;
 
-            GetUdpSocket()->Send(bs_fir.GetData(), bs_fir.SizeInBytes());
+            fir_ssrc[2][0] = video_publisher_ssrc_;
+            fir_ssrc[2][1] = 3233846889;
+            fir_ssrc[2][2] = 3233846889;
+
+            fir_ssrc[3][0] = video_publisher_ssrc_;
+            fir_ssrc[3][1] = 3233846889;
+            fir_ssrc[3][2] = video_publisher_ssrc_;
+
+            fir_ssrc[4][0] = 3233846889;
+            fir_ssrc[4][1] = 3233846889;
+            fir_ssrc[4][2] = 3233846889;
+
+            fir_ssrc[5][0] = 3233846889;
+            fir_ssrc[5][1] = 3233846889;
+            fir_ssrc[5][2] = video_publisher_ssrc_;
+
+            fir_ssrc[6][0] = 3233846889;
+            fir_ssrc[6][1] = video_publisher_ssrc_;
+            fir_ssrc[6][2] = 3233846889;
+
+            fir_ssrc[7][0] = 3233846889;
+            fir_ssrc[7][1] = video_publisher_ssrc_;
+            fir_ssrc[7][2] = video_publisher_ssrc_;
+
+            // Full Intra Request,发送到PUBLISH端,让其重新编码一个IDR帧,有新观众加入时用
+            for (int i = 0; i != 8; ++i)
+            {
+                BitStream bs_fir;
+
+                bs_fir.WriteBits(2, 0x02);
+                bs_fir.WriteBits(1, 0x00);
+                bs_fir.WriteBits(5, 0x04);  // FIR
+                bs_fir.WriteBytes(1, 206);
+                bs_fir.WriteBytes(2, 4);
+                bs_fir.WriteBytes(4, fir_ssrc[i][0]);
+                bs_fir.WriteBytes(4, fir_ssrc[i][1]);
+                bs_fir.WriteBytes(4, fir_ssrc[i][2]);
+                static uint8_t seq_nr = 1;
+                bs_fir.WriteBytes(1, ++seq_nr);
+                bs_fir.WriteBytes(3, 0x000000);
+
+                uint8_t protect_buf[1500];
+                int protect_buf_len = bs_fir.SizeInBytes();
+                int ret = ProtectRtcp(bs_fir.GetData(), bs_fir.SizeInBytes(), protect_buf, protect_buf_len);
+
+                GetUdpSocket()->Send(protect_buf, protect_buf_len);
+            }
         }
 
-		RtcpHeader rtcp_pli;
-    	rtcp_pli.setPacketType(RTCP_PS_Feedback_PT);
-    	rtcp_pli.setBlockCount(1);
-    	rtcp_pli.setSSRC(video_publisher_ssrc_);
-    	rtcp_pli.setSourceSSRC(3233846889);
-    	rtcp_pli.setLength(2);
+        // PLI方法2,当前先留着
+        {
+		    RtcpHeader rtcp_pli;
+    	    rtcp_pli.setPacketType(RTCP_PS_Feedback_PT);
+    	    rtcp_pli.setBlockCount(1);
+    	    rtcp_pli.setSSRC(video_publisher_ssrc_);
+    	    rtcp_pli.setSourceSSRC(3233846889);
+    	    rtcp_pli.setLength(2);
 
-    	uint8_t *buf = (uint8_t*)(&rtcp_pli);
-    	size_t len = (rtcp_pli.getLength() + 1)*4;
+    	    uint8_t *buf = (uint8_t*)(&rtcp_pli);
+    	    size_t len = (rtcp_pli.getLength() + 1)*4;
 
-        GetUdpSocket()->Send(buf, len);
+            //GetUdpSocket()->Send(buf, len);
 
-        cout << LMSG << "send pli " << endl;
+            cout << LMSG << "send pli " << endl;
+        }
     }
 
 #elif defined(USE_VP8_WEBM) || defined(USE_VP9_WEBM)
@@ -1876,25 +1888,21 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
 
                         memcpy(rtp, &rtp_header, rtp_header.getHeaderLength()/*rtp head size*/);
 
-                        char protect_buf[1500];
+                        uint8_t protect_buf[1500];
                         int protect_buf_len = rtp_header.getHeaderLength() + rtp_packet_len;
-                        memcpy(protect_buf, rtp, protect_buf_len);
+                        int ret = ProtectRtp(rtp, protect_buf_len, protect_buf, protect_buf_len);
 
-                        // TODO:改成统一的函数: ProtectRtp
-                        int ret = srtp_protect(srtp_send_, protect_buf, &protect_buf_len);
                         if (ret == 0)
                         {
-                            cout << LMSG << "srtp_protect success" << endl;
+                            cout << "ProtectRtp success" << endl;
                             GetUdpSocket()->Send((const uint8_t*)protect_buf, protect_buf_len);
                         }
                         else
                         {
-                            cout << LMSG << "srtp_protect faile:" << ret << endl;
+                            cout << LMSG << "ProtectRtp failed:" << ret << endl;
                         }
 
                         cout << LMSG << "srtp protect_buf_len:" << protect_buf_len << endl;
-
-                        //cout << LMSG << "==> packet rtp success <==" << endl;
                     }   
                 }   
                 while (! last_packet);
@@ -1928,19 +1936,19 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
             	memcpy(rtp, &rtp_header, 12/*rtp head size*/);
             	memcpy(rtp_packet, frame_data, frame_len);
 
-                char protect_buf[1500];
+                uint8_t protect_buf[1500];
                 int protect_buf_len = 12 + frame_len;;
                 memcpy(protect_buf, rtp, protect_buf_len);
+                int ret = ProtectRtp(rtp, protect_buf_len, protect_buf, protect_buf_len);
 
-                int ret = srtp_protect(srtp_send_, protect_buf, &protect_buf_len);
                 if (ret == 0)
                 {
-                    cout << LMSG << "srtp_protect success" << endl;
+                    cout << LMSG << "ProtectRtp opus success" << endl;
                     GetUdpSocket()->Send((const uint8_t*)protect_buf, protect_buf_len);
                 }
                 else
                 {
-                    cout << LMSG << "srtp_protect faile:" << ret << endl;
+                    cout << LMSG << "ProtectRtp failed:" << ret << endl;
                 }
 
                 cout << LMSG << "srtp protect_buf_len:" << protect_buf_len << endl;

@@ -33,7 +33,6 @@ int HttpFileProtocol::Parse(IoBuffer& io_buffer)
         if (http_parse_.GetFileType() == "html")
         {
             string html = Util::ReadFile(http_parse_.GetFileName() + ".html");
-
             if (html.empty())
             {
 				HttpSender http_rsp;
@@ -48,6 +47,8 @@ int HttpFileProtocol::Parse(IoBuffer& io_buffer)
             }
             else
             {
+                Util::Replace(html, "hw.com", g_server_ip);
+
 				HttpSender http_rsp;
                 http_rsp.SetStatus("200");
                 http_rsp.SetContentType("html");

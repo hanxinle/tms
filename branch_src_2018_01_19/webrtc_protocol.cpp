@@ -1643,119 +1643,89 @@ int WebrtcProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& inte
 int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)
 {
 #ifdef USE_PUBLISH
+
+/*
+ 	 0                   1                   2                   3
+     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |V=2|P|   FMT   |       PT      |          length               |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |                  SSRC of packet sender                        |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |                  SSRC of media source                         |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    :            Feedback Control Information (FCI)                 :
+*/
     if (dtls_handshake_done_ && count % 50 == 0)
     {
-        // PLI当前先不用,代码留着
+        // PLI, 可以工作
         {
-            uint32_t pli_ssrc[4][2];
-            pli_ssrc[0][0] = video_publisher_ssrc_;
-            pli_ssrc[0][1] = video_publisher_ssrc_;
-            pli_ssrc[1][0] = 3233846889;
-            pli_ssrc[1][1] = 3233846889;
-            pli_ssrc[2][0] = video_publisher_ssrc_;
-            pli_ssrc[2][1] = 3233846889;
-            pli_ssrc[3][0] = 3233846889;
-            pli_ssrc[3][1] = video_publisher_ssrc_;
+            BitStream bs_pli;
 
-            for (int i = 0; i != 4; ++i)
+            bs_pli.WriteBits(2, 0x02);
+            bs_pli.WriteBits(1, 0x00);
+            bs_pli.WriteBits(5, 0x01);
+            bs_pli.WriteBytes(1, 206);
+            bs_pli.WriteBytes(2, 2); // PLI没有参数
+            bs_pli.WriteBytes(4, 3233846889);
+            bs_pli.WriteBytes(4, video_publisher_ssrc_);
+
+            uint8_t protect_buf[1500];
+            int protect_buf_len = bs_pli.SizeInBytes();
+            int ret = ProtectRtcp(bs_pli.GetData(), bs_pli.SizeInBytes(), protect_buf, protect_buf_len);
+
+            if (ret == 0)
             {
-                BitStream bs_pli;
-
-                bs_pli.WriteBits(2, 0x02);
-                bs_pli.WriteBits(1, 0x00);
-                bs_pli.WriteBits(5, 0x01);
-                bs_pli.WriteBytes(1, 206);
-                bs_pli.WriteBytes(2, 2);
-                bs_pli.WriteBytes(4, pli_ssrc[i][0]);
-                bs_pli.WriteBytes(4, pli_ssrc[i][1]);
-
-                uint8_t protect_buf[1500];
-                int protect_buf_len = bs_pli.SizeInBytes();
-                int ret = ProtectRtcp(bs_pli.GetData(), bs_pli.SizeInBytes(), protect_buf, protect_buf_len);
-
-                if (ret == 0)
-                {
-                    cout << LMSG << "ProtectRtcp success" << endl;
-                    //GetUdpSocket()->Send(protect_buf, protect_buf_len);
-                }
-            }
-        }
-
-        // FIR,当前生效
-        {
-            uint32_t fir_ssrc[8][3];
-            fir_ssrc[0][0] = video_publisher_ssrc_;
-            fir_ssrc[0][1] = video_publisher_ssrc_;
-            fir_ssrc[0][2] = video_publisher_ssrc_;
-
-            fir_ssrc[1][0] = video_publisher_ssrc_;
-            fir_ssrc[1][1] = video_publisher_ssrc_;
-            fir_ssrc[1][2] = 3233846889;
-
-            fir_ssrc[2][0] = video_publisher_ssrc_;
-            fir_ssrc[2][1] = 3233846889;
-            fir_ssrc[2][2] = 3233846889;
-
-            fir_ssrc[3][0] = video_publisher_ssrc_;
-            fir_ssrc[3][1] = 3233846889;
-            fir_ssrc[3][2] = video_publisher_ssrc_;
-
-            fir_ssrc[4][0] = 3233846889;
-            fir_ssrc[4][1] = 3233846889;
-            fir_ssrc[4][2] = 3233846889;
-
-            fir_ssrc[5][0] = 3233846889;
-            fir_ssrc[5][1] = 3233846889;
-            fir_ssrc[5][2] = video_publisher_ssrc_;
-
-            fir_ssrc[6][0] = 3233846889;
-            fir_ssrc[6][1] = video_publisher_ssrc_;
-            fir_ssrc[6][2] = 3233846889;
-
-            fir_ssrc[7][0] = 3233846889;
-            fir_ssrc[7][1] = video_publisher_ssrc_;
-            fir_ssrc[7][2] = video_publisher_ssrc_;
-
-            // Full Intra Request,发送到PUBLISH端,让其重新编码一个IDR帧,有新观众加入时用
-            for (int i = 0; i != 8; ++i)
-            {
-                BitStream bs_fir;
-
-                bs_fir.WriteBits(2, 0x02);
-                bs_fir.WriteBits(1, 0x00);
-                bs_fir.WriteBits(5, 0x04);  // FIR
-                bs_fir.WriteBytes(1, 206);
-                bs_fir.WriteBytes(2, 4);
-                bs_fir.WriteBytes(4, fir_ssrc[i][0]);
-                bs_fir.WriteBytes(4, fir_ssrc[i][1]);
-                bs_fir.WriteBytes(4, fir_ssrc[i][2]);
-                static uint8_t seq_nr = 1;
-                bs_fir.WriteBytes(1, ++seq_nr);
-                bs_fir.WriteBytes(3, 0x000000);
-
-                uint8_t protect_buf[1500];
-                int protect_buf_len = bs_fir.SizeInBytes();
-                int ret = ProtectRtcp(bs_fir.GetData(), bs_fir.SizeInBytes(), protect_buf, protect_buf_len);
-
+                cout << LMSG << "ProtectRtcp success" << endl;
                 GetUdpSocket()->Send(protect_buf, protect_buf_len);
             }
+
+            cout << LMSG << "PLI[" << Util::Bin2Hex(bs_pli.GetData(), bs_pli.SizeInBytes()) << "]" << endl;
         }
 
-        // PLI方法2,当前先留着
+        // FIR,当前生效,暂时不发
+        {
+            BitStream bs_fir;
+
+            bs_fir.WriteBits(2, 0x02);
+            bs_fir.WriteBits(1, 0x00);
+            bs_fir.WriteBits(5, 0x04);  // FIR
+            bs_fir.WriteBytes(1, 206);  // PSFB (206)
+            bs_fir.WriteBytes(2, 4);
+            // FIXME:暂时都用发布者的ssrc
+            bs_fir.WriteBytes(4, video_publisher_ssrc_);
+            bs_fir.WriteBytes(4, video_publisher_ssrc_);
+            bs_fir.WriteBytes(4, video_publisher_ssrc_);
+            static uint8_t seq_nr = 1;
+            bs_fir.WriteBytes(1, ++seq_nr);
+            bs_fir.WriteBytes(3, 0x000000);
+
+            uint8_t protect_buf[1500];
+            int protect_buf_len = bs_fir.SizeInBytes();
+            int ret = ProtectRtcp(bs_fir.GetData(), bs_fir.SizeInBytes(), protect_buf, protect_buf_len);
+
+            //GetUdpSocket()->Send(protect_buf, protect_buf_len);
+        }
+
+        // PLI方法2, 生效可以工作,暂时不发
         {
 		    RtcpHeader rtcp_pli;
     	    rtcp_pli.setPacketType(RTCP_PS_Feedback_PT);
     	    rtcp_pli.setBlockCount(1);
-    	    rtcp_pli.setSSRC(video_publisher_ssrc_);
-    	    rtcp_pli.setSourceSSRC(3233846889);
+    	    rtcp_pli.setSSRC(3233846889);
+    	    rtcp_pli.setSourceSSRC(video_publisher_ssrc_);
     	    rtcp_pli.setLength(2);
 
     	    uint8_t *buf = (uint8_t*)(&rtcp_pli);
     	    size_t len = (rtcp_pli.getLength() + 1)*4;
 
-            //GetUdpSocket()->Send(buf, len);
+            uint8_t protect_buf[1500];
+            int protect_buf_len = len;
+            int ret = ProtectRtcp(buf, len, protect_buf, protect_buf_len);
 
-            cout << LMSG << "send pli " << endl;
+            //GetUdpSocket()->Send(protect_buf, protect_buf_len);
+
+            cout << LMSG << "PLI[" << Util::Bin2Hex(buf, len) << "]" << endl;
         }
     }
 

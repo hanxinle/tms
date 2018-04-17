@@ -319,7 +319,7 @@ int Amf0::DecodeEcmaArray(BitBuffer& bit_buffer, Any*& result)
                 break;
             }
 
-            Any* val;
+            Any* val = NULL;
             if (Decode(type, bit_buffer, val) != 0)
             {
                 cout << LMSG << "decode key" << key << " failed" << endl;

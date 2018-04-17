@@ -47,6 +47,30 @@ static uint32_t s0_len = 1;
 static uint32_t s1_len = 4/*time*/ + 4/*zero*/ + 1528/*random*/;
 static uint32_t s2_len = 4/*time*/ + 4/*time2*/ + 1528/*random*/;
 
+static uint8_t kFlashMediaServerKey[] = 
+{
+	0x47, 0x65, 0x6e, 0x75, 0x69, 0x6e, 0x65, 0x20,
+    0x41, 0x64, 0x6f, 0x62, 0x65, 0x20, 0x46, 0x6c,
+    0x61, 0x73, 0x68, 0x20, 0x4d, 0x65, 0x64, 0x69,
+    0x61, 0x20, 0x53, 0x65, 0x72, 0x76, 0x65, 0x72,
+    0x20, 0x30, 0x30, 0x31, 0xf0, 0xee, 0xc2, 0x4a, 
+	0x80, 0x68, 0xbe, 0xe8, 0x2e, 0x00, 0xd0, 0xd1, 
+	0x02, 0x9e, 0x7e, 0x57, 0x6e, 0xec, 0x5d, 0x2d, 
+	0x29, 0x80, 0x6f, 0xab, 0x93, 0xb8, 0xe6, 0x36, 
+	0xcf, 0xeb, 0x31, 0xae
+};
+
+static uint8_t kFlashPlayerKey[] = 
+{
+   	0x47, 0x65, 0x6E, 0x75, 0x69, 0x6E, 0x65, 0x20,
+    0x41, 0x64, 0x6F, 0x62, 0x65, 0x20, 0x46, 0x6C,
+    0x61, 0x73, 0x68, 0x20, 0x50, 0x6C, 0x61, 0x79, 
+    0x65, 0x72, 0x20, 0x30, 0x30, 0x31, 0xF0, 0xEE, 
+    0xC2, 0x4A, 0x80, 0x68, 0xBE, 0xE8, 0x2E, 0x00, 
+    0xD0, 0xD1, 0x02, 0x9E, 0x7E, 0x57, 0x6E, 0xEC, 
+    0x5D, 0x2D, 0x29, 0x80, 0x6F, 0xAB, 0x93, 0xB8,
+    0xE6, 0x36, 0xCF, 0xEB, 0x31, 0xAE 
+};
 
 RtmpProtocol::RtmpProtocol(Epoller* epoller, Fd* fd)
     :
@@ -55,7 +79,7 @@ RtmpProtocol::RtmpProtocol(Epoller* epoller, Fd* fd)
     epoller_(epoller),
     socket_(fd),
     handshake_status_(kStatus_0),
-    role_(kUnknownRtmpRole),
+    role_(RtmpRole::kUnknownRtmpRole),
     in_chunk_size_(128),
     out_chunk_size_(128),
     transaction_id_(0.0),
@@ -69,9 +93,16 @@ RtmpProtocol::RtmpProtocol(Epoller* epoller, Fd* fd)
     last_audio_timestamp_delta_(0),
     last_video_message_length_(0),
     last_audio_message_length_(0),
-    last_message_type_id_(0)
+    last_message_type_id_(0),
+    dump_(false),
+    dump_fd_(-1)
 {
     cout << LMSG << endl;
+
+    if (dump_)
+    {
+        OpenDumpFile();
+    }
 }
 
 RtmpProtocol::~RtmpProtocol()
@@ -184,6 +215,18 @@ int RtmpProtocol::ParseRtmpUrl(const string& url, RtmpUrl& rtmp_url)
 
 int RtmpProtocol::Parse(IoBuffer& io_buffer)
 {
+    if (dump_)
+    {
+        int io_buffer_size = io_buffer.Size();
+        uint8_t* dump = NULL;
+        io_buffer.Peek(dump, 0, io_buffer_size);
+
+        if (dump != NULL && io_buffer_size > 0)
+        {
+            DumpRtmp(dump, io_buffer_size);
+        }
+    }
+    
     if (handshake_status_ == kStatus_Done)
     {
         bool one_message_done = false;
@@ -471,18 +514,20 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
                     bit_buffer.GetBytes(4, timestamp);
                     // send s0 + s1 + s2
 
-                    io_buffer.Read(buf, 4);
+                    uint32_t zero = 0;
+
+                    io_buffer.ReadU32(zero);
                     io_buffer.Read(buf, 1528);
 
                     // s0
-                    uint8_t version = 1;
+                    uint8_t version = 3;
                     io_buffer.WriteU8(version);
 
                     // s1
                     uint32_t server_time = Util::GetNowMs();
                     io_buffer.WriteU32(server_time);
 
-                    uint32_t zero = 0;
+                    zero = 0;
                     io_buffer.WriteU32(zero);
 
                     io_buffer.WriteFake(1528);
@@ -614,6 +659,7 @@ int RtmpProtocol::OnUserControlMessage(RtmpMessage& rtmp_msg)
 
 int RtmpProtocol::OnAudio(RtmpMessage& rtmp_msg)
 {
+    cout << LMSG << "timestamp:" << rtmp_msg.timestamp << ",timestamp_delta:" << rtmp_msg.timestamp_delta << ",timestamp_calc:" << rtmp_msg.timestamp_calc << endl;
     if (rtmp_msg.len >= 2)
     {
         BitBuffer bit_buffer(rtmp_msg.msg, 2);
@@ -820,9 +866,9 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
                         {
                             if (media_muxer_.GetForwardToggleBit())
                             {
-                                ConnectForwardRtmpServer(WS_PUSH, CDN_PORT);
-                                ConnectForwardRtmpServer(AL_PUSH, CDN_PORT);
-                                ConnectForwardRtmpServer(TX_PUSH, CDN_PORT);
+                                //ConnectForwardRtmpServer(WS_PUSH, CDN_PORT);
+                                //ConnectForwardRtmpServer(AL_PUSH, CDN_PORT);
+                                //ConnectForwardRtmpServer(TX_PUSH, CDN_PORT);
                             }
 
                             media_muxer_.OnVideo(video_payload);
@@ -999,23 +1045,12 @@ int RtmpProtocol::OnConnectCommand(AmfCommand& amf_command)
                     {
                         cout << LMSG << "tcUrl = " << tc_url_ << endl;
 
-                        size_t pos = string::npos;
+                        RtmpUrl rtmp_url;
+                        ParseRtmpUrl(tc_url_, rtmp_url);
 
-                        for (int i = 0; i != 4; ++i)
+                        if (! rtmp_url.stream.empty())
                         {
-                            pos = tc_url_.find("/", pos + 1);
-
-                            if (i == 3 && pos != string::npos)
-                            {
-                                string stream = tc_url_.substr(pos + 1);
-                                cout << LMSG << "stream:" << stream << endl;
-                                SetStreamName(stream);
-                            }
-
-                            if (pos == string::npos)
-                            {
-                                break;
-                            }
+                            SetStreamName(rtmp_url.stream);
                         }
                     }
                 }
@@ -1046,7 +1081,7 @@ int RtmpProtocol::OnConnectCommand(AmfCommand& amf_command)
 
                 if (data != NULL && len > 0)
                 {
-                    SetWindowAcknowledgementSize(0x10000000);
+                    SetWindowAcknowledgementSize(16*1024*1024);
                     SetPeerBandwidth(0x10000000, 2);
                     SendUserControlMessage(0, 0);
                     SendRtmpMessage(2, 0, kAmf0Command, data, len);
@@ -1242,14 +1277,14 @@ int RtmpProtocol::OnResultCommand(AmfCommand& amf_command)
         cout << LMSG << "pre_call " << transaction_id << " [" << pre_call << "]" << endl;
         if (pre_call == "connect")
         {
-            if (role_ == kPushServer)
+            if (role_ == RtmpRole::kPushServer)
             {
                 SendReleaseStream();
                 SendFCPublish();
                 SendCreateStream();
                 SendCheckBw();
             }
-            else if (role_ == kPullServer)
+            else if (role_ == RtmpRole::kPullServer)
             {
                 SendCreateStream();
                 cout << LMSG << "pull server" << endl;
@@ -1274,11 +1309,11 @@ int RtmpProtocol::OnResultCommand(AmfCommand& amf_command)
                 }
             }
 
-            if (role_ == kPushServer)
+            if (role_ == RtmpRole::kPushServer)
             {
                 SendPublish(stream_id);
             }
-            else if (role_ == kPullServer)
+            else if (role_ == RtmpRole::kPullServer)
             {
                 cout << LMSG << "pull server" << endl;
                 SendPlay(stream_id);
@@ -1299,11 +1334,11 @@ int RtmpProtocol::OnStatusCommand(AmfCommand& amf_command)
         {
             can_publish_ = true;
 
-            if (role_ == kPushServer)
+            if (role_ == RtmpRole::kPushServer)
             {
                 media_publisher_->AddSubscriber(this);
             }
-            else if (role_ == kClientPull)
+            else if (role_ == RtmpRole::kClientPull)
             {
                 media_publisher_->AddSubscriber(this);
             }
@@ -1359,6 +1394,12 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
 
     switch (rtmp_msg.message_type_id)
     {
+        case 0:
+        {
+            return kSuccess;
+        }
+        break;
+
         case kSetChunkSize:
         {
             return OnSetChunkSize(rtmp_msg);
@@ -1407,7 +1448,12 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
         }
         break;
 
-        case kMetaData:
+        case kMetaData_AMF3:
+        {
+            return kSuccess;
+        }
+
+        case kMetaData_AMF0:
         {
             return OnMetaData(rtmp_msg);
         }
@@ -1435,11 +1481,11 @@ int RtmpProtocol::OnStop()
         }
     }
 
-    cout << LMSG << "role:" << role_ << endl;
+    cout << LMSG << "role:" << (int)role_ << endl;
 
     csid_head_.clear();
 
-    if (role_ == kClientPush)
+    if (role_ == RtmpRole::kClientPush)
     {
         for (auto& sub : subscriber_)
         {
@@ -1448,7 +1494,7 @@ int RtmpProtocol::OnStop()
 
         g_local_stream_center.UnRegisterStream(app_, stream_, this);
     }
-    else if (role_ == kPushServer)
+    else if (role_ == RtmpRole::kPushServer)
     {
         if (media_publisher_ != NULL)
         {
@@ -1456,7 +1502,7 @@ int RtmpProtocol::OnStop()
             media_publisher_->RemoveSubscriber(this);
         }
     }
-    else if (role_ == kClientPull)
+    else if (role_ == RtmpRole::kClientPull)
     {
         if (media_publisher_ != NULL)
         {
@@ -1470,7 +1516,7 @@ int RtmpProtocol::OnStop()
 
 int RtmpProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)
 {
-    if (role_ == kClientPush || role_ == kPullServer)
+    if (role_ == RtmpRole::kClientPush || role_ == RtmpRole::kPullServer)
     {
         media_muxer_.EveryNSecond(now_in_ms, interval, count);
     }
@@ -1501,10 +1547,15 @@ int RtmpProtocol::SendRtmpMessage(const uint32_t cs_id, const uint32_t& message_
     rtmp_message.msg = (uint8_t*)data;
     rtmp_message.len = len;
 
+    if (message_type_id == kAmf0Command)
+    {
+        Payload payload;
+        return SendData(rtmp_message, payload, true);
+    }
     return SendData(rtmp_message);
 }
 
-int RtmpProtocol::SendData(const RtmpMessage& cur_info, const Payload& payload)
+int RtmpProtocol::SendData(const RtmpMessage& cur_info, const Payload& payload, const bool& force_fmt0)
 {
     const uint32_t cs_id = cur_info.cs_id;
 
@@ -1533,7 +1584,7 @@ int RtmpProtocol::SendData(const RtmpMessage& cur_info, const Payload& payload)
     int fmt = 0x0f;
 
     // new cs_id, fmt0
-    if (pre_message_length == 0)
+    if (pre_message_length == 0 || force_fmt0)
     {
         fmt = 0;
     }
@@ -1719,12 +1770,50 @@ int RtmpProtocol::SendAudioHeader(const string& header)
 
 int RtmpProtocol::SendMetaData(const string& metadata)
 {
-    SendRtmpMessage(4, 1, kMetaData, (const uint8_t*)metadata.data(), metadata.size());
+    SendRtmpMessage(4, 1, kMetaData_AMF0, (const uint8_t*)metadata.data(), metadata.size());
 
     return 0;
 }
 
-int RtmpProtocol::HandShakeStatus0()
+int RtmpProtocol::OpenDumpFile()
+{
+    if (dump_fd_ > 0)
+    {
+        return 0;
+    }
+
+    ostringstream os;
+    os << Util::GetNowStr() << "-rtmp" << this << ".dump";
+    string dump_file_name = os.str();
+    dump_fd_ = open(dump_file_name.c_str(), O_CREAT|O_TRUNC|O_RDWR, 0664);
+
+    if (dump_fd_ < 0)
+    {
+        cout << LMSG << "open " << dump_file_name << " failed" << endl;
+        return -1;
+    }
+
+    return 0;
+}
+
+int RtmpProtocol::DumpRtmp(const uint8_t* data, const int& size)
+{
+    if (dump_fd_ < 0)
+    {
+        return -1;
+    }
+
+    int nbytes = write(dump_fd_, data, size);
+
+    if (nbytes < 0)
+    {
+        cout << LMSG << "write failed" << endl;
+    }
+
+    return nbytes;
+}
+
+int RtmpProtocol::SendHandShakeStatus0()
 {
     cout << LMSG << endl;
 
@@ -1737,7 +1826,7 @@ int RtmpProtocol::HandShakeStatus0()
     return kSuccess;
 }
 
-int RtmpProtocol::HandShakeStatus1()
+int RtmpProtocol::SendHandShakeStatus1()
 {
     cout << LMSG << endl;
 
@@ -2118,8 +2207,8 @@ int RtmpProtocol::ConnectForwardRtmpServer(const string& ip, const uint16_t& por
         rtmp_forward->GetTcpSocket()->SetConnected();
         rtmp_forward->GetTcpSocket()->EnableRead();
 
-        rtmp_forward->HandShakeStatus0();
-        rtmp_forward->HandShakeStatus1();
+        rtmp_forward->SendHandShakeStatus0();
+        rtmp_forward->SendHandShakeStatus1();
     }
 
     rtmp_forward->SetMediaPublisher(this);
@@ -2181,12 +2270,12 @@ int RtmpProtocol::OnConnected()
     GetTcpSocket()->EnableRead();
     GetTcpSocket()->DisableWrite();
 
-    if (role_ == kPushServer || role_ == kPullServer_)
+    if (role_ == RtmpRole::kPushServer || role_ == RtmpRole::kPullServer)
     {
         if (handshake_status_ == kStatus_0)
         {
-            HandShakeStatus0();
-            HandShakeStatus1();
+            SendHandShakeStatus0();
+            SendHandShakeStatus1();
         }
     }
 

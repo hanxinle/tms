@@ -15,7 +15,7 @@ ServerProtocol::ServerProtocol(Epoller* epoller, Fd* socket)
     epoller_(epoller),
     socket_(socket),
     media_publisher_(NULL),
-    role_(kUnknownServerRole)
+    role_(ServerRole::kUnknownServerRole)
 {
 }
 
@@ -248,7 +248,7 @@ int ServerProtocol::OnStop()
 {
     cout << LMSG << endl;
 
-    if (role_ == kServerPush)
+    if (role_ == ServerRole::kServerPush)
     {
         g_local_stream_center.UnRegisterStream(app_, stream_, this);
     }
@@ -271,7 +271,7 @@ int ServerProtocol::OnConnected()
     GetTcpSocket()->EnableRead();
     GetTcpSocket()->DisableWrite();
 
-    if (role_ == kPushServer_)
+    if (role_ == ServerRole::kPushServer)
     {
         if (media_publisher_ != NULL)
         {
@@ -303,7 +303,7 @@ int ServerProtocol::OnConnected()
             }
         }
     }
-    else if (role_ == kPullServer_)
+    else if (role_ == ServerRole::kPullServer)
     {
         SendPullAppStream();
     }
@@ -478,7 +478,7 @@ int ServerProtocol::OnNewRtmpPlayer(RtmpProtocol* protocol)
 
     if (media_muxer_.HasMetaData())
     {
-        protocol->SendRtmpMessage(6, 1, kMetaData, (const uint8_t*)media_muxer_.GetMetaData().data(), media_muxer_.GetMetaData().size());
+        protocol->SendRtmpMessage(6, 1, kMetaData_AMF0, (const uint8_t*)media_muxer_.GetMetaData().data(), media_muxer_.GetMetaData().size());
     }
 
     if (media_muxer_.HasAudioHeader())

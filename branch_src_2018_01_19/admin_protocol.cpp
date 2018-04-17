@@ -147,8 +147,8 @@ int AdminProtocol::ProcAdminMsg(const string& admin_msg)
     			        rtmp_player->GetTcpSocket()->SetConnected();
     			        rtmp_player->GetTcpSocket()->EnableRead();
 
-    			        rtmp_player->HandShakeStatus0();
-    			        rtmp_player->HandShakeStatus1();
+    			        rtmp_player->SendHandShakeStatus0();
+    			        rtmp_player->SendHandShakeStatus1();
     			    }    
 
     			    cout << LMSG << endl;
@@ -219,8 +219,8 @@ int AdminProtocol::ProcAdminMsg(const string& admin_msg)
     			        rtmp_player->GetTcpSocket()->SetConnected();
     			        rtmp_player->GetTcpSocket()->EnableRead();
 
-    			        rtmp_player->HandShakeStatus0();
-    			        rtmp_player->HandShakeStatus1();
+    			        rtmp_player->SendHandShakeStatus0();
+    			        rtmp_player->SendHandShakeStatus1();
     			    }    
 
     			    cout << LMSG << endl;

@@ -124,7 +124,7 @@ int HttpFlvProtocol::SendMetaData(const string& metadata)
 
     flv_tag.WriteU32(pre_tag_size_);
 
-    flv_tag.WriteU8(kMetaData);
+    flv_tag.WriteU8(kMetaData_AMF0);
 
     flv_tag.WriteU24(data_size);
     flv_tag.WriteU24(0);

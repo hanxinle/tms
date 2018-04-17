@@ -48,12 +48,13 @@ enum RtmpMessageType
     kAudio        = 8,
     kVideo        = 9,
 
-    kAmf3Command = 17,
-    kMetaData    = 18,
-    kAmf0Command = 20,
+    kMetaData_AMF3 = 15,
+    kAmf3Command   = 17,
+    kMetaData_AMF0 = 18,
+    kAmf0Command   = 20,
 };
 
-enum RtmpRole
+enum class RtmpRole
 {
     // other_server --> me --> client
 
@@ -140,32 +141,32 @@ public:
 
     bool IsServerRole()
     {
-        return role_ == kClientPull || role_ == kClientPush;
+        return role_ == RtmpRole::kClientPull || role_ == RtmpRole::kClientPush;
     }
 
     bool IsClientRole()
     {
-        return role_ == kPushServer || role_ == kPullServer;
+        return role_ == RtmpRole::kPushServer || role_ == RtmpRole::kPullServer;
     }
 
     void SetClientPush()
     {
-        role_ = kClientPush;
+        role_ = RtmpRole::kClientPush;
     }
 
     void SetPushServer()
     {
-        role_ = kPushServer;
+        role_ = RtmpRole::kPushServer;
     }
 
     void SetPullServer()
     {
-        role_ = kPullServer;
+        role_ = RtmpRole::kPullServer;
     }
 
     void SetClientPull()
     {
-        role_ = kClientPull;
+        role_ = RtmpRole::kClientPull;
     }
 
     void SetRole(const RtmpRole& role)
@@ -184,8 +185,8 @@ public:
 
     int EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
 
-    int HandShakeStatus0();
-    int HandShakeStatus1();
+    int SendHandShakeStatus0();
+    int SendHandShakeStatus1();
     int SetOutChunkSize(const uint32_t& chunk_size);
     int SetWindowAcknowledgementSize(const uint32_t& ack_window_size);
     int SetPeerBandwidth(const uint32_t& ack_window_size, const uint8_t& limit_type);
@@ -244,6 +245,9 @@ public:
     virtual int SendAudioHeader(const string& header);
     virtual int SendMetaData(const string& metadata);
 
+    int OpenDumpFile();
+    int DumpRtmp(const uint8_t* data, const int& size);
+
 private:
     double GetTransactionId()
     {
@@ -285,14 +289,14 @@ private:
     virtual int OnPendingArrive();
 
     int OnRtmpMessage(RtmpMessage& rtmp_msg);
-    int SendData(const RtmpMessage& cur_info, const Payload& paylod = Payload());
+    int SendData(const RtmpMessage& cur_info, const Payload& paylod = Payload(), const bool& force_fmt0 = false);
 
 private:
     Epoller* epoller_;
     Fd* socket_;
     HandShakeStatus handshake_status_;
 
-    int role_;
+    RtmpRole role_;
 
     uint32_t in_chunk_size_;
     uint32_t out_chunk_size_;
@@ -328,6 +332,9 @@ private:
     uint32_t last_video_message_length_;
     uint32_t last_audio_message_length_;
     uint8_t last_message_type_id_;
+
+    bool dump_;
+    int dump_fd_;
 };
 
 #endif // __RTMP_PROTOCOL_H__

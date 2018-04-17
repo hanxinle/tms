@@ -28,13 +28,13 @@ class RtmpProtocol;
 class ServerMgr;
 class TcpSocket;
 
-enum kServerRole
+enum class ServerRole
 {
     kUnknownServerRole = -1,
+
     kServerPush = 0,
-    // FIXME: add namespace
-    kPushServer_ = 1,
-    kPullServer_ = 2,
+    kPushServer = 1,
+    kPullServer = 2,
 };
 
 class ServerProtocol : public MediaPublisher, public MediaSubscriber
@@ -87,17 +87,17 @@ public:
 
     void SetServerPush()
     {
-        role_ = kServerPush;
+        role_ = ServerRole::kServerPush;
     }
 
     void SetPushServer()
     {
-        role_ = kPushServer_;
+        role_ = ServerRole::kPushServer;
     }
 
     void SetPullServer()
     {
-        role_ = kPullServer_;
+        role_ = ServerRole::kPullServer;
     }
 
 private:
@@ -112,7 +112,7 @@ private:
     string app_;
     string stream_;
 
-    int role_;
+    ServerRole role_;
 };
 
 #endif // __SERVER_PROTOCOL_H__

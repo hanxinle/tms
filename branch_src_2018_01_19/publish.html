@@ -37,7 +37,11 @@
         // 获取本地音频和视频流
         navigator.webkitGetUserMedia({
             "audio": true,
-            "video": true
+            "video": { 
+                width: 1280,
+                height:720,
+                frameRate:30
+            }
         }, function(stream){
             //绑定本地媒体流到video标签用于输出
             document.getElementById('localVideo').src = URL.createObjectURL(stream);

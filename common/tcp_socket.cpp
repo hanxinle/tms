@@ -58,7 +58,7 @@ int TcpSocket::OnRead()
                 int bytes = read_buffer_.ReadFromFdAndWrite(fd_);
                 if (bytes > 0)
                 {
-                    cout << LMSG << "read " << bytes << " bytes" << endl;
+                    //cout << LMSG << "read " << bytes << " bytes" << endl;
                     if (handler_ != NULL)
                     {
                         int ret = handler_->HandleRead(read_buffer_, *this);

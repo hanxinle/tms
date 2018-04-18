@@ -179,6 +179,11 @@ public:
         media_publisher_ = media_publisher;
     }
 
+    uint32_t GetDigestOffset(const uint8_t scheme, const uint8_t* buf);
+    uint32_t GetDHOffset(const uint8_t& scheme, const uint8_t* buf);
+    bool GuessScheme(const uint8_t& scheme, const uint8_t* buf);
+
+
     int Parse(IoBuffer& io_buffer);
     int OnStop();
     int OnConnected();
@@ -267,6 +272,11 @@ private:
         return os.str();
     }
 
+    bool IsHandshakeDone()
+    {
+        return handshake_status_ == kStatus_Done;
+    }
+
     int OnConnectCommand(AmfCommand& amf_command);
     int OnCreateStreamCommand(RtmpMessage& rtmp_msg, AmfCommand& amf_command);
     int OnPlayCommand(RtmpMessage& rtmp_msg, AmfCommand& amf_command);
@@ -297,6 +307,11 @@ private:
     HandShakeStatus handshake_status_;
 
     RtmpRole role_;
+
+    // complex handshake or simple handshake
+    uint8_t version_;
+    uint8_t scheme_;
+    bool encrypted_;
 
     uint32_t in_chunk_size_;
     uint32_t out_chunk_size_;

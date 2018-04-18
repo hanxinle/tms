@@ -218,7 +218,7 @@ int IoBuffer::MakeSpaceIfNeed(const size_t& len)
 
     size_t new_capacity = max(capacity_ + len, capacity_ * 2);
 
-    cout << LMSG << "cur_capacity:" << cur_capacity << ",new_capacity:" << new_capacity << endl;
+    //cout << LMSG << "cur_capacity:" << cur_capacity << ",new_capacity:" << new_capacity << endl;
 
     buf_ = (uint8_t*)realloc(buf_, new_capacity);
 

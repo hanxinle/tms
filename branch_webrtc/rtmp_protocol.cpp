@@ -10,6 +10,7 @@
 #include "bit_stream.h"
 #include "common_define.h"
 #include "crc32.h"
+#include "dh_tool.h"
 #include "global.h"
 #include "http_flv_protocol.h"
 #include "io_buffer.h"
@@ -72,6 +73,57 @@ static uint8_t kFlashPlayerKey[] =
     0xE6, 0x36, 0xCF, 0xEB, 0x31, 0xAE 
 };
 
+static int HmacEncode(const string& algo, const uint8_t* key, const int& key_length,  
+                      const uint8_t* input, const int& input_length,  
+                      uint8_t* output, unsigned int& output_length) 
+{  
+    const EVP_MD* engine = NULL;
+
+    if (algo == "sha512") 
+    {    
+        engine = EVP_sha512();  
+    }    
+    else if(algo == "sha256") 
+    {    
+        engine = EVP_sha256();  
+    }    
+    else if(algo == "sha1") 
+    {    
+        engine = EVP_sha1();  
+    }    
+    else if(algo == "md5") 
+    {    
+        engine = EVP_md5();  
+    }    
+    else if(algo == "sha224") 
+    {    
+        engine = EVP_sha224();  
+    }    
+    else if(algo == "sha384") 
+    {    
+        engine = EVP_sha384();  
+    }    
+    else if(algo == "sha") 
+    {    
+        engine = EVP_sha();  
+    }    
+    else 
+    {    
+        cout << LMSG << "Algorithm " << algo << " is not supported by this program!" << endl;  
+        return -1;  
+    }    
+  
+    HMAC_CTX ctx;  
+    HMAC_CTX_init(&ctx);  
+    HMAC_Init_ex(&ctx, key, key_length, engine, NULL);  
+    HMAC_Update(&ctx, input, input_length);
+  
+    HMAC_Final(&ctx, output, &output_length);  
+    HMAC_CTX_cleanup(&ctx);  
+  
+    return 0;   
+}
+
 RtmpProtocol::RtmpProtocol(Epoller* epoller, Fd* fd)
     :
     MediaPublisher(),
@@ -80,6 +132,9 @@ RtmpProtocol::RtmpProtocol(Epoller* epoller, Fd* fd)
     socket_(fd),
     handshake_status_(kStatus_0),
     role_(RtmpRole::kUnknownRtmpRole),
+    version_(3),
+    scheme_(0),
+    encrypted_(false),
     in_chunk_size_(128),
     out_chunk_size_(128),
     transaction_id_(0.0),
@@ -212,9 +267,96 @@ int RtmpProtocol::ParseRtmpUrl(const string& url, RtmpUrl& rtmp_url)
     return 0;
 }
 
+uint32_t RtmpProtocol::GetDigestOffset(const uint8_t scheme, const uint8_t* buf)
+{
+    uint32_t offset = 0;
+    if (scheme == 0)
+    {
+        offset = buf[8] + buf[9] + buf[10] + buf[11];
+        offset = offset % 728;
+        offset = offset + 12;
+
+        if (offset + 32 >= 1536)
+        {
+            cout << LMSG << "invalid offset:" << offset << endl;
+        }
+    }
+    else if (scheme == 1)
+    {
+        offset = buf[772] + buf[773] + buf[774] + buf[775];
+        offset = offset % 728;
+        offset = offset + 776;
+
+        if (offset + 32 >= 1536)
+        {
+            cout << LMSG << "invalid offset:" << offset << endl;
+        }
+    }
+
+    cout << LMSG << "scheme:" << (int)scheme << ",offset:" << offset << endl;
+
+    return offset;
+}
+
+uint32_t RtmpProtocol::GetDHOffset(const uint8_t& scheme, const uint8_t* buf)
+{
+    uint32_t offset = 0;
+    if (scheme == 0)
+    {
+        offset = buf[1532] + buf[1533] + buf[1534] + buf[1535];
+        offset = offset % 632;
+        offset = offset + 772;
+
+        if (offset + 128 >= 1536)
+        {
+            cout << LMSG << "invalid offset:" << offset << endl;
+        }
+    }
+    else if (scheme == 1)
+    {
+        offset = buf[768] + buf[769] + buf[770] + buf[771];
+        offset = offset % 632;
+        offset = offset + 8;
+
+        if (offset + 128 >= 1536)
+        {
+            cout << LMSG << "invalid offset:" << offset << endl;
+        }
+    }
+
+    cout << LMSG << "scheme:" << (int)scheme << ",offset:" << offset << endl;
+
+    return offset;
+}
+
+bool RtmpProtocol::GuessScheme(const uint8_t& scheme, const uint8_t* buf)
+{
+    cout << LMSG << "s1:\n" << Util::Bin2Hex(buf, 1536) << endl;
+    cout << LMSG << "scheme:" << (int)scheme << endl;
+    uint32_t client_digest_offset = GetDigestOffset(scheme, buf);
+
+    uint8_t cal_buf[1536 - 32] = {0};
+
+    memcpy(cal_buf, buf, client_digest_offset);
+    memcpy(cal_buf + client_digest_offset, buf + client_digest_offset + 32, 1536 - client_digest_offset - 32);
+
+    cout << LMSG << "cal_buf:\n" << Util::Bin2Hex(cal_buf, 1536 - 32) << endl;
+
+    uint8_t sha256[256] = {0};
+    uint8_t* p_sha256 = sha256;
+    unsigned int sha256_out_len = 0;
+    HmacEncode("sha256", kFlashPlayerKey, 30, cal_buf, sizeof(cal_buf), p_sha256, sha256_out_len);
+
+    cout << LMSG << "sha256_out_len:" << sha256_out_len << endl;
+    cout << LMSG << Util::Bin2Hex(sha256, 32) << endl;
+    cout << LMSG << Util::Bin2Hex(buf + client_digest_offset, 32) << endl;
+
+    return memcmp(sha256, buf + client_digest_offset, 32) == 0;
+}
 
 int RtmpProtocol::Parse(IoBuffer& io_buffer)
 {
+    // FIXME: 这个dump方法是不对的,可能会重复
     if (dump_)
     {
         int io_buffer_size = io_buffer.Size();
@@ -227,7 +369,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
         }
     }
     
-    if (handshake_status_ == kStatus_Done)
+    if (IsHandshakeDone())
     {
         bool one_message_done = false;
         uint32_t cs_id = 0;
@@ -411,7 +553,6 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
         }
         else
         {
-            cout << LMSG << endl;
             return kNoEnoughData;
         }
 
@@ -421,7 +562,6 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
             rtmp_msg.cs_id = cs_id;
 
             int ret = OnRtmpMessage(rtmp_msg);
-            cout << LMSG << "ret:" << ret << ",io_buffer size:" << io_buffer.Size() << endl;
 
             free(rtmp_msg.msg);
 
@@ -487,11 +627,9 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
             {
                 if (io_buffer.Size() >= s0_len)
                 {
-                    uint8_t version;
-
-                    if (io_buffer.ReadU8(version) == 1)
+                    if (io_buffer.ReadU8(version_) == 1)
                     {
-                        cout << LMSG << "version:" << (uint16_t)version << endl;
+                        cout << LMSG << "version:" << (int)version_ << endl;
                         handshake_status_ = kStatus_1;
                         return kSuccess;
                     }
@@ -505,42 +643,128 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
             {
                 if (io_buffer.Size() >= s1_len)
                 {
-                    uint8_t* buf = NULL;
-                    io_buffer.Read(buf, 4);
+                    uint8_t* peek_buf = NULL;
+                    cout << LMSG << io_buffer.Peek(peek_buf, 0, s1_len) << endl;
 
-                    BitBuffer bit_buffer(buf, 4);
+                    if (version_ == 3)
+                    {
+                        uint8_t* buf = NULL;
+                        io_buffer.Read(buf, 4);
 
-                    uint32_t timestamp;
-                    bit_buffer.GetBytes(4, timestamp);
-                    // send s0 + s1 + s2
+                        BitBuffer bit_buffer(buf, 4);
 
-                    uint32_t zero = 0;
+                        uint32_t timestamp;
+                        bit_buffer.GetBytes(4, timestamp);
+                        // send s0 + s1 + s2
 
-                    io_buffer.ReadU32(zero);
-                    io_buffer.Read(buf, 1528);
+                        uint32_t zero = 0;
 
-                    // s0
-                    uint8_t version = 3;
-                    io_buffer.WriteU8(version);
+                        io_buffer.ReadU32(zero);
 
-                    // s1
-                    uint32_t server_time = Util::GetNowMs();
-                    io_buffer.WriteU32(server_time);
+                        if (zero == 0) // simple handshake
+                        {
+                            cout << LMSG << "simple handshake" << endl;
+                            io_buffer.Read(buf, 1528);
 
-                    zero = 0;
-                    io_buffer.WriteU32(zero);
+                            // s0
+                            io_buffer.WriteU8(version_);
 
-                    io_buffer.WriteFake(1528);
+                            // s1
+                            uint32_t server_time = Util::GetNowMs();
+                            io_buffer.WriteU32(server_time);
 
-                    // s2
-                    io_buffer.WriteU32(timestamp);
-                    io_buffer.WriteU32(server_time);
-                    io_buffer.Write(buf, 1528);
+                            zero = 0;
+                            io_buffer.WriteU32(zero);
 
-                    io_buffer.WriteToFd(socket_->GetFd());
+                            io_buffer.WriteFake(1528);
 
-                    handshake_status_ = kStatus_2;
-                    return kSuccess;
+                            // s2
+                            io_buffer.WriteU32(timestamp);
+                            io_buffer.WriteU32(server_time);
+                            io_buffer.Write(buf, 1528);
+
+                            io_buffer.WriteToFd(socket_->GetFd());
+
+                            handshake_status_ = kStatus_2;
+                            return kSuccess;
+                        }
+                        else // complex handshake
+                        {
+                            cout << LMSG << "complex handshake" << endl;
+                            bool guess_success = false;
+                            for (int i = 0; i < 2; ++i)
+                            {
+                                bool scheme_guess = GuessScheme(i, peek_buf);
+                                if (scheme_guess)
+                                {
+                                    scheme_ = i;
+                                    guess_success = true;
+                                    cout << LMSG << "use scheme " << scheme_ << endl;
+                                    break;
+                                }
+                            }
+
+                            if (! guess_success)
+                            {
+                                cout << LMSG << "scheme guess failed" << endl;
+                                return kClose;
+                            }
+
+                            // complex handshake s0 + s1 + s2 response
+                            {
+                                uint8_t s1[1536];
+                                uint8_t s2[1536];
+
+                                uint32_t server_dh_offset = GetDHOffset(scheme_, s1);
+                                uint32_t client_dh_offset = GetDHOffset(scheme_, peek_buf);
+
+                                cout << LMSG << "server_dh_offset:" << server_dh_offset << ",client_dh_offset:" << client_dh_offset << endl;
+
+                                DhTool dh_tool;
+                                dh_tool.Initialize(1024);
+                                dh_tool.CreateSharedKey(peek_buf + client_dh_offset, 128);
+                                dh_tool.CopyPublishKey(s1 + server_dh_offset, 128);
+
+                                uint32_t server_digest_offset = GetDigestOffset(scheme_, s1);
+
+                                cout << LMSG << "server_digest_offset:" << server_digest_offset << endl;
+
+                                uint8_t cal_buf[1536 - 32];
+
+                                memcpy(cal_buf, s1, server_digest_offset);
+                                memcpy(cal_buf + server_digest_offset, s1 + server_digest_offset + 32, 1536 - server_digest_offset - 32);
+
+                                uint8_t* p_sha256 = s1 + server_digest_offset;
+                                unsigned int sha256_out_len = 0;
+                                HmacEncode("sha256", kFlashMediaServerKey, 36, cal_buf, sizeof(cal_buf), p_sha256, sha256_out_len);
+
+                                cout << LMSG << "server digest\n" << Util::Bin2Hex(p_sha256, sha256_out_len) << endl;
+                                cout << LMSG << "s1\n" << Util::Bin2Hex(s1, s1_len) << endl;
+
+                                uint32_t client_digest_offset = GetDigestOffset(scheme_, peek_buf);
+                                cout << LMSG << "client_digest_offset:" <<client_digest_offset << endl;
+                                uint8_t first_hash[512] = {0};
+                                HmacEncode("sha256", kFlashMediaServerKey, 68, peek_buf + client_digest_offset, 32, first_hash, sha256_out_len);
+
+                                uint32_t second_hash[512] = {0};
+                                HmacEncode("sha256", first_hash, 32, s2, 1536 - 32, s2 + 1536 - 32, sha256_out_len);
+
+                                io_buffer.WriteU8(3);
+                                io_buffer.Write(s1, s1_len);
+                                io_buffer.Write(s2, s2_len);
+                                io_buffer.WriteToFd(socket_->GetFd());
+
+                                handshake_status_ = kStatus_2;
+                                return kSuccess;
+                            }
+
+                        }
+                    }
+                    else if (version_ == 6) 
+                    {
+                        cout << LMSG << "encrypted" << endl;
+                        encrypted_ = true;
+                    }
                 }
                 else
                 {
@@ -577,6 +801,10 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
                 }
             }
         }
+        //else
+        //{
+        //    cout << LMSG << "unknow rtmp role " << (int)role_ << endl;
+        //}
     }
 
     assert(false);
@@ -659,7 +887,7 @@ int RtmpProtocol::OnUserControlMessage(RtmpMessage& rtmp_msg)
 
 int RtmpProtocol::OnAudio(RtmpMessage& rtmp_msg)
 {
-    cout << LMSG << "timestamp:" << rtmp_msg.timestamp << ",timestamp_delta:" << rtmp_msg.timestamp_delta << ",timestamp_calc:" << rtmp_msg.timestamp_calc << endl;
+    //cout << LMSG << "timestamp:" << rtmp_msg.timestamp << ",timestamp_delta:" << rtmp_msg.timestamp_delta << ",timestamp_calc:" << rtmp_msg.timestamp_calc << endl;
     if (rtmp_msg.len >= 2)
     {
         BitBuffer bit_buffer(rtmp_msg.msg, 2);

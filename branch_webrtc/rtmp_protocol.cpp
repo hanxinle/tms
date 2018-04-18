@@ -1410,6 +1410,11 @@ int RtmpProtocol::OnPublishCommand(RtmpMessage& rtmp_msg, AmfCommand& amf_comman
             {
                 cout << LMSG << "stream:" << stream << endl;
 
+                auto args_pos = stream.find("?");
+                if (args_pos != string::npos)
+                {
+                    stream = stream.substr(0, args_pos);
+                }
                 SetStreamName(stream);
 
                 if (g_local_stream_center.RegisterStream(app_, stream_, this, true) == false)

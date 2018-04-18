@@ -345,6 +345,8 @@ int Amf0::DecodeNull(BitBuffer& bit_buffer, Any*& result)
     UNUSED(bit_buffer);
     UNUSED(result);
 
+    result = NULL;
+
     return 0;
 }
 

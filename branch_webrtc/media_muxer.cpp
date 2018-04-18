@@ -192,8 +192,8 @@ void MediaMuxer::PacketTs(const Payload& payload)
                     adaption_stuffing_bytes = 188 - (payload.GetRawLen() + ts_header_size + adaptation_size + pes_header_size + extern_data_len);
                 }
 
-                cout << LMSG << "payload size:" << payload.GetRawLen() << ", ts_header_size:" << (int)ts_header_size << ", adaptation_size:" << (int)adaptation_size
-                             << ",pes_header_size:" << (int)pes_header_size << ",extern_data_len:" << (int)extern_data_len << endl;
+                //cout << LMSG << "payload size:" << payload.GetRawLen() << ", ts_header_size:" << (int)ts_header_size << ", adaptation_size:" << (int)adaptation_size
+                             //<< ",pes_header_size:" << (int)pes_header_size << ",extern_data_len:" << (int)extern_data_len << endl;
 
                 if (! is_video)
                 {

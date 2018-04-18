@@ -83,7 +83,10 @@ public:
         {
             for (const auto& any : vec_any_)
             {
-                delete any;
+                if (any != NULL)
+                {
+                    delete any;
+                }
             }
         }
     }

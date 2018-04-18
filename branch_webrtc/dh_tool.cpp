@@ -1,6 +1,9 @@
 #include <string.h>
 
+#include <iostream>
+
 #include "dh_tool.h"
+#include "common_define.h"
 
 #define kP1024 \
     "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1" \
@@ -9,6 +12,8 @@
     "E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7ED" \
     "EE386BFB5A899FA5AE9F24117C4B1FE649286651ECE65381" \
     "FFFFFFFFFFFFFFFF"
+
+using namespace std;
 
 DhTool::DhTool()
 {
@@ -70,6 +75,7 @@ int DhTool::CreateSharedKey(uint8_t* peer_public_key, const int32_t& peer_public
 
     if (shared_key_length_ <= 0 || shared_key_length_ > 1024)
     {
+        cout << LMSG << endl;
         return -1;
     }
 
@@ -84,6 +90,7 @@ int DhTool::CreateSharedKey(uint8_t* peer_public_key, const int32_t& peer_public
 
     if (DH_compute_key(shared_key_, peer_public_key_, dh_) == -1)
     {
+        cout << LMSG << endl;
         return -1;
     }
 
@@ -102,7 +109,13 @@ int DhTool::CopyPublishKey(uint8_t* dst, const uint32_t& length)
         return -1;
     }
 
-    memcpy(dst, shared_key_, shared_key_length_);
+    int32_t key_size = BN_num_bytes(dh_->pub_key);
+
+    if (BN_bn2bin(dh_->pub_key, dst) != key_size)
+    {
+        cout << LMSG << endl;
+        return -1;
+    }
 
     return 0;
 }

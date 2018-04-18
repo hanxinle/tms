@@ -690,6 +690,8 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
                         }
                         else // complex handshake
                         {
+                            io_buffer.Skip(1528);
+
                             cout << LMSG << "complex handshake" << endl;
                             bool guess_success = false;
                             for (int i = 0; i < 2; ++i)

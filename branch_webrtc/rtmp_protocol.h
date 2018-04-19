@@ -180,7 +180,7 @@ public:
     }
 
     uint32_t GetDigestOffset(const uint8_t scheme, const uint8_t* buf);
-    uint32_t GetDHOffset(const uint8_t& scheme, const uint8_t* buf);
+    uint32_t GetKeyOffset(const uint8_t& scheme, const uint8_t* buf);
     bool GuessScheme(const uint8_t& scheme, const uint8_t* buf);
 
 
@@ -300,6 +300,8 @@ private:
 
     int OnRtmpMessage(RtmpMessage& rtmp_msg);
     int SendData(const RtmpMessage& cur_info, const Payload& paylod = Payload(), const bool& force_fmt0 = false);
+
+    void GenerateRandom(uint8_t* data, const int& len);
 
 private:
     Epoller* epoller_;

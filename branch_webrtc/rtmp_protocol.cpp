@@ -298,7 +298,7 @@ uint32_t RtmpProtocol::GetDigestOffset(const uint8_t scheme, const uint8_t* buf)
     return offset;
 }
 
-uint32_t RtmpProtocol::GetDHOffset(const uint8_t& scheme, const uint8_t* buf)
+uint32_t RtmpProtocol::GetKeyOffset(const uint8_t& scheme, const uint8_t* buf)
 {
     uint32_t offset = 0;
     if (scheme == 0)
@@ -352,6 +352,14 @@ bool RtmpProtocol::GuessScheme(const uint8_t& scheme, const uint8_t* buf)
     cout << LMSG << Util::Bin2Hex(buf + client_digest_offset, 32) << endl;
 
     return memcmp(sha256, buf + client_digest_offset, 32) == 0;
+}
+
+void RtmpProtocol::GenerateRandom(uint8_t* data, const int& len)
+{
+    for (int i = 0; i < len; ++i)
+    {
+        data[i] = (uint8_t)(random() % 256);
+    }
 }
 
 int RtmpProtocol::Parse(IoBuffer& io_buffer)
@@ -690,12 +698,14 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
                         }
                         else // complex handshake
                         {
+                            // 已经peek了,剩下的不要
                             io_buffer.Skip(1528);
 
                             cout << LMSG << "complex handshake" << endl;
                             bool guess_success = false;
                             for (int i = 0; i < 2; ++i)
                             {
+                                // 解析scheme0和scheme1,判断客户端用的是哪种格式
                                 bool scheme_guess = GuessScheme(i, peek_buf);
                                 if (scheme_guess)
                                 {
@@ -713,19 +723,56 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
                             }
 
                             // complex handshake s0 + s1 + s2 response
+                            /*
+                                c1/s1: 1536 = 4 + 4 + 764 + 764 = 1536
+                                
+                                ------------------------
+                                scheme 0
+                                ------------------------
+                                time     | 4 bytes
+                                version  | 4 bytes
+                                key      | 764 bytes
+                                digest   | 764 bytes
+                                ------------------------
+                                scheme 1
+                                ------------------------
+                                time     | 4 bytes
+                                version  | 4 bytes
+                                digest   | 764 bytes
+                                key      | 764 bytes
+                                ------------------------
+                                
+                                -------------------------------------------------
+                                key
+                                -------------------------------------------------
+                                random_data    |    offset bytes
+                                key_data       |    128 bytes
+                                random_data    |    (764-128-offset-4) bytes
+                                offset         |    4bytes
+                                -------------------------------------------------
+                                digest
+                                -------------------------------------------------
+                                offset         |    4bytes
+                                random_data    |    offset bytes
+                                digest_data    |    32 bytes
+                                random_data    |    (764-32-offset-4) bytes
+                                -------------------------------------------------
+                             */
                             {
+                                // s1 response cal
                                 uint8_t s1[1536];
-                                uint8_t s2[1536];
+                                GenerateRandom(s1, sizeof(s1));
+                                // XXX: 写入 time version
 
-                                uint32_t server_dh_offset = GetDHOffset(scheme_, s1);
-                                uint32_t client_dh_offset = GetDHOffset(scheme_, peek_buf);
+                                uint32_t server_dh_offset = GetKeyOffset(scheme_, s1);
+                                uint32_t client_dh_offset = GetKeyOffset(scheme_, peek_buf);
 
                                 cout << LMSG << "server_dh_offset:" << server_dh_offset << ",client_dh_offset:" << client_dh_offset << endl;
 
                                 DhTool dh_tool;
                                 dh_tool.Initialize(1024);
                                 dh_tool.CreateSharedKey(peek_buf + client_dh_offset, 128);
-                                dh_tool.CopyPublishKey(s1 + server_dh_offset, 128);
+                                dh_tool.CopyPublicKey(s1 + server_dh_offset, 128);
 
                                 uint32_t server_digest_offset = GetDigestOffset(scheme_, s1);
 
@@ -738,18 +785,24 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
 
                                 uint8_t* p_sha256 = s1 + server_digest_offset;
                                 unsigned int sha256_out_len = 0;
-                                HmacEncode("sha256", kFlashMediaServerKey, 36, cal_buf, sizeof(cal_buf), p_sha256, sha256_out_len);
+                                HmacEncode("sha256", kFlashMediaServerKey/*key*/, 36/*key len*/, cal_buf/*data*/, sizeof(cal_buf)/*data len*/, p_sha256, sha256_out_len);
 
                                 cout << LMSG << "server digest\n" << Util::Bin2Hex(p_sha256, sha256_out_len) << endl;
                                 cout << LMSG << "s1\n" << Util::Bin2Hex(s1, s1_len) << endl;
 
+                                // s1 response cal
                                 uint32_t client_digest_offset = GetDigestOffset(scheme_, peek_buf);
-                                cout << LMSG << "client_digest_offset:" <<client_digest_offset << endl;
-                                uint8_t first_hash[512] = {0};
-                                HmacEncode("sha256", kFlashMediaServerKey, 68, peek_buf + client_digest_offset, 32, first_hash, sha256_out_len);
+                                cout << LMSG << "client_digest_offset:" << client_digest_offset << endl;
+                                uint8_t client_digest_sha256[32] = {0};
+                                // 将客户端的digest用kFlashMediaServerKey做一次sha256
+                                HmacEncode("sha256", kFlashMediaServerKey/*key*/, 68/*key len*/, peek_buf + client_digest_offset/*data*/, 32/*data len*/, client_digest_sha256, sha256_out_len);
+
+                                uint8_t s2[1536];
+                                GenerateRandom(s2, sizeof(s2));
 
                                 uint32_t second_hash[512] = {0};
-                                HmacEncode("sha256", first_hash, 32, s2, 1536 - 32, s2 + 1536 - 32, sha256_out_len);
+                                // 将上面拿到的'客户端的digest用kFlashMediaServerKey做一次sha256'作为key,对S2前1536-32字节做一次sha256
+                                HmacEncode("sha256", client_digest_sha256/*key*/, 32/*key len*/, s2/*data*/, 1536 - 32/*data len*/, s2 + 1536 - 32, sha256_out_len);
 
                                 io_buffer.WriteU8(3);
                                 io_buffer.Write(s1, s1_len);
@@ -1157,7 +1210,7 @@ int RtmpProtocol::OnAmf0Message(RtmpMessage& rtmp_msg)
 
     AmfCommand amf_command;
     int ret = Amf0::Decode(amf,  amf_command);
-    cout << LMSG << "ret:" << ret << ", amf_command.size():" <<  amf_command.size() << endl;
+    cout << LMSG << "ret:" << ret << ", amf_command.size():" <<  amf_command.size() << ",rtmp:" << rtmp_msg.ToString() << endl;
 
     for (size_t index = 0; index != amf_command.size(); ++index)
     {
@@ -1629,12 +1682,6 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
 
     switch (rtmp_msg.message_type_id)
     {
-        case 0:
-        {
-            return kSuccess;
-        }
-        break;
-
         case kSetChunkSize:
         {
             return OnSetChunkSize(rtmp_msg);
@@ -1784,8 +1831,7 @@ int RtmpProtocol::SendRtmpMessage(const uint32_t cs_id, const uint32_t& message_
 
     if (message_type_id == kAmf0Command)
     {
-        Payload payload;
-        return SendData(rtmp_message, payload, true);
+        return SendData(rtmp_message, Payload(), true);
     }
     return SendData(rtmp_message);
 }

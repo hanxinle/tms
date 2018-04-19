@@ -29,8 +29,8 @@ const int SRTP_MASTER_KEY_SALT_LEN = 14;
 
 extern WebrtcProtocol* g_debug_webrtc;
 
-static int HmacEncode(const string& algo, const char* key, const int& key_length,  
-                	  const char* input, const int& input_length,  
+static int HmacEncode(const string& algo, const uint8_t* key, const int& key_length,  
+                	  const uint8_t* input, const int& input_length,  
                 	  uint8_t* output, unsigned int& output_length) 
 {  
     const EVP_MD* engine = NULL;
@@ -71,7 +71,7 @@ static int HmacEncode(const string& algo, const char* key, const int& key_length
   
     HMAC_CTX ctx;  
     HMAC_CTX_init(&ctx);  
-    HMAC_Init_ex(&ctx, key, strlen(key), engine, NULL);  
+    HMAC_Init_ex(&ctx, key, key_length, engine, NULL);  
     HMAC_Update(&ctx, (const unsigned char*)input, input_length);
   
     HMAC_Final(&ctx, output, &output_length);  
@@ -561,7 +561,7 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
                 hmac_input.WriteData(transcation_id.size(), (const uint8_t*)transcation_id.data());
                 hmac_input.WriteData(binding_response.SizeInBytes(), binding_response.GetData());
                 unsigned int out_len = 0;
-                HmacEncode("sha1", local_pwd_.data(), local_pwd_.size(), (const char*)hmac_input.GetData(), hmac_input.SizeInBytes(), hmac, out_len);
+                HmacEncode("sha1", (const uint8_t*)local_pwd_.data(), local_pwd_.size(), hmac_input.GetData(), hmac_input.SizeInBytes(), hmac, out_len);
 
                 cout << LMSG << "local_pwd_:" << local_pwd_ << endl;
                 cout << LMSG << "hamc out_len:" << out_len << endl;
@@ -1338,6 +1338,18 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
             }
 
             cout << LMSG << "parse vp8 success" << endl;
+
+#ifdef USE_PUBLISH
+            {   
+                RtpHeader* rtp_header = (RtpHeader*)unprotect_buf;
+
+                video_publisher_ssrc_ = ssrc;
+
+                rtp_header->setSSRC(3233846889);
+
+                g_webrtc_mgr->__DebugBroadcast(unprotect_buf, unprotect_buf_len);
+            }
+#endif
         }
         else if (payload_type == 98)
         {
@@ -1359,6 +1371,20 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
                          << ",timestamp:" << timestamp
                          << endl;
 
+#ifdef USE_PUBLISH
+            {   
+                RtpHeader* rtp_header = (RtpHeader*)unprotect_buf;
+
+                video_publisher_ssrc_ = ssrc;
+
+                rtp_header->setSSRC(3233846889);
+
+                g_webrtc_mgr->__DebugBroadcast(unprotect_buf, unprotect_buf_len);
+            }
+#endif
+        }
+        else if (payload_type == 100) // H264
+        {
 #ifdef USE_PUBLISH
             {   
                 RtpHeader* rtp_header = (RtpHeader*)unprotect_buf;
@@ -1997,7 +2023,7 @@ void WebrtcProtocol::SendBindingRequest()
         hmac_input.WriteData(transcation_id.size(), (const uint8_t*)transcation_id.data());
         hmac_input.WriteData(binding_request.SizeInBytes(), binding_request.GetData());
         unsigned int out_len = 0;
-        HmacEncode("sha1", remote_pwd_.data(), remote_pwd_.size(), (const char*)hmac_input.GetData(), hmac_input.SizeInBytes(), hmac, out_len);
+        HmacEncode("sha1", (const uint8_t*)remote_pwd_.data(), remote_pwd_.size(), hmac_input.GetData(), hmac_input.SizeInBytes(), hmac, out_len);
 
         cout << LMSG << "remote_pwd_:" << remote_pwd_ << endl;
         cout << LMSG << "hamc out_len:" << out_len << endl;
@@ -2056,7 +2082,7 @@ void WebrtcProtocol::SendBindingIndication()
         hmac_input.WriteBytes(4, magic_cookie);
         hmac_input.WriteData(transcation_id.size(), (const uint8_t*)transcation_id.data());
         unsigned int out_len = 0;
-        HmacEncode("sha1", remote_pwd_.data(), remote_pwd_.size(), (const char*)hmac_input.GetData(), hmac_input.SizeInBytes(), hmac, out_len);
+        HmacEncode("sha1", (const uint8_t*)remote_pwd_.data(), remote_pwd_.size(), hmac_input.GetData(), hmac_input.SizeInBytes(), hmac, out_len);
 
         cout << LMSG << "remote_pwd_:" << remote_pwd_ << endl;
         cout << LMSG << "hamc out_len:" << out_len << endl;

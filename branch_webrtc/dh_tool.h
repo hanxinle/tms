@@ -14,7 +14,7 @@ public:
 
     int Initialize(const uint32_t& bit_count);
     int CreateSharedKey(uint8_t* peer_public_key, const int32_t& peer_public_key_length);
-    int CopyPublishKey(uint8_t* dst, const uint32_t& length);
+    int CopyPublicKey(uint8_t* dst, const uint32_t& length);
 
 private:
     DH* dh_;

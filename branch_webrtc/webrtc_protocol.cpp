@@ -2125,3 +2125,118 @@ void WebrtcProtocol::SendBindingIndication()
 
     GetUdpSocket()->Send(binding_indication_header.GetData(), binding_indication_header.SizeInBytes());
 }
+
+void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_len, const uint32_t& dts)
+{
+	RTPVideoTypeHeader rtp_video_head;
+
+    RTPVideoHeaderH264& rtp_header_h264 = rtp_video_head.H264;
+
+    rtp_header_h264.nalu_type = frame_data[0];
+
+    //if (frame_len < 900)
+    if (true)
+    {
+        //rtp_header_h264.packetization_type = kH264SingleNalu;
+        rtp_header_h264.packetization_type = kH264StapA;
+    }
+    else
+    {
+        //rtp_header_h264.packetization_type = kH264StapA;
+        //rtp_header_h264.packetization_type = kH264FuA;
+    }
+
+    webrtc::FrameType frame_type = kVideoFrameDelta;
+
+
+    // FIXME:key frame
+
+    // 编码后的视频帧打包为RTP
+    RtpPacketizer* rtp_packetizer = RtpPacketizer::Create(kRtpVideoH264, 1200, &rtp_video_head, frame_type);
+
+    RTPFragmentationHeader fragment_header;
+    fragment_header.VerifyAndAllocateFragmentationHeader(1);
+
+    fragment_header.fragmentationOffset[0] = 0;
+    fragment_header.fragmentationLength[0] = frame_len;
+
+    cout << LMSG << "fragment_header.fragmentationVectorSize:" << fragment_header.fragmentationVectorSize << endl;
+    rtp_packetizer->SetPayloadData(frame_data, frame_len, &fragment_header);
+
+    bool last_packet = false;
+    do  
+    {   
+        uint8_t rtp[1500] = {0};
+        uint8_t* rtp_packet = rtp + 12; 
+        size_t rtp_packet_len = 0;
+        if (! rtp_packetizer->NextPacket(rtp_packet, &rtp_packet_len, &last_packet))
+        {   
+            cerr << LMSG << "packet rtp error" << endl;
+        }   
+        else
+        {   
+            RtpHeader rtp_header;
+
+            rtp_header.setSSRC(3233846889);
+            rtp_header.setMarker(last_packet ? 1 : 0); 
+            static uint32_t video_seq_ = 0;
+            rtp_header.setSeqNumber(++video_seq_);
+            rtp_header.setPayloadType(100);
+            rtp_header.setTimestamp(dts * 90);
+
+            memcpy(rtp, &rtp_header, rtp_header.getHeaderLength()/*rtp head size*/);
+
+            uint8_t protect_buf[1500];
+            int protect_buf_len = rtp_header.getHeaderLength() + rtp_packet_len;
+            int ret = ProtectRtp(rtp, protect_buf_len, protect_buf, protect_buf_len);
+
+            if (ret == 0)
+            {
+                cout << "ProtectRtp success" << endl;
+                GetUdpSocket()->Send((const uint8_t*)protect_buf, protect_buf_len);
+            }
+            else
+            {
+                cout << LMSG << "ProtectRtp failed:" << ret << endl;
+            }
+
+            cout << LMSG << "srtp protect_buf_len:" << protect_buf_len << endl;
+        }   
+    }   
+    while (! last_packet);
+
+	delete rtp_packetizer;
+
+
+    // 构造一个假的音频包过去,看看是不是音视频同步引起的问题
+    // 然而并没有任何卵用,应该是上面的264封装还是有问题
+	RtpHeader rtp_header;
+
+    uint8_t rtp[1500];
+    uint8_t* rtp_packet = rtp + 12; 
+
+    static uint32_t audio_seq_ = 0;
+
+    rtp_header.setSSRC(3233846889+1);
+    rtp_header.setSeqNumber(++audio_seq_);
+    rtp_header.setPayloadType(111);
+
+    rtp_header.setTimestamp(dts * 48);
+
+    int size = 192;
+    memcpy(rtp, &rtp_header, 12/*rtp head size*/);
+
+    uint8_t protect_buf[1500];
+    int protect_buf_len = 12 + size;;
+    memcpy(protect_buf, rtp, protect_buf_len);
+
+    int ret = ProtectRtp(rtp, protect_buf_len, protect_buf, protect_buf_len);
+    if (ret == 0)
+    {
+        GetUdpSocket()->Send((const uint8_t*)protect_buf, protect_buf_len);
+    }
+    else
+    {
+        cout << LMSG << "srtp_protect faile:" << ret << endl;
+    }
+}

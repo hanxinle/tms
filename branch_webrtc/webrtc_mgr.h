@@ -39,6 +39,7 @@ public:
     }
 
     void __DebugBroadcast(const uint8_t* data, const int& len);
+    void __DebugSendH264(const uint8_t* data, const int& len, const uint32_t& dts);
 
 public:
     WebrtcProtocol* GetOrCreateProtocol(Fd& socket);

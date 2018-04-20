@@ -47,7 +47,7 @@ int HttpFileProtocol::Parse(IoBuffer& io_buffer)
             }
             else
             {
-                Util::Replace(html, "hw.com", g_server_ip);
+                //Util::Replace(html, "hw.com", g_server_ip);
 
 				HttpSender http_rsp;
                 http_rsp.SetStatus("200");

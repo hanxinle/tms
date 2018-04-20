@@ -1082,6 +1082,9 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
                         memcpy(video_raw_data, data + cur_len, nalu_len + 4);
 
                         Payload video_payload(video_raw_data, nalu_len + 4);
+
+                        g_webrtc_mgr->__DebugSendH264(video_raw_data + 4, nalu_len, rtmp_msg.timestamp_calc);
+
                         video_payload.SetVideo();
                         video_payload.SetDts(rtmp_msg.timestamp_calc);
                         video_payload.SetPts(rtmp_msg.timestamp_calc);

@@ -164,6 +164,8 @@ public:
     int DtlsSend(const uint8_t* data, const int& size);
     int SendSctpData(const uint8_t* data, const int& len, const int& type);
 
+    void SendH264Data(const uint8_t* frame_data, const int& frame_len, const uint32_t& dts);
+
 private:
     int OnStun(const uint8_t* data, const size_t& len);
     int OnDtls(const uint8_t* data, const size_t& len);

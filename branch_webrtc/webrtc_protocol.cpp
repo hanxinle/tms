@@ -89,6 +89,8 @@ static uint32_t get_host_priority(uint16_t local_pref, bool is_rtp)
 
 WebrtcProtocol::WebrtcProtocol(Epoller* epoller, Fd* socket)
     :
+    MediaPublisher(),
+    MediaSubscriber(kWebRtc),
     epoller_(epoller),
     socket_(socket),
     dtls_hello_send_(false),
@@ -1316,6 +1318,20 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
             bit_buffer.GetBytes(4, csrc);
         }
 
+        if (extension)
+        {
+            uint16_t defined_by_profile = 0;
+            bit_buffer.GetBytes(2, defined_by_profile);
+
+            uint16_t extension_length = 0;
+            bit_buffer.GetBytes(2, extension_length);
+
+            extension_length = extension_length * 4;
+
+            string extension_payload = "";
+            bit_buffer.GetString(extension_length, extension_payload);
+        }
+
         cout << LMSG << "[RTP Header] # version:" << (int)version
                      << ",padding:" << (int)padding
                      << ",extension:" << (int)extension
@@ -1327,11 +1343,13 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
                      << ",ssrc:" << ssrc
                      << endl;
 
+        cout << LMSG << "rtp have read bytes:" << bit_buffer.HaveReadBytes() << endl;
+
         if (payload_type == 96)
         {
             RtpDepacketizer::ParsedPayload parsed_payload;
 
-            if (! vp8_depacket_.Parse(&parsed_payload, unprotect_buf + 12, unprotect_buf_len - 12))
+            if (! vp8_depacket_.Parse(&parsed_payload, unprotect_buf + bit_buffer.HaveReadBytes(), unprotect_buf_len - bit_buffer.HaveReadBytes()))
             {
                 cout << LMSG << "parse vp8 failed" << endl;
                 return kError;
@@ -1396,6 +1414,24 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
                 g_webrtc_mgr->__DebugBroadcast(unprotect_buf, unprotect_buf_len);
             }
 #endif
+
+            cout << LMSG << "h264 dump:\n" << Util::Bin2Hex(unprotect_buf, unprotect_buf_len) << endl;
+
+            RtpDepacketizer::ParsedPayload parsed_payload;
+            if (! h264_depacket_.Parse(&parsed_payload, unprotect_buf + bit_buffer.HaveReadBytes(), unprotect_buf_len - bit_buffer.HaveReadBytes()))
+            {
+                cout << LMSG << "parse h264 failed" << endl;
+                return kError;
+            }
+
+            cout << LMSG << "payload_length:" << parsed_payload.payload_length
+                         << ",frame_type:" << parsed_payload.frame_type
+                         << ",payload_length:" << parsed_payload.payload_length
+                         << ",frame_type:" << parsed_payload.frame_type
+                         << ",nalu_type:" << (int)parsed_payload.type.Video.codecHeader.H264.nalu_type
+                         << ",packetization_type:" << parsed_payload.type.Video.codecHeader.H264.packetization_type
+                         << ",dump:\n" << Util::Bin2Hex(parsed_payload.payload, parsed_payload.payload_length > 32 ? 32 : parsed_payload.payload_length)
+                         << endl;
         }
         else if (payload_type == 111)
         {

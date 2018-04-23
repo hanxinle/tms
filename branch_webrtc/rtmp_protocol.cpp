@@ -1685,6 +1685,13 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
 
     switch (rtmp_msg.message_type_id)
     {
+        // FIXME:
+        case 0:
+        {
+            return kSuccess;
+        }
+        break;
+
         case kSetChunkSize:
         {
             return OnSetChunkSize(rtmp_msg);

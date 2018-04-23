@@ -10,10 +10,13 @@
 
 #include "bit_buffer.h"
 #include "media_input.h"
+#include "media_publisher.h"
+#include "media_subscriber.h"
 #include "ref_ptr.h"
 
 #include "webrtc/modules/rtp_rtcp/source/rtp_format_vp8.h"
 #include "webrtc/modules/rtp_rtcp/source/rtp_format_vp9.h"
+#include "webrtc/modules/rtp_rtcp/source/rtp_format_h264.h"
 
 class Epoller;
 class Fd;
@@ -107,7 +110,7 @@ struct SctpSession
     uint16_t stream_seq_num_n;
 };
 
-class WebrtcProtocol
+class WebrtcProtocol : public MediaPublisher, public MediaSubscriber
 {
 public:
     WebrtcProtocol(Epoller* epoller, Fd* socket);
@@ -209,6 +212,7 @@ private:
 
     webrtc::RtpDepacketizerVp8 vp8_depacket_;
     webrtc::RtpDepacketizerVp9 vp9_depacket_;
+    webrtc::RtpDepacketizerH264 h264_depacket_;
 
     uint32_t video_publisher_ssrc_;
     uint32_t audio_publisher_ssrc_;

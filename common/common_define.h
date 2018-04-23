@@ -70,6 +70,7 @@ enum SubscriberType
     kHttpFlv = 1,
     kHttpHls = 2,
     kTcpServer = 3,
+    kWebRtc = 4,
 };
 
 enum ServerProtocolDefine

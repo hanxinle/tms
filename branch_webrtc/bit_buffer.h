@@ -97,6 +97,11 @@ public:
 
     int PeekBits(const size_t& bits, uint64_t& result);
 
+    size_t HaveReadBytes()
+    {
+        return cur_pos_ / 8;
+    }
+
 private:
     const uint8_t* data_;
     size_t bit_len_;

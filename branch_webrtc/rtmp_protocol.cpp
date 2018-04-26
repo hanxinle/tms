@@ -1083,7 +1083,12 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
 
                         Payload video_payload(video_raw_data, nalu_len + 4);
 
-                        g_webrtc_mgr->__DebugSendH264(video_raw_data + 4, nalu_len, rtmp_msg.timestamp_calc);
+                        cout << LMSG << "nalu_unit_type:" << (int)nalu_unit_type << endl;
+                        // SEI不能传给webrtc,不然会导致只能解码关键帧,其他帧都无法解码
+                        if (nalu_unit_type != 6)
+                        {
+                            g_webrtc_mgr->__DebugSendH264(video_raw_data + 4, nalu_len, rtmp_msg.timestamp_calc);
+                        }
 
                         video_payload.SetVideo();
                         video_payload.SetDts(rtmp_msg.timestamp_calc);

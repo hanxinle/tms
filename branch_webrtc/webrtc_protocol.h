@@ -110,6 +110,43 @@ struct SctpSession
     uint16_t stream_seq_num_n;
 };
 
+enum class MediaSliceCodecType
+{
+    kUnknown = -1,
+    kVp8 = 0,
+    kVp9 = 1,
+    kH264 = 2,
+};
+
+enum class MediaSliceFrameType
+{
+    kUnknown = -1,
+    kKeyFrame= 0,
+    kOtherFrame = 1,
+};
+
+struct MediaSlice
+{
+    MediaSlice()
+        :
+        codec_type(MediaSliceCodecType::kUnknown),
+        frame_type(MediaSliceFrameType::kUnknown),
+        seq_number(-1),
+        picture_id(-1),
+        timestamp(-1),
+        payload_length(0)
+    {
+    }
+
+    MediaSliceCodecType     codec_type;
+    MediaSliceFrameType     frame_type;
+    int64_t                 seq_number;
+    int64_t                 picture_id;
+    int64_t                 timestamp;
+    uint8_t                 payload[1500];
+    int                     payload_length;
+};
+
 class WebrtcProtocol : public MediaPublisher, public MediaSubscriber
 {
 public:
@@ -221,6 +258,8 @@ private:
 
     SctpSession sctp_session_;
     bool datachannel_open_;
+
+    map<uint32_t, MediaSlice> media_slice_map_;
 };
 
 #endif // __WEBRTC_PROTOCOL_H__

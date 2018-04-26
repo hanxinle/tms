@@ -1429,9 +1429,35 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
                          << ",payload_length:" << parsed_payload.payload_length
                          << ",frame_type:" << parsed_payload.frame_type
                          << ",nalu_type:" << (int)parsed_payload.type.Video.codecHeader.H264.nalu_type
+                         << ",isFirstPacket:" << parsed_payload.type.Video.isFirstPacket
                          << ",packetization_type:" << parsed_payload.type.Video.codecHeader.H264.packetization_type
                          << ",dump:\n" << Util::Bin2Hex(parsed_payload.payload, parsed_payload.payload_length > 32 ? 32 : parsed_payload.payload_length)
                          << endl;
+
+            MediaSlice media_slice;
+
+            media_slice.codec_type = MediaSliceCodecType::kH264;
+            media_slice.frame_type = MediaSliceFrameType::kOtherFrame;
+            if (parsed_payload.frame_type == kVideoFrameKey)
+            {
+                media_slice.frame_type = MediaSliceFrameType::kKeyFrame;
+            }
+
+            media_slice.payload_length = parsed_payload.payload_length;
+            memcpy(media_slice.payload, parsed_payload.payload, media_slice.payload_length);
+            media_slice.seq_number = sequence_number;
+            media_slice.timestamp = timestamp;
+
+            auto iter = media_slice_map_.insert(make_pair(sequence_number, media_slice));
+            if (iter.second == false)
+            {
+                cout << LMSG << "duplicate:" << sequence_number << endl;
+            }
+
+            if (media_slice_map_.size() >= 3000)
+            {
+                media_slice_map_.erase(media_slice_map_.begin());
+            }
         }
         else if (payload_type == 111)
         {
@@ -2168,6 +2194,7 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
 
     RTPVideoHeaderH264& rtp_header_h264 = rtp_video_head.H264;
 
+#if 0
     rtp_header_h264.nalu_type = frame_data[0];
 
     //if (frame_len < 900)
@@ -2182,13 +2209,14 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
         //rtp_header_h264.packetization_type = kH264FuA;
     }
 
+#endif
     webrtc::FrameType frame_type = kVideoFrameDelta;
 
 
     // FIXME:key frame
 
     // 编码后的视频帧打包为RTP
-    RtpPacketizer* rtp_packetizer = RtpPacketizer::Create(kRtpVideoH264, 1200, &rtp_video_head, frame_type);
+    RtpPacketizer* rtp_packetizer = RtpPacketizer::Create(kRtpVideoH264, 900, &rtp_video_head, frame_type);
 
     RTPFragmentationHeader fragment_header;
     fragment_header.VerifyAndAllocateFragmentationHeader(1);
@@ -2211,6 +2239,30 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
         }   
         else
         {   
+            // DEUBG
+            // XXX:目前发现RTP.264发送给对端,只有关键帧才能解码
+            {
+                uint8_t debug[1500];
+                memcpy(debug, rtp_packet, rtp_packet_len);
+                RtpDepacketizer::ParsedPayload parsed_payload;
+                if (! h264_depacket_.Parse(&parsed_payload, debug, rtp_packet_len))
+                {
+                    cout << LMSG << "parse h264 failed" << endl;
+                }
+                else
+                {
+                    cout << LMSG << "payload_length:" << parsed_payload.payload_length
+                                 << ",frame_type:" << parsed_payload.frame_type
+                                 << ",payload_length:" << parsed_payload.payload_length
+                                 << ",frame_type:" << parsed_payload.frame_type
+                                 << ",isFirstPacket:" << parsed_payload.type.Video.isFirstPacket
+                                 << ",nalu_type:" << (int)parsed_payload.type.Video.codecHeader.H264.nalu_type
+                                 << ",packetization_type:" << parsed_payload.type.Video.codecHeader.H264.packetization_type
+                                 << ",dump:\n" << Util::Bin2Hex(parsed_payload.payload, parsed_payload.payload_length > 32 ? 32 : parsed_payload.payload_length)
+                                 << endl;
+                }
+            }
+
             RtpHeader rtp_header;
 
             rtp_header.setSSRC(3233846889);

@@ -1185,7 +1185,7 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
         return kNoEnoughData;
     }
 
-    cout << LMSG << "Rtp Header Peek:" << Util::Bin2Hex(data, 12) << endl;
+    cout << LMSG << "Rtp Header Peek:" << Util::Bin2Hex(data, len) << endl;
 
 
     uint8_t unprotect_buf[4096] = {0};
@@ -1194,7 +1194,7 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
 
     cout << LMSG << "type:" << (int)data[1] << endl;
 
-    if (data[1] == 200 || data[1] == 201 || data[1] == 202 || data[1] == 203 || data[1] == 204)
+    if (data[1] == 200 || data[1] == 201 || data[1] == 202 || data[1] == 203 || data[1] == 204 || data[1] == 205 || data[1] == 206)
     {
         int ret = srtp_unprotect_rtcp(srtp_recv_, unprotect_buf, &unprotect_buf_len);
         if (ret == 0)
@@ -1268,6 +1268,23 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
                              << ",delay_since_last_SR:" << delay_since_last_SR
                              << endl;
             }
+        }
+        else if (packet_type == 205)
+        {
+            cout << LMSG << "RTPFB" << endl;
+        }
+        else if (packet_type == 206)
+        {
+            cout << LMSG << "PSFB" << endl;
+        }
+
+        if (bit_buffer.BytesLeft() >0)
+        {
+            string left = "";
+            bit_buffer.GetString(bit_buffer.BytesLeft(), left);
+            uint8_t type = (uint8_t)left[1];
+            uint8_t fmt = ((uint8_t)left[0]) & 0x1f;
+            cout << LMSG << "rtcp left, type:" << (int)type << ",fmt:" << (int)fmt << "[" << Util::Bin2Hex(left) << endl;
         }
     }
     else

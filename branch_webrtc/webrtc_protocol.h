@@ -60,6 +60,17 @@ enum DataChannelMsgType
     DataChannelMsgType_OPEN = 3,
 };
 
+enum RtcpPayloadType
+{
+    kSenderReport = 200,
+    kReceiverReport = 201,
+    kSourceDescription = 202,
+    kBye = 203,
+    kApp = 204,
+    kRtpFeedback = 205,
+    kPayloadSpecialFeedback = 206,
+};
+
 struct SctpSession
 {
     SctpSession()

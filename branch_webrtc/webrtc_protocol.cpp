@@ -29,6 +29,8 @@ const int SRTP_MASTER_KEY_SALT_LEN = 14;
 
 extern WebrtcProtocol* g_debug_webrtc;
 
+static uint32_t video_seq_ = 0;
+
 static int HmacEncode(const string& algo, const uint8_t* key, const int& key_length,  
                 	  const uint8_t* input, const int& input_length,  
                 	  uint8_t* output, unsigned int& output_length) 
@@ -194,7 +196,6 @@ void WebrtcProtocol::SendVideoData(const uint8_t* data, const int& size, const u
 
             rtp_header.setSSRC(3233846889);
             rtp_header.setMarker(last_packet ? 1 : 0); 
-            static uint32_t video_seq_ = 0;
             rtp_header.setSeqNumber(++video_seq_);
             rtp_header.setPayloadType(96);
             rtp_header.setTimestamp((uint32_t)(timestamp) * 90);
@@ -1185,106 +1186,203 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
         return kNoEnoughData;
     }
 
-    cout << LMSG << "Rtp Header Peek:" << Util::Bin2Hex(data, len) << endl;
-
-
     uint8_t unprotect_buf[4096] = {0};
     int unprotect_buf_len = len;
     memcpy(unprotect_buf, data, len);
 
-    cout << LMSG << "type:" << (int)data[1] << endl;
+    uint8_t payload_type = data[1];
 
-    if (data[1] == 200 || data[1] == 201 || data[1] == 202 || data[1] == 203 || data[1] == 204 || data[1] == 205 || data[1] == 206)
+    if (payload_type >= 200 && payload_type <= 206)
     {
         int ret = srtp_unprotect_rtcp(srtp_recv_, unprotect_buf, &unprotect_buf_len);
-        if (ret == 0)
+        if (ret != 0)
         {
-            cout << LMSG << "srtp_unprotect_rtcp success" << endl;
-        }
-        else
-        {
-            cout << LMSG << "srtp_unprotect_rtcp ret:" << ret << endl;
+            cout << LMSG << "srtp_unprotect_rtcp failed, ret:" << ret << endl;
+            return kError;
         }
 
-        BitBuffer bit_buffer(unprotect_buf, unprotect_buf_len);
+        cout << LMSG << "Rtcp Header Peek:" << Util::Bin2Hex(unprotect_buf, unprotect_buf_len) << endl;
 
-        uint8_t version = 0;
-        bit_buffer.GetBits(2, version);
+        BitBuffer rtcp_bit_buffer(unprotect_buf, unprotect_buf_len);
 
-        uint8_t padding = 0;
-        bit_buffer.GetBits(1, padding);
-
-        uint8_t reception_report_count = 0;
-        bit_buffer.GetBits(5, reception_report_count);
-
-        uint8_t packet_type = 0;
-        bit_buffer.GetBits(8, packet_type);
-
-        uint16_t length = 0;
-        bit_buffer.GetBytes(2, length);
-
-        uint32_t ssrc = 0;
-        bit_buffer.GetBytes(4, ssrc);
-
-        cout << LMSG << "[RTCP Header] # version:" << (int)version
-                     << ",padding:" << (int)padding
-                     << ",length:" << (int)length
-                     << ",packet_type:" << (int)packet_type
-                     << ",ssrc:" << ssrc
-                     << endl;
-
-        if (packet_type == 201)
+        while (rtcp_bit_buffer.BytesLeft() > 0)
         {
-            if (bit_buffer.MoreThanBytes(24))
+            uint8_t version = 0;
+            rtcp_bit_buffer.GetBits(2, version);
+
+            uint8_t padding = 0;
+            rtcp_bit_buffer.GetBits(1, padding);
+
+            uint8_t five_bits = 0;
+            rtcp_bit_buffer.GetBits(5, five_bits);
+
+            uint8_t payload_type = 0;
+            rtcp_bit_buffer.GetBits(8, payload_type);
+
+            uint16_t length = 0;
+            rtcp_bit_buffer.GetBytes(2, length);
+
+            // length也包括头
+            length = length * 4;
+
+            cout << LMSG << "[RTCP Header] # version:" << (int)version
+                         << ",padding:" << (int)padding
+                         << ",five_bits:" << (int)five_bits
+                         << ",payload_type:" << (int)payload_type
+                         << ",length:" << length
+                         << endl;
+
+            if (! rtcp_bit_buffer.MoreThanBytes(length))
             {
-                uint32_t ssrc = 0;
-                bit_buffer.GetBytes(4, ssrc);
-
-                uint8_t fraction_lost = 0;
-                bit_buffer.GetBytes(1, fraction_lost);
-
-                uint32_t cumulative_number_of_packets_lost = 0;
-                bit_buffer.GetBytes(3, cumulative_number_of_packets_lost);
-
-                uint32_t extended_highest_sequence_number_received = 0;
-                bit_buffer.GetBytes(4, extended_highest_sequence_number_received);
-
-                uint32_t interarrival_jitter = 0;
-                bit_buffer.GetBytes(4, interarrival_jitter);
-
-                uint32_t last_SR = 0;
-                bit_buffer.GetBytes(4, last_SR);
-
-                uint32_t delay_since_last_SR = 0;
-                bit_buffer.GetBytes(4, delay_since_last_SR);
-
-                cout << LMSG << "[Receiver Report RTCP Packet]"
-                             << "ssrc:" << ssrc
-                             << ",fraction_lost:" << (int)fraction_lost
-                             << ",cumulative_number_of_packets_lost:" << cumulative_number_of_packets_lost
-                             << ",extended_highest_sequence_number_received:" << extended_highest_sequence_number_received
-                             << ",interarrival_jitter:" << interarrival_jitter
-                             << ",last_SR:" << last_SR
-                             << ",delay_since_last_SR:" << delay_since_last_SR
-                             << endl;
+                cout << LMSG << "length:" << length << ",rtcp_bit_buffer left:" << rtcp_bit_buffer.BytesLeft() << endl;
+                break;
             }
-        }
-        else if (packet_type == 205)
-        {
-            cout << LMSG << "RTPFB" << endl;
-        }
-        else if (packet_type == 206)
-        {
-            cout << LMSG << "PSFB" << endl;
-        }
 
-        if (bit_buffer.BytesLeft() >0)
-        {
-            string left = "";
-            bit_buffer.GetString(bit_buffer.BytesLeft(), left);
-            uint8_t type = (uint8_t)left[1];
-            uint8_t fmt = ((uint8_t)left[0]) & 0x1f;
-            cout << LMSG << "rtcp left, type:" << (int)type << ",fmt:" << (int)fmt << "[" << Util::Bin2Hex(left) << endl;
+            cout << LMSG << "Rtcp payload_type:" << (int)payload_type << endl;
+
+            string one_rtcp_packet = "";
+            rtcp_bit_buffer.GetString(length, one_rtcp_packet);
+
+            BitBuffer one_rtcp_packet_bit_buffer((const uint8_t*)one_rtcp_packet.data(), one_rtcp_packet.length());
+
+            switch (payload_type)
+            {
+                case kSenderReport:
+                {
+                }
+                break;
+
+                case kReceiverReport:
+                {
+                    uint32_t ssrc_of_packet_sender = 0;
+                    one_rtcp_packet_bit_buffer.GetBytes(4, ssrc_of_packet_sender);
+
+                    // FIXME:multi block process
+
+                    // RR: Receiver Report RTCP Packet
+                    uint32_t ssrc = 0;
+                    one_rtcp_packet_bit_buffer.GetBytes(4, ssrc);
+
+                    uint8_t fraction_lost = 0;
+                    one_rtcp_packet_bit_buffer.GetBytes(1, fraction_lost);
+
+                    uint32_t cumulative_number_of_packets_lost = 0;
+                    one_rtcp_packet_bit_buffer.GetBytes(3, cumulative_number_of_packets_lost);
+
+                    uint32_t extended_highest_sequence_number_received = 0;
+                    one_rtcp_packet_bit_buffer.GetBytes(4, extended_highest_sequence_number_received);
+
+                    uint32_t interarrival_jitter = 0;
+                    one_rtcp_packet_bit_buffer.GetBytes(4, interarrival_jitter);
+
+                    uint32_t last_SR = 0;
+                    one_rtcp_packet_bit_buffer.GetBytes(4, last_SR);
+
+                    uint32_t delay_since_last_SR = 0;
+                    one_rtcp_packet_bit_buffer.GetBytes(4, delay_since_last_SR);
+
+                    cout << LMSG << "[Receiver Report RTCP Packet]"
+                                 << "ssrc:" << ssrc
+                                 << ",fraction_lost:" << (int)fraction_lost
+                                 << ",cumulative_number_of_packets_lost:" << cumulative_number_of_packets_lost
+                                 << ",extended_highest_sequence_number_received:" << extended_highest_sequence_number_received
+                                 << ",interarrival_jitter:" << interarrival_jitter
+                                 << ",last_SR:" << last_SR
+                                 << ",delay_since_last_SR:" << delay_since_last_SR
+                                 << endl;
+                }
+                break;
+
+                case kSourceDescription:
+                {
+                }
+                break;
+
+                case kBye:
+                {
+                }
+                break;
+
+                case kApp:
+                {
+                }
+                break;
+
+                case kRtpFeedback:
+                {
+                    uint32_t ssrc_of_packet_sender = 0;
+                    one_rtcp_packet_bit_buffer.GetBytes(4, ssrc_of_packet_sender);
+
+                    uint32_t ssrc_of_media_source = 0;
+                    one_rtcp_packet_bit_buffer.GetBytes(4, ssrc_of_media_source);
+
+                    switch (five_bits)
+                    {
+                        case 1: /*NACK*/
+                        {
+                            uint16_t packet_id = 0;
+                            one_rtcp_packet_bit_buffer.GetBytes(2, packet_id);
+
+                            uint16_t bitmask_of_following_lost_packets = 0;
+                            one_rtcp_packet_bit_buffer.GetBytes(2, bitmask_of_following_lost_packets);
+
+                            cout << LMSG << "NACK, packet_id:" << packet_id << ",bitmask_of_following_lost_packets:" << bitmask_of_following_lost_packets
+                                         << ",video_seq_:" << video_seq_ << endl;
+                        }
+                        break;
+
+                        default:
+                        {
+                        }
+                        break;
+                    }
+                }
+                break;
+
+                case kPayloadSpecialFeedback:
+                {
+                    uint32_t ssrc_of_packet_sender = 0;
+                    one_rtcp_packet_bit_buffer.GetBytes(4, ssrc_of_packet_sender);
+
+                    uint32_t ssrc_of_media_source = 0;
+                    one_rtcp_packet_bit_buffer.GetBytes(4, ssrc_of_media_source);
+
+                    switch (five_bits)
+                    {
+                        case 1: /*PLI*/
+                        {
+                            cout << LMSG << "PLI" << endl;
+                        }
+                        break;
+
+                        case 2: /*SLI*/
+                        {
+                            uint16_t first = 0;
+                            one_rtcp_packet_bit_buffer.GetBits(13, first);
+
+                            uint16_t number = 0;
+                            one_rtcp_packet_bit_buffer.GetBits(13, number);
+
+                            uint8_t picture_id = 0;
+                            one_rtcp_packet_bit_buffer.GetBits(6, picture_id);
+
+                            cout << LMSG << "SLI, first:" << first << ", number:" << number << ", picture_id:" << picture_id << endl;
+                        }
+                        break;
+
+                        default:
+                        {
+                        }
+                        break;
+                    }
+                }
+                break;
+
+                default:
+                {
+                }
+                break;
+            }
         }
     }
     else
@@ -1299,54 +1397,54 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
             cout << LMSG << "srtp_unprotect ret:" << ret << endl;
         }
 
-        BitBuffer bit_buffer(unprotect_buf, unprotect_buf_len);
+        BitBuffer rtp_bit_buffer(unprotect_buf, unprotect_buf_len);
 
         cout << LMSG << "unprotect_buf_len:" << unprotect_buf_len << endl;
         uint8_t version = 0;
-        bit_buffer.GetBits(2, version);
+        rtp_bit_buffer.GetBits(2, version);
 
         uint8_t padding = 0;
-        bit_buffer.GetBits(1, padding);
+        rtp_bit_buffer.GetBits(1, padding);
 
         uint8_t extension = 0;
-        bit_buffer.GetBits(1, extension);
+        rtp_bit_buffer.GetBits(1, extension);
 
         uint8_t csrc_count = 0;
-        bit_buffer.GetBits(4, csrc_count);
+        rtp_bit_buffer.GetBits(4, csrc_count);
 
         uint8_t marker = 0;
-        bit_buffer.GetBits(1, marker);
+        rtp_bit_buffer.GetBits(1, marker);
         
         uint8_t payload_type = 0;
-        bit_buffer.GetBits(7, payload_type);
+        rtp_bit_buffer.GetBits(7, payload_type);
 
         uint16_t sequence_number = 0;
-        bit_buffer.GetBytes(2, sequence_number);
+        rtp_bit_buffer.GetBytes(2, sequence_number);
 
         uint32_t timestamp = 0;
-        bit_buffer.GetBytes(4, timestamp);
+        rtp_bit_buffer.GetBytes(4, timestamp);
 
         uint32_t ssrc = 0;
-        bit_buffer.GetBytes(4, ssrc);
+        rtp_bit_buffer.GetBytes(4, ssrc);
 
         for (uint8_t c = 0; c != csrc_count; ++c)
         {
             uint32_t csrc = 0;
-            bit_buffer.GetBytes(4, csrc);
+            rtp_bit_buffer.GetBytes(4, csrc);
         }
 
         if (extension)
         {
             uint16_t defined_by_profile = 0;
-            bit_buffer.GetBytes(2, defined_by_profile);
+            rtp_bit_buffer.GetBytes(2, defined_by_profile);
 
             uint16_t extension_length = 0;
-            bit_buffer.GetBytes(2, extension_length);
+            rtp_bit_buffer.GetBytes(2, extension_length);
 
             extension_length = extension_length * 4;
 
             string extension_payload = "";
-            bit_buffer.GetString(extension_length, extension_payload);
+            rtp_bit_buffer.GetString(extension_length, extension_payload);
         }
 
         cout << LMSG << "[RTP Header] # version:" << (int)version
@@ -1360,13 +1458,13 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
                      << ",ssrc:" << ssrc
                      << endl;
 
-        cout << LMSG << "rtp have read bytes:" << bit_buffer.HaveReadBytes() << endl;
+        cout << LMSG << "rtp have read bytes:" << rtp_bit_buffer.HaveReadBytes() << endl;
 
         if (payload_type == 96)
         {
             RtpDepacketizer::ParsedPayload parsed_payload;
 
-            if (! vp8_depacket_.Parse(&parsed_payload, unprotect_buf + bit_buffer.HaveReadBytes(), unprotect_buf_len - bit_buffer.HaveReadBytes()))
+            if (! vp8_depacket_.Parse(&parsed_payload, unprotect_buf + rtp_bit_buffer.HaveReadBytes(), unprotect_buf_len - rtp_bit_buffer.HaveReadBytes()))
             {
                 cout << LMSG << "parse vp8 failed" << endl;
                 return kError;
@@ -1435,7 +1533,7 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
             cout << LMSG << "h264 dump:\n" << Util::Bin2Hex(unprotect_buf, unprotect_buf_len) << endl;
 
             RtpDepacketizer::ParsedPayload parsed_payload;
-            if (! h264_depacket_.Parse(&parsed_payload, unprotect_buf + bit_buffer.HaveReadBytes(), unprotect_buf_len - bit_buffer.HaveReadBytes()))
+            if (! h264_depacket_.Parse(&parsed_payload, unprotect_buf + rtp_bit_buffer.HaveReadBytes(), unprotect_buf_len - rtp_bit_buffer.HaveReadBytes()))
             {
                 cout << LMSG << "parse h264 failed" << endl;
                 return kError;
@@ -1944,7 +2042,6 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
 
                         rtp_header.setSSRC(3233846889);
                         rtp_header.setMarker(last_packet ? 1 : 0); 
-                        static uint32_t video_seq_ = 0;
                         rtp_header.setSeqNumber(++video_seq_);
 #ifdef USE_VP8_WEBM
                         rtp_header.setPayloadType(96);
@@ -2284,7 +2381,6 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
 
             rtp_header.setSSRC(3233846889);
             rtp_header.setMarker(last_packet ? 1 : 0); 
-            static uint32_t video_seq_ = 0;
             rtp_header.setSeqNumber(++video_seq_);
             rtp_header.setPayloadType(100);
             rtp_header.setTimestamp(dts * 90);

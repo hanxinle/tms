@@ -271,6 +271,7 @@ private:
     bool datachannel_open_;
 
     map<uint32_t, MediaSlice> media_slice_map_;
+    map<uint32_t, string> send_map_;
 };
 
 #endif // __WEBRTC_PROTOCOL_H__

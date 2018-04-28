@@ -1201,7 +1201,7 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
             return kError;
         }
 
-        cout << LMSG << "Rtcp Header Peek:" << Util::Bin2Hex(unprotect_buf, unprotect_buf_len) << endl;
+        cout << LMSG << "Rtcp Peek:\n" << Util::Bin2Hex(unprotect_buf, unprotect_buf_len) << endl;
 
         BitBuffer rtcp_bit_buffer(unprotect_buf, unprotect_buf_len);
 
@@ -1238,10 +1238,10 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
                 break;
             }
 
-            cout << LMSG << "Rtcp payload_type:" << (int)payload_type << endl;
-
             string one_rtcp_packet = "";
             rtcp_bit_buffer.GetString(length, one_rtcp_packet);
+
+            cout << LMSG << "Rtcp one packet peek\n" << Util::Bin2Hex(one_rtcp_packet) << endl;
 
             BitBuffer one_rtcp_packet_bit_buffer((const uint8_t*)one_rtcp_packet.data(), one_rtcp_packet.length());
 
@@ -1320,14 +1320,45 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
                     {
                         case 1: /*NACK*/
                         {
-                            uint16_t packet_id = 0;
-                            one_rtcp_packet_bit_buffer.GetBytes(2, packet_id);
+                            while (one_rtcp_packet_bit_buffer.BytesLeft())
+                            {
+                                uint16_t packet_id = 0;
+                                one_rtcp_packet_bit_buffer.GetBytes(2, packet_id);
 
-                            uint16_t bitmask_of_following_lost_packets = 0;
-                            one_rtcp_packet_bit_buffer.GetBytes(2, bitmask_of_following_lost_packets);
+                                uint16_t bitmask_of_following_lost_packets = 0;
+                                one_rtcp_packet_bit_buffer.GetBytes(2, bitmask_of_following_lost_packets);
 
-                            cout << LMSG << "NACK, packet_id:" << packet_id << ",bitmask_of_following_lost_packets:" << bitmask_of_following_lost_packets
-                                         << ",video_seq_:" << video_seq_ << endl;
+                                uint32_t fix_loss_seq_base = video_seq_ - (video_seq_ % 65536) + packet_id;
+
+                                cout << LMSG << "NACK, packet_id:" << packet_id << ",bitmask_of_following_lost_packets:" << bitmask_of_following_lost_packets
+                                             << ",video_seq_:" << video_seq_ << ", fix_loss_seq_base:" << fix_loss_seq_base << endl;
+
+                                uint16_t mask = 0x8000;
+                                for (int i = 0; i != sizeof(bitmask_of_following_lost_packets)*8; ++i)
+                                {
+                                    //if (bitmask_of_following_lost_packets & mask)
+                                    if (true)
+                                    {
+                                        uint32_t loss_seq = fix_loss_seq_base + i + 1;
+
+                                        auto iter = send_map_.find(loss_seq);
+
+                                        if (iter == send_map_.end())
+                                        {
+                                            cout << LMSG << "NACK can't find loss seq:" << loss_seq << endl;
+                                        }
+                                        else
+                                        {
+                                            cout << LMSG << "NACK find loss seq:" << loss_seq << " and resend it" << endl;
+                                            GetUdpSocket()->Send((const uint8_t*)iter->second.data(), iter->second.size());
+                                        }
+                                    }
+
+                                    mask >>= 1;
+                                }
+                            }
+
+                            cout << LMSG << "NACK left:" << one_rtcp_packet_bit_buffer.BytesLeft() << endl;
                         }
                         break;
 
@@ -2381,7 +2412,7 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
 
             rtp_header.setSSRC(3233846889);
             rtp_header.setMarker(last_packet ? 1 : 0); 
-            rtp_header.setSeqNumber(++video_seq_);
+            rtp_header.setSeqNumber(video_seq_);
             rtp_header.setPayloadType(100);
             rtp_header.setTimestamp(dts * 90);
 
@@ -2391,15 +2422,25 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
             int protect_buf_len = rtp_header.getHeaderLength() + rtp_packet_len;
             int ret = ProtectRtp(rtp, protect_buf_len, protect_buf, protect_buf_len);
 
+
             if (ret == 0)
             {
                 cout << "ProtectRtp success" << endl;
+                send_map_[video_seq_] = string((const char*)protect_buf, protect_buf_len);
+
+                if (send_map_.size() >= 5000)
+                {
+                    send_map_.erase(send_map_.begin());
+                }
+
                 GetUdpSocket()->Send((const uint8_t*)protect_buf, protect_buf_len);
             }
             else
             {
                 cout << LMSG << "ProtectRtp failed:" << ret << endl;
             }
+
+            ++video_seq_;
 
             cout << LMSG << "srtp protect_buf_len:" << protect_buf_len << endl;
         }   

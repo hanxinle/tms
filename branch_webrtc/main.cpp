@@ -104,11 +104,15 @@ int main(int argc, char* argv[])
     string tmp;
     Base64::Decode(base64, tmp);
 
-    cout << raw << endl;
-    cout << tmp << endl;
+    cout << LMSG <<raw << endl;
+    cout << LMSG <<tmp << endl;
 
-    cout << raw.size() << endl;
-    cout << tmp.size() << endl;
+    cout << LMSG << raw.size() << endl;
+    cout << LMSG << base64.size() << endl;
+    cout << LMSG << tmp.size() << endl;
+
+    cout << Util::Bin2Hex(raw, 32, false, "prefix:") << endl;
+    cout << LMSG << endl;
 
     assert(raw == tmp);
 

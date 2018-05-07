@@ -71,6 +71,15 @@ enum RtcpPayloadType
     kPayloadSpecialFeedback = 206,
 };
 
+enum class WebrtcStatType
+{
+    kStun = 0,
+    kDtls = 1,
+    kRtp = 2,
+    kRtcp = 3,
+    kOther = 4,
+};
+
 struct SctpSession
 {
     SctpSession()
@@ -217,6 +226,8 @@ public:
 
     void SendH264Data(const uint8_t* frame_data, const int& frame_len, const uint32_t& dts);
 
+    bool CheckCanClose();
+
 private:
     int OnStun(const uint8_t* data, const size_t& len);
     int OnDtls(const uint8_t* data, const size_t& len);
@@ -225,9 +236,31 @@ private:
 
     int Handshake();
 
+    void UpdateRecvTime(const WebrtcStatType& type, const uint64_t& time_ms)
+    {
+        recv_time_ms_[(int)type] = time_ms;
+    }
+
+    void AddPeriodPacketRecv(const WebrtcStatType& type, const int& count)
+    {
+        period_packet_recv_map_[(int)type] += count;
+    }
+
+    void AddAllPacketRecv(const WebrtcStatType& type, const int& count)
+    {
+        all_packet_recv_map_[(int)type] += count;
+    }
+
 private:
     Epoller* epoller_;
     Fd* socket_;
+
+    uint64_t create_time_ms_;
+
+    // key:
+    map<int, uint64_t> recv_time_ms_;
+    map<int, uint64_t> all_packet_recv_map_;
+    map<int, uint64_t> period_packet_recv_map_;
 
     bool dtls_hello_send_;
     SSL* dtls_;

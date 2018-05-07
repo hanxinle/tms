@@ -161,51 +161,67 @@ map<string, string> Util::ParseArgs(int argc, char* argv[])
     return ret;
 }
 
-string Util::Bin2Hex(const uint8_t* buf, const size_t& len, const size_t& char_per_line)
+string Util::Bin2Hex(const uint8_t* buf, const size_t& len, const size_t& char_per_line, const bool& printf_ascii, const string& prefix)
 {   
     string hex; 
     string ascii = "    ";
         
+    string line = prefix;
     for (size_t index = 0; index < len; ++index)
     {        
         char tmp[64] = {0}; 
         int bytes = sprintf(tmp, "%02X", buf[index]);
             
-        if (isprint((char)buf[index]) && buf[index] != '\r' && buf[index] != '\n')
-        {        
-            ascii += (char)buf[index];
-        }        
-        else 
-        {        
-            ascii += "."; 
-        }    
+        if (printf_ascii)
+        {
+            if (isprint((char)buf[index]) && buf[index] != '\r' && buf[index] != '\n')
+            {        
+                ascii += (char)buf[index];
+            }        
+            else 
+            {        
+                ascii += "."; 
+            }    
+        }
             
         if (bytes > 0)  
         {        
-            hex.append(tmp, bytes);
+            line.append(tmp, bytes);
         }    
             
         if (index % char_per_line == (char_per_line - 1))  
         {        
-            hex += ascii;
-            ascii = "    ";
-            hex.append("\n");
+            if (printf_ascii)
+            {
+                line += ascii;
+                ascii = "    ";
+            }
+
+            line.append("\n");
+
+            hex += line;
+            line = prefix;
         }        
         else 
         {        
-            hex.append(" ");
+            line.append(" ");
         }    
     }    
+
+    hex += line;
         
-    hex.append((char_per_line - (len % char_per_line)) * 3 - 1, ' ');
-    hex += ascii;
+    if (printf_ascii)
+    {
+        hex.append((char_per_line - (len % char_per_line)) * 3 - 1, ' ');
+        hex += ascii;
+    }
         
     return hex; 
 }   
 
-string Util::Bin2Hex(const string& str)
+string Util::Bin2Hex(const string& str, const size_t& char_per_line, const bool& printf_ascii, const string& prefix)
 {   
-    return Bin2Hex((const uint8_t*)str.data(), str.length(), 32);
+    return Bin2Hex((const uint8_t*)str.data(), str.length(), char_per_line, printf_ascii, prefix);
 }
 
 uint64_t Util::GetNowMs()

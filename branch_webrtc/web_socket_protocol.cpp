@@ -8,6 +8,7 @@
 #include "global.h"
 #include "web_socket_protocol.h"
 #include "io_buffer.h"
+#include "sdp_generate.h"
 #include "sdp_parse.h"
 #include "tcp_socket.h"
 
@@ -273,6 +274,26 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
             Util::Replace(webrtc_test_sdp, "xxx.xxx.xxx.xxx:what", g_server_ip + " 11445");
             Util::Replace(webrtc_test_sdp, "xxx.xxx.xxx.xxx", g_server_ip);
             Util::Replace(webrtc_test_sdp, "xxx_port", "11445");
+
+            SdpGenerate sdp_generate;
+
+            sdp_generate.SetType("sendrecv");
+            sdp_generate.SetServerIp(g_server_ip);
+            sdp_generate.SetServerPort(11445);
+            sdp_generate.SetMsid("OLO87QiClCfcq0MvMiszbcGmBmOR8zMqsJP7");
+            sdp_generate.SetCname("l8xleMDV+womgBvm");
+            sdp_generate.SetLabel("9c4880af-115a-4c33-983b-43963cb20848");
+            sdp_generate.SetIceUfrag(g_local_ice_ufrag);
+            sdp_generate.SetIcePwd(g_local_ice_pwd);
+            sdp_generate.SetFingerprint(g_dtls_fingerprint);
+            sdp_generate.AddAudioSupport(111);
+            sdp_generate.AddVideoSupport(96);
+            sdp_generate.AddVideoSupport(98);
+            sdp_generate.AddVideoSupport(100);
+            sdp_generate.SetAudioSsrc(3233846889 + 1);
+            sdp_generate.SetVideoSsrc(3233846889);
+
+            webrtc_test_sdp = sdp_generate.Generate();
 
             // a=sendrecv sdp中这个影响chrome推流
 #if 1

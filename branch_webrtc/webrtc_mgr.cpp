@@ -58,9 +58,22 @@ WebrtcProtocol* WebrtcMgr::GetOrCreateProtocol(Fd& socket)
 
 int WebrtcMgr::HandleTimerInSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)
 {
-    for (auto& kv : fd_protocol_)
+    auto iter = fd_protocol_.begin();
+    while (iter != fd_protocol_.end())
     {   
-        kv.second->EveryNSecond(now_in_ms, interval, count);
+        iter->second->EveryNSecond(now_in_ms, interval, count);
+
+        bool can_close = iter->second->CheckCanClose();
+
+        if (can_close)
+        {
+            delete iter->second;
+            iter = fd_protocol_.erase(iter);
+        }
+        else
+        {
+            ++iter;
+        }
     }   
 
     return kSuccess;

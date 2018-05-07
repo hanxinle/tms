@@ -17,8 +17,8 @@ class Util
 public:
     static void Daemon();
 	static map<string, string> ParseArgs(int argc, char* argv[]);
-	static string Bin2Hex(const uint8_t* buf, const size_t& len, const size_t& char_per_line = 32);
-    static string Bin2Hex(const string& str);
+    static string Bin2Hex(const uint8_t* buf, const size_t& len, const size_t& char_per_line = 32, const bool& printf_ascii = true, const string& prefix = "");
+    static string Bin2Hex(const string& str, const size_t& char_per_line = 32, const bool& printf_ascii = true, const string& prefix = "");
 
 	static uint64_t GetNowMs();
     static uint64_t GetNow();

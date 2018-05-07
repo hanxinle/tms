@@ -95,6 +95,7 @@ WebrtcProtocol::WebrtcProtocol(Epoller* epoller, Fd* socket)
     MediaSubscriber(kWebRtc),
     epoller_(epoller),
     socket_(socket),
+    create_time_ms_(Util::GetNowMs()),
     dtls_hello_send_(false),
     dtls_(NULL),
     dtls_handshake_done_(false),
@@ -1602,8 +1603,7 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
 
                 video_publisher_ssrc_ = ssrc;
 
-                rtp_header->setSSRC(3233846889)
-
+                rtp_header->setSSRC(3233846889);
 
                 g_webrtc_mgr->__DebugBroadcast(unprotect_buf, unprotect_buf_len);
             }
@@ -2469,6 +2469,7 @@ void WebrtcProtocol::SendBindingIndication()
     GetUdpSocket()->Send(binding_indication_header.GetData(), binding_indication_header.SizeInBytes());
 }
 
+// 注意, 要拒绝SEI帧发送,不然chrome只能解码关键帧
 void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_len, const uint32_t& dts)
 {
 	RTPVideoTypeHeader rtp_video_head;
@@ -2521,7 +2522,6 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
         else
         {   
             // DEUBG
-            // XXX:目前发现RTP.264发送给对端,只有关键帧才能解码
             {
                 uint8_t debug[1500];
                 memcpy(debug, rtp_packet, rtp_packet_len);
@@ -2569,7 +2569,8 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
                     send_map_.erase(send_map_.begin());
                 }
 
-                if (video_seq_ % 10000 == 1)
+                //if (video_seq_ % 10000 == 1)
+                if (false)
                 {
                     cout << LMSG << "NACK TEST, skip " << video_seq_ << endl;
                 }
@@ -2592,9 +2593,7 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
 
 	delete rtp_packetizer;
 
-
-    // 构造一个假的音频包过去,看看是不是音视频同步引起的问题
-    // 然而并没有任何卵用,应该是上面的264封装还是有问题
+    // 构造一个假的音频包过去
 	RtpHeader rtp_header;
 
     uint8_t rtp[1500];
@@ -2624,4 +2623,11 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
     {
         cout << LMSG << "srtp_protect faile:" << ret << endl;
     }
+}
+
+bool WebrtcProtocol::CheckCanClose()
+{
+    uint64_t now_ms = Util::GetNowMs();
+
+    return false;
 }

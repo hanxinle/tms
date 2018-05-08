@@ -1,0 +1,40 @@
+enum PROTOCOL_ID : uint32
+{
+    NodeRegisterReq_ID = 1,
+    NodeRegisterRsp_ID = 2,
+}
+
+table NodeInfo 
+{
+    ip:string (id:0);
+    ports:[uint16] (id:1);
+    start_time_ms:uint64 (id:2);
+    pid:[uint64] (id:3);
+    type:[uint8] (id:4);
+}
+
+table NodeRegisterReq
+{
+    node_info:NodeInfo (id:0);
+}
+
+root_type NodeRegisterReq;
+
+table NodeRegisterRsp
+{
+}
+
+root_type NodeRegisterRsp;
+
+table NodePingReq
+{
+    node_info:NodeInfo (id:0);
+}
+
+root_type NodePingReq;
+
+table NodePingRsp
+{
+}
+
+root_type NodePingRsp;

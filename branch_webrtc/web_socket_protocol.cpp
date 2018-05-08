@@ -280,9 +280,9 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
             sdp_generate.SetType("sendrecv");
             sdp_generate.SetServerIp(g_server_ip);
             sdp_generate.SetServerPort(11445);
-            sdp_generate.SetMsid("OLO87QiClCfcq0MvMiszbcGmBmOR8zMqsJP7");
-            sdp_generate.SetCname("l8xleMDV+womgBvm");
-            sdp_generate.SetLabel("9c4880af-115a-4c33-983b-43963cb20848");
+            sdp_generate.SetMsid("xiao");
+            sdp_generate.SetCname("zhi");
+            sdp_generate.SetLabel("hong");
             sdp_generate.SetIceUfrag(g_local_ice_ufrag);
             sdp_generate.SetIcePwd(g_local_ice_pwd);
             sdp_generate.SetFingerprint(g_dtls_fingerprint);

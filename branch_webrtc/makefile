@@ -28,9 +28,9 @@ CXXFLAGS       = -g -std=c++0x -DWEBRTC_POSIX -W -Wall -Werror -O2 -pg -Wno-stri
 				 -Wno-unused-variable -Wno-unused-parameter -Wno-unused-value
 
 # 这4个标志位是互斥的
-CXXFLAGS       += -DUSE_PUBLISH
+#CXXFLAGS       += -DUSE_PUBLISH
 #CXXFLAGS       += -DUSE_VP8_WEBM
-#CXXFLAGS       += -DUSE_VP9_WEBM
+CXXFLAGS       += -DUSE_VP9_WEBM
 #CXXFLAGS       += -DUSE_TRANSCODER
 
 CXXFLAGS       += -D__STDC_CONSTANT_MACROS

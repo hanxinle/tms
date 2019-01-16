@@ -14,8 +14,6 @@ Click Here Send Msg
 </button>
 <br>
 
-Local Media: <br>
-<video id = "local_media" autoplay></video><br>
 Remote Media: <br>
 <video id = "remote_media" autoplay></video>
 
@@ -31,10 +29,8 @@ var pc = new PeerConnection(null);
 
 pc.onaddstream = function(event)
 {
-    var url = event.stream ? URL.createObjectURL(event.stream) : ''
-    var remote_media = document.getElementById('remote_media');
-    remote_media.src = url;
-    console.log('onaddstream callback: ' + url);
+    console.log('onaddstream');
+    document.getElementById('remote_media').srcObject = event.stream;
     remote_media.load();
 };
 

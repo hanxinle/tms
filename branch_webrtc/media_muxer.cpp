@@ -5,6 +5,7 @@
 #include "global.h"
 #include "media_publisher.h"
 #include "media_muxer.h"
+#include "srt/srt.h"
 #include "util.h"
 
 using namespace std;
@@ -465,11 +466,31 @@ void MediaMuxer::PacketTs(const Payload& payload)
 
         ts_bs.WriteData(bytes_left, data);
 
+        //if (g_srt_client_fd != -1)
+        //{
+        //    srt_send(g_srt_client_fd, (const char*)ts_bs.GetData(), ts_bs.SizeInBytes());
+        //}
+
         assert(ts_bs.SizeInBytes() == 188);
         ts_queue_[ts_seq_].ts_data.append((const char*)ts_bs.GetData(), ts_bs.SizeInBytes());
 
         data += bytes_left;
         i += bytes_left;
+    }
+
+    if (g_srt_client_fd != -1)
+    {
+        uint32_t has_send = 0;
+        for (uint32_t i = 0; i != ts_queue_[ts_seq_].ts_data.size() / 1316; ++i)
+        {
+            srt_send(g_srt_client_fd, ts_queue_[ts_seq_].ts_data.data() + 1316 * i, 1316);
+            has_send += 1316;
+        }
+
+        if ((ts_queue_[ts_seq_].ts_data.size() % 1316) > 0)
+        {
+            srt_send(g_srt_client_fd, ts_queue_[ts_seq_].ts_data.data() + has_send, ts_queue_[ts_seq_].ts_data.size() - has_send);
+        }
     }
 }
 

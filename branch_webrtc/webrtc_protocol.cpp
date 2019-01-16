@@ -29,8 +29,6 @@ const int SRTP_MASTER_KEY_SALT_LEN = 14;
 
 extern WebrtcProtocol* g_debug_webrtc;
 
-static uint32_t video_seq_ = 0;
-
 static int HmacEncode(const string& algo, const uint8_t* key, const int& key_length,  
                 	  const uint8_t* input, const int& input_length,  
                 	  uint8_t* output, unsigned int& output_length) 
@@ -105,7 +103,8 @@ WebrtcProtocol::WebrtcProtocol(Epoller* epoller, Fd* socket)
     media_input_open_count_(0),
     media_input_read_video_frame_count(0),
     send_begin_time_(Util::GetNowMs()),
-    datachannel_open_(false)
+    datachannel_open_(false),
+    video_seq_(0)
 {
 #if defined(USE_PUBLISH)
     cout << LMSG << "WebRTC USE_PUBLISH" << endl;
@@ -746,7 +745,7 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
 
 int WebrtcProtocol::OnDtls(const uint8_t* data, const size_t& len)
 {
-    cout << LMSG <<endl;
+    cout << LMSG << "handshake:" << dtls_handshake_done_ << endl;
 
     if (! dtls_handshake_done_)
     {
@@ -2533,6 +2532,8 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
                 else
                 {
                     cout << LMSG << "payload_length:" << parsed_payload.payload_length
+                                 << ",this:" << this
+                                 << ",video_seq:" << video_seq_
                                  << ",frame_type:" << parsed_payload.frame_type
                                  << ",payload_length:" << parsed_payload.payload_length
                                  << ",frame_type:" << parsed_payload.frame_type

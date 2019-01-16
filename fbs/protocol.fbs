@@ -11,6 +11,7 @@ table NodeInfo
     start_time_ms:uint64 (id:2);
     pid:[uint64] (id:3);
     type:[uint8] (id:4);
+    ext:[uint8] (id:5);
 }
 
 table NodeRegisterReq

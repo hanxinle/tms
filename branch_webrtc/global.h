@@ -33,5 +33,6 @@ extern string                   g_remote_ice_pwd;
 extern string                   g_remote_ice_ufrag;
 
 extern string                   g_server_ip;
+extern int                      g_srt_client_fd;
 
 #endif // __GLOBAL_H__

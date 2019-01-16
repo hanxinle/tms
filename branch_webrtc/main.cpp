@@ -19,6 +19,7 @@
 #include "rtmp_mgr.h"
 #include "server_mgr.h"
 #include "socket_util.h"
+#include "srt/srt.h"
 #include "ssl_socket.h"
 #include "tcp_socket.h"
 #include "timer_in_second.h"
@@ -71,6 +72,7 @@ string                  g_remote_ice_pwd = "";
 string                  g_remote_ice_ufrag = "";
 string                  g_server_ip = "";
 WebrtcProtocol*         g_debug_webrtc = NULL;
+int                     g_srt_client_fd = -1;
 
 void AvLogCallback(void* ptr, int level, const char* fmt, va_list vl)
 {
@@ -82,6 +84,46 @@ void AvLogCallback(void* ptr, int level, const char* fmt, va_list vl)
 
 int main(int argc, char* argv[])
 {
+    // srt
+    srt_startup();
+    //srt_setloglevel(logging::LogLevel::debug);
+
+	addrinfo hints;
+    addrinfo* res;
+
+    memset(&hints, 0, sizeof(struct addrinfo));
+    hints.ai_flags = AI_PASSIVE;
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_DGRAM;
+
+    string service("9000");
+
+    if (0 != getaddrinfo(NULL, service.c_str(), &hints, &res))
+    {
+        cout << "illegal port number or port is busy" << endl;
+        return 0;
+    }
+
+    SRTSOCKET serv = srt_socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+
+    SRT_TRANSTYPE tt = SRTT_LIVE;
+    srt_setsockopt(serv, 0, SRTO_TRANSTYPE, &tt, sizeof tt);
+
+    bool sync = false;
+
+    srt_setsockopt(serv, 0, SRTO_RCVSYN, &sync, sizeof sync);
+
+    if (SRT_ERROR == srt_bind(serv, res->ai_addr, res->ai_addrlen))
+    {
+        cout << "bind: " << srt_getlasterror_str() << endl;
+        return 0;
+    }
+
+    freeaddrinfo(res);
+
+	srt_listen(serv, 10);
+    // srt end
+
     av_register_all();
     avcodec_register_all();
 
@@ -621,11 +663,40 @@ int main(int argc, char* argv[])
 
     timer_in_second.AddTimerSecondHandle(&media_node_discovery_mgr);
 
+    sockaddr_storage clientaddr;
+    int addrlen = sizeof(clientaddr);
+	SRTSOCKET fhandle;
 
     // Event Loop
     while (true)
     {
         epoller.Run();
+
+		if (SRT_INVALID_SOCK == (fhandle = srt_accept(serv, (sockaddr*)&clientaddr, &addrlen)))
+        {
+            int err = srt_getlasterror(NULL);
+
+
+            if (err == (MJ_AGAIN * 1000 + MN_RDAVAIL))
+            {
+                continue;
+            }
+
+            cout << "err:" << err << endl;
+
+            cout << "accept: " << srt_getlasterror_str() << endl;
+            return 0;
+        }
+
+        cout << "accept success" << endl;
+
+        int tsbpdmode = 1;
+        srt_setsockopt(fhandle, 0, SRTO_TSBPDMODE, &tsbpdmode, sizeof tsbpdmode);
+
+        int tsbpddelay = 1000;
+        srt_setsockopt(fhandle, 0, SRTO_TSBPDDELAY, &tsbpddelay, sizeof tsbpddelay);
+
+        g_srt_client_fd = fhandle;
     }
 
     return 0;

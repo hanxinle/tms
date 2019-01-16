@@ -279,7 +279,7 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
 
             sdp_generate.SetType("sendrecv");
             sdp_generate.SetServerIp(g_server_ip);
-            sdp_generate.SetServerPort(11445);
+            sdp_generate.SetServerPort(5000);
             sdp_generate.SetMsid("xiao");
             sdp_generate.SetCname("zhi");
             sdp_generate.SetLabel("hong");
@@ -293,7 +293,7 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
             sdp_generate.SetAudioSsrc(3233846889 + 1);
             sdp_generate.SetVideoSsrc(3233846889);
 
-            webrtc_test_sdp = sdp_generate.Generate();
+            //webrtc_test_sdp = sdp_generate.Generate();
 
             // a=sendrecv sdp中这个影响chrome推流
 #if 1
@@ -312,7 +312,9 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
             }
 
 
+            cout << "sdp_answer size:" << sdp_answer.size() << endl;
             Util::Replace(sdp_answer, "\r\n", "\\r\\n");
+            cout << "sdp_answer size:" << sdp_answer.size() << endl;
 
             cout << LMSG << sdp_answer << endl;
 

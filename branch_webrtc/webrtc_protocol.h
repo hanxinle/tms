@@ -305,6 +305,8 @@ private:
 
     map<uint32_t, MediaSlice> media_slice_map_;
     map<uint32_t, string> send_map_;
+
+    uint32_t video_seq_;
 };
 
 #endif // __WEBRTC_PROTOCOL_H__

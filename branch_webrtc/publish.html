@@ -1,9 +1,9 @@
 <html>
 <body>
     Local: <br>
-    <video id="localVideo" autoplay></video><br>
+    <video width="800" height="480" id="localVideo" autoplay></video><br>
     Remote: <br>
-    <video id="remoteVideo" autoplay></video>
+    <video width="800" height="480" id="remoteVideo" autoplay></video>
 
     <script>
         // 仅仅用于控制哪一端的浏览器发起offer，#号后面有值的一方发起
@@ -24,7 +24,9 @@
 
         // 如果检测到媒体流连接到本地，将其绑定到一个video标签上输出
         pc.onaddstream = function(event){
-            document.getElementById('remoteVideo').src = URL.createObjectURL(event.stream);
+            //document.getElementById('remoteVideo').src = URL.createObjectURL(event.stream);
+            console.log('onaddstream');
+            document.getElementById('remoteVideo').srcObject = event.stream;
         };
 
         // 发送offer和answer的函数，发送本地session描述
@@ -44,7 +46,8 @@
             }
         }, function(stream){
             //绑定本地媒体流到video标签用于输出
-            document.getElementById('localVideo').src = URL.createObjectURL(stream);
+            //document.getElementById('localVideo').src = URL.createObjectURL(stream);
+            document.getElementById('localVideo').srcObject = stream;
             //向PeerConnection中加入需要发送的流
             pc.addStream(stream);
             //如果是发起方则发送一个offer信令

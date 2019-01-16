@@ -122,7 +122,7 @@ inline bool IsBFrame(const uint32_t& mask) { return (mask & kFrameTypeMask)   ==
 inline bool IsPFrame(const uint32_t& mask) { return (mask & kFrameTypeMask)   == kPFrameTypeValue; }
 inline bool IsHeaderFrame(const uint32_t& mask) { return (mask & kFrameTypeMask)   == kHeaderFrameTypeValue; }
 
-#define  LMSG  Util::GetNowMsStr()<<" ["<<__FILE__<<"]#"<<__func__<<":"<<__LINE__<<" "
+#define  LMSG  Util::GetNowMsStr()<<" @ Trs ["<<__FILE__<<"]#"<<__func__<<":"<<__LINE__<<" "
 #define  TRACE "============================================================"
 
 //#define VERBOSE Log(kLevelVerbose)

@@ -107,6 +107,7 @@ void WebrtcMgr::__DebugBroadcast(const uint8_t* data, const int& len)
 
 void WebrtcMgr::__DebugSendH264(const uint8_t* data, const int& len, const uint32_t& dts)
 {
+    cout << LMSG << "h264 client count:" << fd_protocol_.size() << endl;
     for (auto& kv : fd_protocol_)
     {
         if (kv.second->DtlsHandshakeDone())

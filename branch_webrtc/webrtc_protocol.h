@@ -307,6 +307,8 @@ private:
     map<uint32_t, string> send_map_;
 
     uint32_t video_seq_;
+
+    uint64_t pre_recv_data_time_ms_;
 };
 
 #endif // __WEBRTC_PROTOCOL_H__

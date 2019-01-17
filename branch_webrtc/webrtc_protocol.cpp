@@ -24,6 +24,8 @@ using namespace socket_util;
 using namespace std;
 using namespace webrtc;
 
+const int kWebRtcRecvTimeoutInMs = 10000;
+
 const int SRTP_MASTER_KEY_KEY_LEN = 16;
 const int SRTP_MASTER_KEY_SALT_LEN = 14;
 
@@ -104,7 +106,8 @@ WebrtcProtocol::WebrtcProtocol(Epoller* epoller, Fd* socket)
     media_input_read_video_frame_count(0),
     send_begin_time_(Util::GetNowMs()),
     datachannel_open_(false),
-    video_seq_(0)
+    video_seq_(0),
+    pre_recv_data_time_ms_(Util::GetNowMs())
 {
 #if defined(USE_PUBLISH)
     cout << LMSG << "WebRTC USE_PUBLISH" << endl;
@@ -130,6 +133,8 @@ int WebrtcProtocol::Parse(IoBuffer& io_buffer)
     if (len > 0)
     {
         cout << LMSG << "webrtc recv\n" << Util::Bin2Hex(data, len) << endl;
+
+        pre_recv_data_time_ms_ = Util::GetNowMs();
 
 		if ((data[0] == 0) || (data[0] == 1)) 
    		{   
@@ -2629,6 +2634,12 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
 bool WebrtcProtocol::CheckCanClose()
 {
     uint64_t now_ms = Util::GetNowMs();
+
+    if (now_ms - pre_recv_data_time_ms_ >= kWebRtcRecvTimeoutInMs)
+    {
+        cout << LMSG << "webrtc timeout" << endl;
+        return true;
+    }
 
     return false;
 }

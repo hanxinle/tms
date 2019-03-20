@@ -135,6 +135,17 @@ int main(int argc, char* argv[])
     uint8_t crc[] = {1, 2, 3, 4, 5, 6};
     cout << LMSG << crc32.GetCrc32(crc, 6) << endl;
 
+    {
+        static uint8_t kSps[] = {0x67, 0x64, 0x00, 0x33, 0xAC,0x2C,0xAC,0x07,0x80,0x22,0x7E,0x5C,0x05,0xA8,0x08,0x08,0x0A,0x00,0x00,0x07,0xD0,0x00,0x01,0xD4,0xC1,0x08};
+        static uint8_t kPps[] = {0x68, 0xEE, 0x3C, 0xB0};
+
+        string tmp((const char*)kSps, sizeof(kSps));
+
+        string t;
+        Base64::Encode(tmp, t);
+        cout << t << endl;
+    }
+
     string raw = "Man is distinguished, not only by his reason, but by this singular passion from other animals, which is a lust of the mind, that by a perseverance of delight in the continued and indefatigable generation of knowledge, exceeds the short vehemence of any carnal pleasure.";
 
     string base64;
@@ -695,6 +706,9 @@ int main(int argc, char* argv[])
 
         int tsbpddelay = 1000;
         srt_setsockopt(fhandle, 0, SRTO_TSBPDDELAY, &tsbpddelay, sizeof tsbpddelay);
+
+        bool sync = false;
+        srt_setsockopt(fhandle, 0, SRTO_SNDSYN, &sync, sizeof sync);
 
         g_srt_client_fd = fhandle;
     }

@@ -296,7 +296,7 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
             //webrtc_test_sdp = sdp_generate.Generate();
 
             // a=sendrecv sdp中这个影响chrome推流
-#if 1
+#if 0
             string candidate = R"(candidate":"candidate:1 1 udp 2115783679 xxx.xxx.xxx.xxx:what typ host generation 0 ufrag )" + g_local_ice_ufrag + R"( netwrok-cost 50", "sdpMid":"data","sdpMLineIndex":0)";
             Util::Replace(candidate, "xxx.xxx.xxx.xxx:what", g_server_ip + " 11445");
             string sdp_answer = "{\"sdpAnswer\":\"" + webrtc_test_sdp + "\", \"candidate\":{" + "\"" + candidate + "}}";

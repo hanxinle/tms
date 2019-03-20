@@ -1673,6 +1673,29 @@ int RtmpProtocol::OnMetaData(RtmpMessage& rtmp_msg)
 
 int RtmpProtocol::OnVideoHeader(RtmpMessage& rtmp_msg)
 {
+    // webrtc test
+#if 0
+    {
+        string video_header((const char*)rtmp_msg.msg + 5, rtmp_msg.len - 5);
+        video_header.erase(0, 6);
+
+        uint16_t sps_len = (uint8_t)(video_header[0]) << 8 | 
+                           (uint8_t)(video_header[1]);
+
+        video_header.erase(0, 2);
+
+        string sps = video_header.substr(0, sps_len);
+
+        string pps = video_header.substr(sps_len + 3);
+
+        cout << "sps:" << Util::Bin2Hex(sps) << endl;
+        cout << "pps:" << Util::Bin2Hex(pps) << endl;
+
+        g_webrtc_mgr->__DebugSendH264((const uint8_t*)sps.data(), sps.size(), 0);
+        g_webrtc_mgr->__DebugSendH264((const uint8_t*)pps.data(), pps.size(), 0);
+    }
+#endif
+
     string video_header((const char*)rtmp_msg.msg + 5, rtmp_msg.len - 5);
 
     cout << LMSG << "recv video_header" << ",size:" << video_header.size() << endl;

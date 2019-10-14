@@ -4,20 +4,6 @@ INCLUDE_DIR    += -I. -I./include/ -I../rpc -I../common -I../common/ssl/ -I../de
 LIB_DIR        += ../depend/lib/libssl.a
 LIB_DIR        += ../depend/lib/libcrypto.a
 LIB_DIR        += ../depend/lib/libsrtp2.a
-LIB_DIR        += ../depend/lib/libavformat.a
-LIB_DIR        += ../depend/lib/libavfilter.a
-LIB_DIR        += ../depend/lib/libavcodec.a
-LIB_DIR        += ../depend/lib/libswresample.a
-LIB_DIR        += ../depend/lib/libavresample.a
-LIB_DIR        += ../depend/lib/libswscale.a
-LIB_DIR        += ../depend/lib/libavutil.a
-LIB_DIR        += ../depend/lib/libopus.a
-LIB_DIR        += ../depend/lib/libfdk-aac.a
-LIB_DIR        += ../depend/lib/libvpx.a
-LIB_DIR        += ../depend/lib/libx264.a
-LIB_DIR        += ../depend/lib/libmfx.a
-LIB_DIR        += ../depend/lib/libsrt.a
-#LIB_DIR        += -lpthread -lbz2 -lz -lva -ldl -lva-drm
 LIB_DIR        += -lpthread -lbz2 -lz -ldl
 
 # ====================================================

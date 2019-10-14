@@ -1,7 +1,6 @@
 #include "http_flv_protocol.h"
 #include "media_publisher.h"
 #include "rtmp_protocol.h"
-#include "server_protocol.h"
 
 bool MediaPublisher::AddSubscriber(MediaSubscriber* subscriber)
 {   

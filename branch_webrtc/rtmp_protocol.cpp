@@ -18,7 +18,6 @@
 #include "rtmp_protocol.h"
 #include "fd.h"
 #include "rtmp_mgr.h"
-#include "server_mgr.h"
 #include "tcp_socket.h"
 #include "util.h"
 
@@ -1409,18 +1408,8 @@ int RtmpProtocol::OnPlayCommand(RtmpMessage& rtmp_msg, AmfCommand& amf_command)
         if (media_publisher == NULL)
         {
             cout << LMSG << "no found app:" << app_ << ", stream_:" << stream_ << endl;
-
-			g_media_center_mgr->GetAppStreamMasterNode(app_, stream_);
-            expired_time_ms_ = Util::GetNowMs() + 10000;
-
-            g_local_stream_center.AddAppStreamPendingSubscriber(app_, stream_, this);
-
-            pending_rtmp_msg_ = rtmp_msg;
-
-            cout << LMSG << "pending" << endl;
-
-            return kPending;
-        }
+			return kError;
+		}
 
         String on_status("onStatus");
         Double transaction_id(0.0);
@@ -1478,7 +1467,7 @@ int RtmpProtocol::OnPublishCommand(RtmpMessage& rtmp_msg, AmfCommand& amf_comman
                 }
                 SetStreamName(stream);
 
-                if (g_local_stream_center.RegisterStream(app_, stream_, this, true) == false)
+				if (g_local_stream_center.RegisterStream(app_, stream_, this) == false)
                 {
                     cout << LMSG << "error" << endl;
                     return kError;
@@ -1487,7 +1476,7 @@ int RtmpProtocol::OnPublishCommand(RtmpMessage& rtmp_msg, AmfCommand& amf_comman
         }
         else
         {
-            if (g_local_stream_center.RegisterStream(app_, stream_, this, true) == false)
+			if (g_local_stream_center.RegisterStream(app_, stream_, this) == false)
             {
                 cout << LMSG << "app:" << app_ << ",stream:" << stream_ << " already register" << endl;
             }
@@ -1812,7 +1801,7 @@ int RtmpProtocol::OnStop()
             sub->OnStop();
         }
 
-        g_local_stream_center.UnRegisterStream(app_, stream_, this);
+		g_local_stream_center.UnRegisterStream(app_, stream_, this);
     }
     else if (role_ == RtmpRole::kPushServer)
     {
@@ -2531,50 +2520,6 @@ int RtmpProtocol::ConnectForwardRtmpServer(const string& ip, const uint16_t& por
     }
 
     rtmp_forward->SetMediaPublisher(this);
-
-    cout << LMSG << endl;
-
-    return kSuccess;
-}
-
-int RtmpProtocol::ConnectFollowServer(const string& ip, const uint16_t& port)
-{
-    int fd = CreateNonBlockTcpSocket();
-
-    if (fd < 0)
-    {
-        cout << LMSG << "ConnectFollowServer ret:" << fd << endl;
-        return -1;
-    }
-
-    int ret = ConnectHost(fd, ip, port);
-
-    if (ret < 0 && errno != EINPROGRESS)
-    {
-        cout << LMSG << "Connect ret:" << ret << endl;
-        return -1;
-    }
-
-    Fd* socket = new TcpSocket(epoller_, fd, (SocketHandle*)g_server_mgr);
-
-    ServerProtocol* server_dst = g_server_mgr->GetOrCreateProtocol(*socket);
-
-    server_dst->SetPushServer();
-
-    server_dst->SetMediaPublisher(this);
-    server_dst->SetApp(app_);
-    server_dst->SetStreamName(stream_);
-
-    if (errno == EINPROGRESS)
-    {
-        server_dst->GetTcpSocket()->SetConnecting();
-        server_dst->GetTcpSocket()->EnableWrite();
-    }
-    else
-    {
-        server_dst->GetTcpSocket()->SetConnected();
-        server_dst->GetTcpSocket()->EnableRead();
-    }
 
     cout << LMSG << endl;
 

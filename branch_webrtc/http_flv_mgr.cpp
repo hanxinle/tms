@@ -2,7 +2,6 @@
 #include "http_flv_mgr.h"
 #include "http_flv_protocol.h"
 #include "rtmp_mgr.h"
-#include "server_mgr.h"
 
 HttpFlvMgr::HttpFlvMgr(Epoller* epoller)
     :

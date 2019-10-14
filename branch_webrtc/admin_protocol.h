@@ -4,9 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#include "protocol.h"
-
-using namespace protocol;
+#include <string>
 
 class Epoller;
 class Fd;
@@ -31,7 +29,7 @@ public:
     }
 
 private: 
-    int ProcAdminMsg(const string& admin_msg);
+    int ProcAdminMsg(const std::string& admin_msg);
 
 private:
 	Epoller* epoller_;

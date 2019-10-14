@@ -60,12 +60,6 @@ public:
         return type_ == kHttpHls;
     }
 
-    // 请求的时候进程没有流,进程从别的进程拉流(回源)成功后/或者超时后,此函数被调用
-    virtual int OnPendingArrive()
-    {
-        return 0;
-    }
-    
     virtual int SendVideoHeader(const string& header)
     {
         UNUSED(header);

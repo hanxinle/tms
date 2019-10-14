@@ -18,7 +18,7 @@ class ServerMgr;
 class RtmpMgr : public SocketHandle, public TimerSecondHandle
 {
 public:
-    RtmpMgr(Epoller* epoller, ServerMgr* server_mgr);
+    RtmpMgr(Epoller* epoller);
     ~RtmpMgr();
 
     virtual int HandleRead(IoBuffer& io_buffer, Fd& socket);
@@ -32,7 +32,6 @@ public:
 
 private:
     Epoller* epoller_;
-    ServerMgr* server_mgr_;
     map<int, RtmpProtocol*> fd_protocol_;
 };
 

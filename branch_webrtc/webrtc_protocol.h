@@ -9,7 +9,6 @@
 #include "srtp2/srtp.h"
 
 #include "bit_buffer.h"
-#include "media_input.h"
 #include "media_publisher.h"
 #include "media_subscriber.h"
 #include "ref_ptr.h"
@@ -273,8 +272,6 @@ private:
 
     srtp_t srtp_send_;
     srtp_t srtp_recv_;
-
-    MediaInput* media_input_;
 
     string local_ufrag_;
     string local_pwd_;

@@ -13,13 +13,9 @@
 #include "http_flv_mgr.h"
 #include "http_hls_mgr.h"
 #include "local_stream_center.h"
-#include "media_center_mgr.h"
-#include "media_node_discovery_mgr.h"
 #include "ref_ptr.h"
 #include "rtmp_mgr.h"
-#include "server_mgr.h"
 #include "socket_util.h"
-#include "srt/srt.h"
 #include "ssl_socket.h"
 #include "tcp_socket.h"
 #include "timer_in_second.h"
@@ -31,12 +27,6 @@
 #include "web_socket_mgr.h"
 
 #include "openssl/ssl.h"
-
-extern "C"
-{
-#include "libavcodec/avcodec.h"
-#include "libavformat/avformat.h"
-}
 
 // debug
 #include "webrtc_protocol.h"
@@ -52,16 +42,12 @@ static void sighandler(int sig_no)
 } 
 
 LocalStreamCenter       g_local_stream_center;
-NodeInfo                g_node_info;
 Epoller*                g_epoll = NULL;
 HttpFlvMgr*             g_http_flv_mgr = NULL;
 HttpFlvMgr*             g_https_flv_mgr = NULL;
 HttpHlsMgr*             g_http_hls_mgr = NULL;
 HttpHlsMgr*             g_https_hls_mgr = NULL;
-MediaCenterMgr*         g_media_center_mgr = NULL;
-MediaNodeDiscoveryMgr*  g_media_node_discovery_mgr = NULL;
 RtmpMgr*                g_rtmp_mgr = NULL;
-ServerMgr*              g_server_mgr = NULL;
 WebrtcMgr*              g_webrtc_mgr = NULL;
 SSL_CTX*                g_tls_ctx = NULL;
 SSL_CTX*                g_dtls_ctx = NULL;
@@ -84,52 +70,6 @@ void AvLogCallback(void* ptr, int level, const char* fmt, va_list vl)
 
 int main(int argc, char* argv[])
 {
-    // srt
-    srt_startup();
-    //srt_setloglevel(logging::LogLevel::debug);
-
-	addrinfo hints;
-    addrinfo* res;
-
-    memset(&hints, 0, sizeof(struct addrinfo));
-    hints.ai_flags = AI_PASSIVE;
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_DGRAM;
-
-    string service("9000");
-
-    if (0 != getaddrinfo(NULL, service.c_str(), &hints, &res))
-    {
-        cout << "illegal port number or port is busy" << endl;
-        return 0;
-    }
-
-    SRTSOCKET serv = srt_socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-
-    SRT_TRANSTYPE tt = SRTT_LIVE;
-    srt_setsockopt(serv, 0, SRTO_TRANSTYPE, &tt, sizeof tt);
-
-    bool sync = false;
-
-    srt_setsockopt(serv, 0, SRTO_RCVSYN, &sync, sizeof sync);
-
-    if (SRT_ERROR == srt_bind(serv, res->ai_addr, res->ai_addrlen))
-    {
-        cout << "bind: " << srt_getlasterror_str() << endl;
-        return 0;
-    }
-
-    freeaddrinfo(res);
-
-	srt_listen(serv, 10);
-    // srt end
-
-    av_register_all();
-    avcodec_register_all();
-
-    av_log_set_callback(AvLogCallback);
-    av_log_set_level(AV_LOG_VERBOSE);
-
     CRC32 crc32(CRC32_STUN);
 
     uint8_t crc[] = {1, 2, 3, 4, 5, 6};
@@ -371,7 +311,6 @@ int main(int argc, char* argv[])
     uint16_t http_flv_port          = 8787;
     uint16_t https_hls_port         = 8843;
     uint16_t http_hls_port          = 8888;
-    uint16_t server_port            = 10001;
     uint16_t admin_port             = 11000;
     uint16_t web_socket_port        = 8901;
     uint16_t ssl_web_socket_port    = 8943;
@@ -383,13 +322,12 @@ int main(int argc, char* argv[])
     auto iter_rtmp_port     = args_map.find("rtmp_port");
     auto iter_http_flv_port = args_map.find("http_flv_port");
     auto iter_http_hls_port = args_map.find("http_hls_port");
-    auto iter_server_port   = args_map.find("server_port");
     auto iter_admin_port    = args_map.find("admin_port");
     auto iter_daemon        = args_map.find("daemon");
 
     if (iter_server_ip == args_map.end())
     {
-        cout << "Usage:" << argv[0] << " -server_ip <xxx.xxx.xxx.xxx> -server_port [xxx] -http_flv_port [xxx] -http_hls_port [xxx] -daemon [xxx]" << endl;
+        cout << "Usage:" << argv[0] << " -server_ip <xxx.xxx.xxx.xxx> -http_flv_port [xxx] -http_hls_port [xxx] -daemon [xxx]" << endl;
         return 0;
     }
 
@@ -419,14 +357,6 @@ int main(int argc, char* argv[])
         }
     }
 
-    if (iter_server_port != args_map.end())
-    {
-        if (! iter_server_port->second.empty())
-        {
-            server_port = Util::Str2Num<uint16_t>(iter_server_port->second);
-        }
-    }
-
     if (iter_admin_port != args_map.end())
     {
         if (! iter_admin_port->second.empty())
@@ -447,12 +377,6 @@ int main(int argc, char* argv[])
         Util::Daemon();
     }
 
-	IpStr2Num(g_server_ip, g_node_info.ip);
-    g_node_info.port.push_back(server_port);
-    g_node_info.type          = RTMP_NODE;
-    g_node_info.start_time_ms = Util::GetNowMs();
-    g_node_info.pid           = getpid();
-
 	signal(SIGUSR1, sighandler);
     signal(SIGPIPE,SIG_IGN);
 
@@ -467,22 +391,6 @@ int main(int argc, char* argv[])
     TimerInSecond timer_in_second(&epoller);
     TimerInMillSecond timer_in_millsecond(&epoller);
 
-    // === Init Server Stream Socket ===
-    int server_stream_fd = CreateNonBlockTcpSocket();
-
-    ReuseAddr(server_stream_fd);
-    Bind(server_stream_fd, "0.0.0.0", server_port);
-    Listen(server_stream_fd);
-    SetNonBlock(server_stream_fd);
-
-    ServerMgr server_mgr(&epoller);
-    timer_in_second.AddTimerSecondHandle(&server_mgr);
-    g_server_mgr = &server_mgr;
-
-    TcpSocket server_stream_socket(&epoller, server_stream_fd, &server_mgr);
-    server_stream_socket.EnableRead();
-    server_stream_socket.AsServerSocket();
-
     // === Init Server Rtmp Socket ===
     int server_rtmp_fd = CreateNonBlockTcpSocket();
 
@@ -491,7 +399,7 @@ int main(int argc, char* argv[])
     Listen(server_rtmp_fd);
     SetNonBlock(server_rtmp_fd);
 
-    RtmpMgr rtmp_mgr(&epoller, &server_mgr);
+    RtmpMgr rtmp_mgr(&epoller);
     timer_in_second.AddTimerSecondHandle(&rtmp_mgr);
     g_rtmp_mgr = &rtmp_mgr;
 
@@ -539,7 +447,7 @@ int main(int argc, char* argv[])
     Listen(server_http_hls_fd);
     SetNonBlock(server_http_hls_fd);
 
-    HttpHlsMgr http_hls_mgr(&epoller, &rtmp_mgr, &server_mgr);
+    HttpHlsMgr http_hls_mgr(&epoller, &rtmp_mgr);
 
     g_http_hls_mgr = &http_hls_mgr;
 
@@ -555,7 +463,7 @@ int main(int argc, char* argv[])
     Listen(server_https_hls_fd);
     SetNonBlock(server_https_hls_fd);
 
-    HttpHlsMgr https_hls_mgr(&epoller, &rtmp_mgr, &server_mgr);
+    HttpHlsMgr https_hls_mgr(&epoller, &rtmp_mgr);
 
     g_https_hls_mgr = &https_hls_mgr;
 
@@ -662,55 +570,10 @@ int main(int argc, char* argv[])
     UdpSocket server_webrtc_socket(&epoller, webrtc_fd, &webrtc_mgr);
     server_webrtc_socket.EnableRead();
 
-    // === Init Media Center ===
-    MediaCenterMgr media_center_mgr(&epoller);
-    timer_in_second.AddTimerSecondHandle(&media_center_mgr);
-    g_media_center_mgr = &media_center_mgr;
-
-    // === Init Media Node Discovery ===
-    MediaNodeDiscoveryMgr media_node_discovery_mgr(&epoller);
-    g_media_node_discovery_mgr = &media_node_discovery_mgr;
-    media_node_discovery_mgr.ConnectNodeDiscovery("127.0.0.1", 16001);
-
-    timer_in_second.AddTimerSecondHandle(&media_node_discovery_mgr);
-
-    sockaddr_storage clientaddr;
-    int addrlen = sizeof(clientaddr);
-	SRTSOCKET fhandle;
-
     // Event Loop
     while (true)
     {
         epoller.Run();
-
-		if (SRT_INVALID_SOCK == (fhandle = srt_accept(serv, (sockaddr*)&clientaddr, &addrlen)))
-        {
-            int err = srt_getlasterror(NULL);
-
-
-            if (err == (MJ_AGAIN * 1000 + MN_RDAVAIL))
-            {
-                continue;
-            }
-
-            cout << "err:" << err << endl;
-
-            cout << "accept: " << srt_getlasterror_str() << endl;
-            return 0;
-        }
-
-        cout << "accept success" << endl;
-
-        int tsbpdmode = 1;
-        srt_setsockopt(fhandle, 0, SRTO_TSBPDMODE, &tsbpdmode, sizeof tsbpdmode);
-
-        int tsbpddelay = 1000;
-        srt_setsockopt(fhandle, 0, SRTO_TSBPDDELAY, &tsbpddelay, sizeof tsbpddelay);
-
-        bool sync = false;
-        srt_setsockopt(fhandle, 0, SRTO_SNDSYN, &sync, sizeof sync);
-
-        g_srt_client_fd = fhandle;
     }
 
     return 0;

@@ -5,7 +5,6 @@
 #include "global.h"
 #include "media_publisher.h"
 #include "media_muxer.h"
-#include "srt/srt.h"
 #include "util.h"
 
 using namespace std;
@@ -74,13 +73,6 @@ void MediaMuxer::UpdateM3U8()
         return;
     }
 
-    bool first_m3u8 = false;
-
-    if (m3u8_.empty())
-    {
-        first_m3u8 = true;
-    }
-
     uint64_t duration = 0;
     for (const auto& ts : ts_queue_)
     {
@@ -115,17 +107,6 @@ void MediaMuxer::UpdateM3U8()
     m3u8_ = os.str();
 
     cout << LMSG << "\n" << TRACE << "\n" << m3u8_ << TRACE << endl;
-
-    if (first_m3u8)
-    {
-        cout << LMSG << "first m3u8 arrive" << endl;
-        auto pending_http_hls_subscriber = g_local_stream_center.GetAndClearAppStreamPendingSubscriberByType(app_, stream_, kHttpHls);
-
-        for (auto& subscriber : pending_http_hls_subscriber)
-        {
-            subscriber->OnPendingArrive();
-        }
-    }
 }
 
 void MediaMuxer::PacketTs(const Payload& payload)
@@ -142,7 +123,7 @@ void MediaMuxer::PacketTs(const Payload& payload)
 
         if (g_srt_client_fd != -1)
         {
-            srt_send(g_srt_client_fd, srt_send_buf_.data(), srt_send_buf_.size());
+			//srt_send(g_srt_client_fd, srt_send_buf_.data(), srt_send_buf_.size());
         }
     }
 
@@ -478,7 +459,7 @@ void MediaMuxer::PacketTs(const Payload& payload)
 
         if (g_srt_client_fd != -1)
         {
-            srt_send(g_srt_client_fd, (const char*)ts_bs.GetData(), ts_bs.SizeInBytes());
+            //srt_send(g_srt_client_fd, (const char*)ts_bs.GetData(), ts_bs.SizeInBytes());
         }
 
         data += bytes_left;

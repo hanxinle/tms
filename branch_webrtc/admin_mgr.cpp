@@ -1,7 +1,6 @@
 #include "admin_mgr.h"
 
 #include "fd.h"
-#include "server_mgr.h"
 #include "socket_util.h"
 #include "tcp_socket.h"
 

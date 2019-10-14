@@ -3,11 +3,10 @@
 #include "http_hls_protocol.h"
 #include "rtmp_mgr.h"
 
-HttpHlsMgr::HttpHlsMgr(Epoller* epoller, RtmpMgr* rtmp_mgr, ServerMgr* server_mgr)
+HttpHlsMgr::HttpHlsMgr(Epoller* epoller, RtmpMgr* rtmp_mgr)
     :
     epoller_(epoller),
-    rtmp_mgr_(rtmp_mgr),
-    server_mgr_(server_mgr)
+    rtmp_mgr_(rtmp_mgr)
 {
 }
 

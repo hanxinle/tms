@@ -8,12 +8,9 @@
 #include "http_sender.h"
 #include "io_buffer.h"
 #include "local_stream_center.h"
-#include "media_center_mgr.h"
 #include "ref_ptr.h"
 #include "rtmp_protocol.h"
-#include "server_protocol.h"
 #include "rtmp_mgr.h"
-#include "server_mgr.h"
 #include "tcp_socket.h"
 
 using namespace std;
@@ -57,12 +54,9 @@ int HttpFlvProtocol::Parse(IoBuffer& io_buffer)
                     SendFlvHeader();
                     media_publisher_->AddSubscriber(this);
                 }
-                else  // 本进程无流, 从MediaCenter获取publish node
+                else
                 {
-                    g_media_center_mgr->GetAppStreamMasterNode(app_, stream_);
-                    expired_time_ms_ = Util::GetNowMs() + 10000;
-
-                    g_local_stream_center.AddAppStreamPendingSubscriber(app_, stream_, this);
+					return kError;
                 }
             }
             else

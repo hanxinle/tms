@@ -129,8 +129,6 @@ int AdminProtocol::ProcAdminMsg(const string& admin_msg)
 
 				    RtmpProtocol* rtmp_player = g_rtmp_mgr->GetOrCreateProtocol(*socket);
 
-                    g_local_stream_center.RegisterStream(rtmp_info.app, rtmp_info.stream, rtmp_player, true);
-
     			    rtmp_player->SetApp(rtmp_info.app);
     			    rtmp_player->SetStreamName(rtmp_info.stream);
                     rtmp_player->SetDomain(rtmp_info.ip);
@@ -200,8 +198,6 @@ int AdminProtocol::ProcAdminMsg(const string& admin_msg)
                     Fd* socket = new TcpSocket(epoller_, fd, (SocketHandle*)g_rtmp_mgr);
 
 				    RtmpProtocol* rtmp_player = g_rtmp_mgr->GetOrCreateProtocol(*socket);
-
-                    g_local_stream_center.RegisterStream(rtmp_info.app, rtmp_info.stream, rtmp_player, true);
 
     			    rtmp_player->SetApp(rtmp_info.app);
     			    rtmp_player->SetStreamName(rtmp_info.stream);

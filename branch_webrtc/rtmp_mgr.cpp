@@ -3,10 +3,9 @@
 #include "fd.h"
 #include "rtmp_mgr.h"
 
-RtmpMgr::RtmpMgr(Epoller* epoller, ServerMgr* server_mgr)
+RtmpMgr::RtmpMgr(Epoller* epoller)
     :
-    epoller_(epoller),
-    server_mgr_(server_mgr)
+    epoller_(epoller)
 {
 }
 

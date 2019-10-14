@@ -30,8 +30,6 @@ public:
 
     int OnStop();
 
-    virtual int OnPendingArrive();
-
 private:
     TcpSocket* GetTcpSocket()
     {   

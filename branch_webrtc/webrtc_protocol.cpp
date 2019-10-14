@@ -99,7 +99,6 @@ WebrtcProtocol::WebrtcProtocol(Epoller* epoller, Fd* socket)
     dtls_hello_send_(false),
     dtls_(NULL),
     dtls_handshake_done_(false),
-    media_input_(NULL),
     timestamp_base_(0),
     timestamp_(0),
     media_input_open_count_(0),
@@ -175,7 +174,7 @@ void WebrtcProtocol::SendVideoData(const uint8_t* data, const int& size, const u
     rtp_header_vp8.nonReference = 0;
 
     webrtc::FrameType frame_type = kVideoFrameDelta;
-    if (flag & AV_PKT_FLAG_KEY)
+    if (flag & 1)
     {
         frame_type = kVideoFrameKey;
         rtp_header_vp8.nonReference = 1;
@@ -2024,8 +2023,7 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
             int ret = ProtectRtcp(buf, len, protect_buf, protect_buf_len);
 
             //GetUdpSocket()->Send(protect_buf, protect_buf_len);
-
-            cout << LMSG << "PLI[" << Util::Bin2Hex(buf, len) << "]" << endl;
+            //cout << LMSG << "PLI[" << Util::Bin2Hex(buf, len) << "]" << endl;
         }
     }
 

@@ -40,9 +40,10 @@
         navigator.webkitGetUserMedia({
             "audio": true,
             "video": { 
-                width: 1280,
-                height:720,
-                frameRate:30
+                width: 800,
+                height:600,
+                frameRate:30,
+				bitRate:8000,
             }
         }, function(stream){
             //绑定本地媒体流到video标签用于输出

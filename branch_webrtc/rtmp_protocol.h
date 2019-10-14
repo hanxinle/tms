@@ -12,7 +12,6 @@
 #include "media_publisher.h"
 #include "media_subscriber.h"
 #include "ref_ptr.h"
-#include "server_protocol.h"
 #include "socket_util.h"
 #include "trace_tool.h"
 
@@ -229,7 +228,6 @@ public:
     }
 
     int ConnectForwardRtmpServer(const string& ip, const uint16_t& port);
-    int ConnectFollowServer(const string& ip, const uint16_t& port);
 
     static int ParseRtmpUrl(const string& url, RtmpUrl& rtmp_url);
 

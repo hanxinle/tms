@@ -99,6 +99,7 @@ void WebrtcMgr::__DebugBroadcast(const uint8_t* data, const int& len)
             int protect_rtp_len = len;
             if (kv.second->ProtectRtp(data, len, protect_rtp, protect_rtp_len) == 0)
             {
+				cout << LMSG << "send webrtc" << endl;
                 kv.second->GetUdpSocket()->Send(protect_rtp, protect_rtp_len);
             }
         }

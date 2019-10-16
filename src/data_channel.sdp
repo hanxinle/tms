@@ -10,5 +10,5 @@ a=ice-pwd:xxx
 a=fingerprint:sha-256
 a=ice-options:trickle
 a=setup:active
-a=mid:data
+a=mid:0
 a=sctpmap:xxx_port webrtc-datachannel 1024

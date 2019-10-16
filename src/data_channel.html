@@ -31,7 +31,7 @@ Remote Media: <br>
 var PeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection;
 var SessionDescription = window.RTCSessionDescription || window.mozRTCSessionDescription || window.webkitRTCSessionDescription;
 
-var socket = new WebSocket("wss://hw.com:8943/webrtc_data_channel_test.sdp");
+var socket = new WebSocket("wss://hw.com:8943/data_channel.sdp");
 var pc = new PeerConnection(null);
 
 pc.ondatachannel = function(evt) {

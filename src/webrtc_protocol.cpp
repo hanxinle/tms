@@ -108,15 +108,6 @@ WebrtcProtocol::WebrtcProtocol(Epoller* epoller, Fd* socket)
     video_seq_(0),
     pre_recv_data_time_ms_(Util::GetNowMs())
 {
-#if defined(USE_PUBLISH)
-    cout << LMSG << "WebRTC USE_PUBLISH" << endl;
-#elif defined(USE_VP8_WEBM)
-    cout << LMSG << "WebRTC USE_VP8_WEBM" << endl;
-#elif defined(USE_VP9_WEBM)
-    cout << LMSG << "WebRTC USE_VP9_WEBM" << endl;
-#elif defined(USE_TRANSCODER)
-    cout << LMSG << "WebRTC USE_TRANSCODER" << endl;
-#endif
 }
 
 WebrtcProtocol::~WebrtcProtocol()
@@ -131,7 +122,7 @@ int WebrtcProtocol::Parse(IoBuffer& io_buffer)
 
     if (len > 0)
     {
-        cout << LMSG << "webrtc recv\n" << Util::Bin2Hex(data, len) << endl;
+        cout << LMSG << "instance=" << this << ",webrtc recv\n" << Util::Bin2Hex(data, len) << endl;
 
         pre_recv_data_time_ms_ = Util::GetNowMs();
 
@@ -1510,6 +1501,7 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
             rtp_bit_buffer.GetBytes(4, csrc);
         }
 
+        ostringstream os_extension;
         if (extension)
         {
             uint16_t defined_by_profile = 0;
@@ -1522,11 +1514,15 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
 
             string extension_payload = "";
             rtp_bit_buffer.GetString(extension_length, extension_payload);
+            
+            os_extension << "defined_by_profile:" << defined_by_profile
+                << ",extension_length:" << extension_length
+                << ",extension_payload:" << Util::Bin2Hex(extension_payload, 32, false);
         }
 
         cout << LMSG << "[RTP Header] # version:" << (int)version
                      << ",padding:" << (int)padding
-                     << ",extension:" << (int)extension
+                     << ",extension:" << (int)extension << " | " << os_extension.str()
                      << ",csrc_count:" << (int)csrc_count
                      << ",marker:" << (int)marker
                      << ",payload_type:" << (int)payload_type
@@ -1549,17 +1545,13 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
 
             cout << LMSG << "parse vp8 success" << endl;
 
-#ifdef USE_PUBLISH
-            {   
-                RtpHeader* rtp_header = (RtpHeader*)unprotect_buf;
+            RtpHeader* rtp_header = (RtpHeader*)unprotect_buf;
 
-                video_publisher_ssrc_ = ssrc;
+            video_publisher_ssrc_ = ssrc;
 
-                rtp_header->setSSRC(3233846889);
+            rtp_header->setSSRC(3233846889);
 
-                g_webrtc_mgr->__DebugBroadcast(unprotect_buf, unprotect_buf_len);
-            }
-#endif
+            g_webrtc_mgr->__DebugBroadcast(unprotect_buf, unprotect_buf_len);
         }
         else if (payload_type == 98)
         {
@@ -1570,61 +1562,74 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
                 cout << LMSG << "parse vp9 failed" << endl;
                 return kError;
             }
-            cout   << LMSG                       << "parse vp9 success"
-                   << ",payload_length:"         << (int64_t)parsed_payload.payload_length
-				   << ",frame_type:"             << (int64_t)parsed_payload.frame_type
-				   << ",is_first_packet:"        << (int64_t)parsed_payload.type.Video.isFirstPacket
-                   << ",picture_id:"             << (int64_t)parsed_payload.type.Video.codecHeader.VP9.picture_id
-                   << ",beginning_of_frame:"     << (int64_t)parsed_payload.type.Video.codecHeader.VP9.beginning_of_frame
-                   << ",end_of_frame:"           << (int64_t)parsed_payload.type.Video.codecHeader.VP9.end_of_frame
-                   << ",inter_pic_predicted:"    << (int64_t)parsed_payload.type.Video.codecHeader.VP9.inter_pic_predicted
-                   << ",flexible_mode:"          << (int64_t)parsed_payload.type.Video.codecHeader.VP9.flexible_mode
-                   << ",ss_data_available:"      << (int64_t)parsed_payload.type.Video.codecHeader.VP9.ss_data_available
-                   << ",max_picture_id:"         << (int64_t)parsed_payload.type.Video.codecHeader.VP9.max_picture_id
-                   << ",tl0_pic_idx:"            << (int64_t)parsed_payload.type.Video.codecHeader.VP9.tl0_pic_idx
-                   << ",temporal_idx:"           << (int64_t)parsed_payload.type.Video.codecHeader.VP9.temporal_idx
-                   << ",spatial_idx:"            << (int64_t)parsed_payload.type.Video.codecHeader.VP9.spatial_idx
-                   << ",temporal_up_switch:"     << (int64_t)parsed_payload.type.Video.codecHeader.VP9.temporal_up_switch
-                   << ",inter_layer_predicted:"  << (int64_t)parsed_payload.type.Video.codecHeader.VP9.inter_layer_predicted
-                   << ",gof_idx:"                << (int64_t)parsed_payload.type.Video.codecHeader.VP9.gof_idx
-                   << ",num_ref_pics:"           << (int64_t)parsed_payload.type.Video.codecHeader.VP9.num_ref_pics
-                   << ",num_spatial_layers:"     << (int64_t)parsed_payload.type.Video.codecHeader.VP9.num_spatial_layers
-                   << ",gof.num_frames_in_gof:"  << (int64_t)parsed_payload.type.Video.codecHeader.VP9.gof.num_frames_in_gof
-                   << ",gof.temporal_idx:"       << (int64_t)parsed_payload.type.Video.codecHeader.VP9.gof.temporal_idx[0]
-                   << ",gof.temporal_up_switch:" << (int64_t)parsed_payload.type.Video.codecHeader.VP9.gof.temporal_up_switch[0]
-                   << ",gof.num_ref_pics:"       << (int64_t)parsed_payload.type.Video.codecHeader.VP9.gof.num_ref_pics[0]
-                   << ",gof.pid_diff:"           << (int64_t)parsed_payload.type.Video.codecHeader.VP9.gof.pid_diff[0][0]
-                   << ","                        << (int64_t)parsed_payload.type.Video.codecHeader.VP9.gof.pid_diff[0][1]
-                   << ","                        << (int64_t)parsed_payload.type.Video.codecHeader.VP9.gof.pid_diff[0][2]
-                   << ",width:"                  << (int64_t)parsed_payload.type.Video.codecHeader.VP9.width[0]
-                   << ",height:"                 << (int64_t)parsed_payload.type.Video.codecHeader.VP9.height[0]
-                   << endl;
+            cout << LMSG                       << "parse vp9 success"
+                 << ",payload_length:"         << (int64_t)parsed_payload.payload_length
+				 << ",frame_type:"             << (int64_t)parsed_payload.frame_type
+				 << ",is_first_packet:"        << (int64_t)parsed_payload.type.Video.isFirstPacket
+                 << ",picture_id:"             << (int64_t)parsed_payload.type.Video.codecHeader.VP9.picture_id
+                 << ",beginning_of_frame:"     << (int64_t)parsed_payload.type.Video.codecHeader.VP9.beginning_of_frame
+                 << ",end_of_frame:"           << (int64_t)parsed_payload.type.Video.codecHeader.VP9.end_of_frame
+                 << ",inter_pic_predicted:"    << (int64_t)parsed_payload.type.Video.codecHeader.VP9.inter_pic_predicted
+                 << ",flexible_mode:"          << (int64_t)parsed_payload.type.Video.codecHeader.VP9.flexible_mode
+                 << ",ss_data_available:"      << (int64_t)parsed_payload.type.Video.codecHeader.VP9.ss_data_available
+                 << ",max_picture_id:"         << (int64_t)parsed_payload.type.Video.codecHeader.VP9.max_picture_id
+                 << ",tl0_pic_idx:"            << (int64_t)parsed_payload.type.Video.codecHeader.VP9.tl0_pic_idx
+                 << ",temporal_idx:"           << (int64_t)parsed_payload.type.Video.codecHeader.VP9.temporal_idx
+                 << ",spatial_idx:"            << (int64_t)parsed_payload.type.Video.codecHeader.VP9.spatial_idx
+                 << ",temporal_up_switch:"     << (int64_t)parsed_payload.type.Video.codecHeader.VP9.temporal_up_switch
+                 << ",inter_layer_predicted:"  << (int64_t)parsed_payload.type.Video.codecHeader.VP9.inter_layer_predicted
+                 << ",gof_idx:"                << (int64_t)parsed_payload.type.Video.codecHeader.VP9.gof_idx
+                 << ",num_ref_pics:"           << (int64_t)parsed_payload.type.Video.codecHeader.VP9.num_ref_pics
+                 << ",num_spatial_layers:"     << (int64_t)parsed_payload.type.Video.codecHeader.VP9.num_spatial_layers
+                 << ",gof.num_frames_in_gof:"  << (int64_t)parsed_payload.type.Video.codecHeader.VP9.gof.num_frames_in_gof
+                 << ",gof.temporal_idx:"       << (int64_t)parsed_payload.type.Video.codecHeader.VP9.gof.temporal_idx[0]
+                 << ",gof.temporal_up_switch:" << (int64_t)parsed_payload.type.Video.codecHeader.VP9.gof.temporal_up_switch[0]
+                 << ",gof.num_ref_pics:"       << (int64_t)parsed_payload.type.Video.codecHeader.VP9.gof.num_ref_pics[0]
+                 << ",gof.pid_diff:"           << (int64_t)parsed_payload.type.Video.codecHeader.VP9.gof.pid_diff[0][0]
+                 << ","                        << (int64_t)parsed_payload.type.Video.codecHeader.VP9.gof.pid_diff[0][1]
+                 << ","                        << (int64_t)parsed_payload.type.Video.codecHeader.VP9.gof.pid_diff[0][2]
+                 << ",width:"                  << (int64_t)parsed_payload.type.Video.codecHeader.VP9.width[0]
+                 << ",height:"                 << (int64_t)parsed_payload.type.Video.codecHeader.VP9.height[0]
+                 << endl;
 
-#ifdef USE_PUBLISH
-            {   
-                RtpHeader* rtp_header = (RtpHeader*)unprotect_buf;
+            RtpHeader* rtp_header = (RtpHeader*)unprotect_buf;
 
-                video_publisher_ssrc_ = ssrc;
+            video_publisher_ssrc_ = ssrc;
 
-                rtp_header->setSSRC(3233846889);
+            rtp_header->setSSRC(3233846889);
 
+            if (rtp_header->getExtension())
+            {
+                uint32_t extension_length = 4 + rtp_header->getExtLength() * 4;
+                cout << LMSG << "ext len from rtp header=" << extension_length << endl;
+
+                uint32_t rtp_header_length = rtp_header->getHeaderLength();
+
+                cout << LMSG << "before=\n" << Util::Bin2Hex(unprotect_buf, unprotect_buf_len) << endl;
+
+                memcpy(unprotect_buf + extension_length, unprotect_buf, rtp_header_length - extension_length);
+                const uint8_t* changed_buf = unprotect_buf + extension_length;
+                int changed_buf_len = unprotect_buf_len - extension_length;
+
+                rtp_header = (RtpHeader*)changed_buf;
+                rtp_header->setExtension(0);
+                cout << LMSG << "after=\n" << Util::Bin2Hex(changed_buf, changed_buf_len) << endl;
+                g_webrtc_mgr->__DebugBroadcast(changed_buf, changed_buf_len);
+            }
+            else
+            {
                 g_webrtc_mgr->__DebugBroadcast(unprotect_buf, unprotect_buf_len);
             }
-#endif
         }
         else if (payload_type == 100) // H264
         {
-#ifdef USE_PUBLISH
-            {   
-                RtpHeader* rtp_header = (RtpHeader*)unprotect_buf;
+            RtpHeader* rtp_header = (RtpHeader*)unprotect_buf;
 
-                video_publisher_ssrc_ = ssrc;
+            video_publisher_ssrc_ = ssrc;
 
-                rtp_header->setSSRC(3233846889);
+            rtp_header->setSSRC(3233846889);
 
-                g_webrtc_mgr->__DebugBroadcast(unprotect_buf, unprotect_buf_len);
-            }
-#endif
+            g_webrtc_mgr->__DebugBroadcast(unprotect_buf, unprotect_buf_len);
 
             cout << LMSG << "h264 dump:\n" << Util::Bin2Hex(unprotect_buf, unprotect_buf_len) << endl;
 
@@ -1834,36 +1839,19 @@ void WebrtcProtocol::SetConnectState()
 
         dtls_hello_send_ = true;
 
-#if defined(USE_VP8_WEBM) || defined(USE_VP9_WEBM)
-        if (media_input_ == NULL)
-        {
-            media_input_ = new MediaInput();
-        }
-
-#ifdef USE_VP8_WEBM
-        media_input_->Open("input_vp8.webm");
-#elif defined USE_VP9_WEBM
-        media_input_->Open("input_vp9.webm");
-#endif
-
-        ++media_input_open_count_;
-        media_input_read_video_frame_count = 0;
-
-#endif  // USE_VP8_WEBM || USE_VP9_WEBM
-
-        if (dtls_ == NULL)
-        {
+       	if (dtls_ == NULL)
+        {    
             dtls_ = SSL_new(g_dtls_ctx);
 
-			SSL_set_connect_state(dtls_);
+            SSL_set_connect_state(dtls_);
 
-        	bio_in_  = BIO_new(BIO_s_mem());
-        	bio_out_ = BIO_new(BIO_s_mem());
+            bio_in_  = BIO_new(BIO_s_mem());
+            bio_out_ = BIO_new(BIO_s_mem());
 
-        	SSL_set_bio(dtls_, bio_in_, bio_out_);
+            SSL_set_bio(dtls_, bio_in_, bio_out_);
 
             Handshake();
-        }
+        } 
     }
 }
 
@@ -1941,8 +1929,6 @@ int WebrtcProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& inte
 
 int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)
 {
-#ifdef USE_PUBLISH
-
 /*
  	 0                   1                   2                   3
      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -2026,314 +2012,6 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
             //cout << LMSG << "PLI[" << Util::Bin2Hex(buf, len) << "]" << endl;
         }
     }
-
-#elif defined(USE_VP8_WEBM) || defined(USE_VP9_WEBM)
-
-    cout << LMSG << "count:" << count << endl;
-
-    if (dtls_handshake_done_ && media_input_ != NULL)
-    {
-        uint64_t send_delta = now_in_ms - send_begin_time_;
-
-        cout << LMSG << "send_delta:" << send_delta << ",timestamp_:" << timestamp_ << ",send_begin_time_:" << send_begin_time_ << ",timestamp_base_:" << timestamp_base_ << endl;
-
-        // FIXME:这种用法如果webrtc_mgr里面有多个webrtc_protocol的话, 会卡死, 大概是因为UDP发包队列的限制
-        while (send_delta >= timestamp_ + timestamp_base_)
-        {
-            uint8_t* frame_data = NULL;
-            int frame_len = 0;
-            int flag = 0;
-            bool is_video = false;
-
-            int ret = media_input_->ReadFrame(frame_data, frame_len, flag, is_video, timestamp_);
-
-            if (ret == 0)
-            {
-                delete media_input_;
-
-                media_input_ = new MediaInput();
-#ifdef USE_VP8_WEBM
-                media_input_->Open("input_vp8.webm");
-#elif defined USE_VP9_WEBM
-                media_input_->Open("input_vp9.webm");
-#endif
-
-                ++media_input_open_count_;
-                media_input_read_video_frame_count = 0;
-
-                cout << LMSG << "timestamp_base_:" << timestamp_base_ << "=>" << (timestamp_base_ + timestamp_) << endl;
-                timestamp_base_ += timestamp_;
-                timestamp_ = 0;
-                break;
-            }
-            else if (ret < 0)
-            {
-                return 0;
-            }
-
-            if (timestamp_ > UINT32_MAX)
-            {
-                cout << LMSG << "first media frame, timestamp_:" << timestamp_ << endl;
-                timestamp_ = 0;
-            }
-
-            ++media_input_read_video_frame_count;
-
-            cout << LMSG << "is_video:" << is_video << ",timestamp_:" << timestamp_ << endl;
-
-            if (is_video)
-            {
-#ifdef USE_VP8_WEBM
-                cout << LMSG << "send vp8 message" << endl;
-#elif defined USE_VP9_WEBM
-                cout << LMSG << "send vp9 message" << endl;
-#endif
-
-                static int picture_id_ = 0;
-
-		        RTPVideoTypeHeader rtp_video_head;
-
-#ifdef USE_VP8_WEBM
-                RTPVideoHeaderVP8& rtp_header_vp8 = rtp_video_head.VP8;
-                rtp_header_vp8.InitRTPVideoHeaderVP8();
-                rtp_header_vp8.pictureId = ++picture_id_;
-                rtp_header_vp8.nonReference = 0;
-
-                webrtc::FrameType frame_type = kVideoFrameDelta;
-                if (flag & AV_PKT_FLAG_KEY)
-                {
-                    frame_type = kVideoFrameKey;
-                    rtp_header_vp8.nonReference = 1;
-                }
-
-                // 编码后的视频帧打包为RTP
-                RtpPacketizer* rtp_packetizer = RtpPacketizer::Create(kRtpVideoVp8, 1200, &rtp_video_head, frame_type);
-#elif defined USE_VP9_WEBM
-                RTPVideoHeaderVP9& rtp_header_vp9 = rtp_video_head.VP9;
-                rtp_header_vp9.InitRTPVideoHeaderVP9();
-                //  XXX:原理还是不是特别懂, 给一个GOF帧, 这一步一定要加, VP9才能播放
-                if (picture_id_ == 0)
-                {
-                    rtp_header_vp9.ss_data_available = true;
-                    rtp_header_vp9.gof.num_frames_in_gof = 1;
-                    rtp_header_vp9.width[0] = 576;
-                    rtp_header_vp9.height[0] = 432;
-                    rtp_header_vp9.spatial_layer_resolution_present = true;
-
-                    cout << LMSG << "set vp9 gof" << endl;
-                }
-
-                rtp_header_vp9.picture_id = ++picture_id_;
-                rtp_header_vp9.inter_pic_predicted = 1;
-
-                webrtc::FrameType frame_type = kVideoFrameDelta;
-                if (flag & AV_PKT_FLAG_KEY)
-                {
-                    frame_type = kVideoFrameKey;
-                    rtp_header_vp9.inter_pic_predicted = 0;
-                }
-
-                // 编码后的视频帧打包为RTP
-                RtpPacketizer* rtp_packetizer = RtpPacketizer::Create(kRtpVideoVp9, 1200, &rtp_video_head, frame_type);
-#endif
-
-#ifdef USE_VP8_WEBM
-                rtp_packetizer->SetPayloadData(frame_data, frame_len, NULL);
-#elif defined USE_VP9_WEBM
-
-                RTPFragmentationHeader fragment_header;
-                fragment_header.VerifyAndAllocateFragmentationHeader(1);
-
-                fragment_header.fragmentationOffset[0] = 0;
-                fragment_header.fragmentationLength[0] = frame_len;
-
-                rtp_packetizer->SetPayloadData(frame_data, frame_len, &fragment_header);
-#else
-                assert(false);
-#endif
-
-                bool last_packet = false;
-                do  
-                {   
-                    uint8_t rtp[1500] = {0};
-                    uint8_t* rtp_packet = rtp + 12; 
-                    size_t rtp_packet_len = 0;
-                    if (! rtp_packetizer->NextPacket(rtp_packet, &rtp_packet_len, &last_packet))
-                    {   
-                        cerr << LMSG << "packet rtp error" << endl;
-                    }   
-                    else
-                    {   
-                        RtpHeader rtp_header;
-
-                        rtp_header.setSSRC(3233846889);
-                        rtp_header.setMarker(last_packet ? 1 : 0); 
-                        rtp_header.setSeqNumber(++video_seq_);
-#ifdef USE_VP8_WEBM
-                        rtp_header.setPayloadType(96);
-#elif defined USE_VP9_WEBM
-                        rtp_header.setPayloadType(98);
-
-                        // debug
-                        {
-                            uint8_t debug[1500];
-                            memcpy(debug, rtp_packet, rtp_packet_len);
-                            RtpDepacketizer::ParsedPayload parsed_payload;
-                            if (! vp9_depacket_.Parse(&parsed_payload, debug, rtp_packet_len))
-                            {
-                                cout << LMSG << "parse vp9 failed" << endl;
-                            }
-                            else
-                            {
-                                cout   << LMSG                       << "parse vp9 success"
-                                       << ",payload_length:"         << (int64_t)parsed_payload.payload_length
-			                    	   << ",frame_type:"             << (int64_t)parsed_payload.frame_type
-			                    	   << ",is_first_packet:"        << (int64_t)parsed_payload.type.Video.isFirstPacket
-                                       << ",picture_id:"             << (int64_t)parsed_payload.type.Video.codecHeader.VP9.picture_id
-                                       << ",beginning_of_frame:"     << (int64_t)parsed_payload.type.Video.codecHeader.VP9.beginning_of_frame
-                                       << ",end_of_frame:"           << (int64_t)parsed_payload.type.Video.codecHeader.VP9.end_of_frame
-                                       << ",inter_pic_predicted:"    << (int64_t)parsed_payload.type.Video.codecHeader.VP9.inter_pic_predicted
-                                       << ",flexible_mode:"          << (int64_t)parsed_payload.type.Video.codecHeader.VP9.flexible_mode
-                                       << ",ss_data_available:"      << (int64_t)parsed_payload.type.Video.codecHeader.VP9.ss_data_available
-                                       << ",max_picture_id:"         << (int64_t)parsed_payload.type.Video.codecHeader.VP9.max_picture_id
-                                       << ",tl0_pic_idx:"            << (int64_t)parsed_payload.type.Video.codecHeader.VP9.tl0_pic_idx
-                                       << ",temporal_idx:"           << (int64_t)parsed_payload.type.Video.codecHeader.VP9.temporal_idx
-                                       << ",spatial_idx:"            << (int64_t)parsed_payload.type.Video.codecHeader.VP9.spatial_idx
-                                       << ",temporal_up_switch:"     << (int64_t)parsed_payload.type.Video.codecHeader.VP9.temporal_up_switch
-                                       << ",inter_layer_predicted:"  << (int64_t)parsed_payload.type.Video.codecHeader.VP9.inter_layer_predicted
-                                       << ",gof_idx:"                << (int64_t)parsed_payload.type.Video.codecHeader.VP9.gof_idx
-                                       << ",num_ref_pics:"           << (int64_t)parsed_payload.type.Video.codecHeader.VP9.num_ref_pics
-                                       << ",num_spatial_layers:"     << (int64_t)parsed_payload.type.Video.codecHeader.VP9.num_spatial_layers
-                                       << ",gof.num_frames_in_gof:"  << (int64_t)parsed_payload.type.Video.codecHeader.VP9.gof.num_frames_in_gof
-                                       << ",gof.temporal_idx:"       << (int64_t)parsed_payload.type.Video.codecHeader.VP9.gof.temporal_idx[0]
-                                       << ",gof.temporal_up_switch:" << (int64_t)parsed_payload.type.Video.codecHeader.VP9.gof.temporal_up_switch[0]
-                                       << ",gof.num_ref_pics:"       << (int64_t)parsed_payload.type.Video.codecHeader.VP9.gof.num_ref_pics[0]
-                                       << ",gof.pid_diff:"           << (int64_t)parsed_payload.type.Video.codecHeader.VP9.gof.pid_diff[0][0]
-                                       << ","                        << (int64_t)parsed_payload.type.Video.codecHeader.VP9.gof.pid_diff[0][1]
-                                       << ","                        << (int64_t)parsed_payload.type.Video.codecHeader.VP9.gof.pid_diff[0][2]
-                                       << ",width:"                  << (int64_t)parsed_payload.type.Video.codecHeader.VP9.width[0]
-                                       << ",height:"                 << (int64_t)parsed_payload.type.Video.codecHeader.VP9.height[0]
-                                       << endl;
-                            }
-                        }
-#endif
-
-                        if (media_input_open_count_ > 1)
-                        {
-                            rtp_header.setTimestamp((uint32_t)(timestamp_ + timestamp_base_) * 90);
-                        }
-                        else
-                        {
-                            rtp_header.setTimestamp((uint32_t)timestamp_ * 90);
-                        }
-
-                        memcpy(rtp, &rtp_header, rtp_header.getHeaderLength()/*rtp head size*/);
-
-                        uint8_t protect_buf[1500];
-                        int protect_buf_len = rtp_header.getHeaderLength() + rtp_packet_len;
-                        int ret = ProtectRtp(rtp, protect_buf_len, protect_buf, protect_buf_len);
-
-                        if (ret == 0)
-                        {
-                            cout << "ProtectRtp success" << endl;
-                            GetUdpSocket()->Send((const uint8_t*)protect_buf, protect_buf_len);
-                        }
-                        else
-                        {
-                            cout << LMSG << "ProtectRtp failed:" << ret << endl;
-                        }
-
-                        cout << LMSG << "srtp protect_buf_len:" << protect_buf_len << endl;
-                    }   
-                }   
-                while (! last_packet);
-
-		        delete rtp_packetizer;
-            }
-            else
-            {
-                cout << LMSG << "send opus message" << endl;
-
-				RtpHeader rtp_header;
-
-            	uint8_t rtp[1500];
-            	uint8_t* rtp_packet = rtp + 12; 
-
-                static uint32_t audio_seq_ = 0;
-
-            	rtp_header.setSSRC(3233846889+1);
-            	rtp_header.setSeqNumber(++audio_seq_);
-            	rtp_header.setPayloadType(111);
-
-                if (media_input_open_count_ > 1)
-                {
-            	    rtp_header.setTimestamp((uint32_t)(timestamp_ + timestamp_base_) * 48);
-                }
-                else
-                {
-            	    rtp_header.setTimestamp((uint32_t)timestamp_ * 48);
-                }
-
-            	memcpy(rtp, &rtp_header, 12/*rtp head size*/);
-            	memcpy(rtp_packet, frame_data, frame_len);
-
-                uint8_t protect_buf[1500];
-                int protect_buf_len = 12 + frame_len;;
-                memcpy(protect_buf, rtp, protect_buf_len);
-                int ret = ProtectRtp(rtp, protect_buf_len, protect_buf, protect_buf_len);
-
-                if (ret == 0)
-                {
-                    cout << LMSG << "ProtectRtp opus success" << endl;
-                    GetUdpSocket()->Send((const uint8_t*)protect_buf, protect_buf_len);
-                }
-                else
-                {
-                    cout << LMSG << "ProtectRtp failed:" << ret << endl;
-                }
-
-                cout << LMSG << "srtp protect_buf_len:" << protect_buf_len << endl;
-            }
-        }
-    }
-#elif defined USE_TRANSCODER
-    if (dtls_handshake_done_)
-    {
-        uint64_t send_delta = now_in_ms - send_begin_time_;
-
-        cout << LMSG << "send_delta:" << send_delta << ",timestamp_:" << timestamp_ << endl;
-
-        if (g_media_queue.size() >= 600)
-        {
-            cout << LMSG << "g_media_queue.size() = " << g_media_queue.size() << endl;
-
-            while (send_delta >= timestamp_)
-            {
-                static int index = 0;
-                MediaPacket& media_packet = g_media_queue[index % g_media_queue.size()];
-                ++index;
-                timestamp_ = media_packet.dts_;
-
-                if (timestamp_ > UINT32_MAX)
-                {
-                    cout << LMSG << "first media frame, timestamp_:" << timestamp_ << endl;
-                    timestamp_ = 0;
-                }
-
-                if (media_packet.IsVideo())
-                {
-                    SendVideoData((const uint8_t*)(media_packet.data_.data()), media_packet.data_.size(), media_packet.dts_, media_packet.flag_);
-                }
-                else if (media_packet.IsAudio())
-                {
-                    SendAudioData((const uint8_t*)(media_packet.data_.data()), media_packet.data_.size(), media_packet.dts_, media_packet.flag_);
-                }
-
-                //g_media_queue.pop_front();
-            }
-        }
-    }
-#endif
 
     return kSuccess;
 }
@@ -2635,7 +2313,7 @@ bool WebrtcProtocol::CheckCanClose()
 
     if (now_ms - pre_recv_data_time_ms_ >= kWebRtcRecvTimeoutInMs)
     {
-        cout << LMSG << "webrtc timeout" << endl;
+        cout << LMSG << "instance=" << this << ",webrtc timeout" << endl;
         return true;
     }
 

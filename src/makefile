@@ -14,12 +14,7 @@ CFLAGS         = -g -W -Wall -Werror -O2 -pg
 CXXFLAGS       = -g -std=c++0x -DWEBRTC_POSIX -W -Wall -Werror -O2 -pg -Wno-strict-aliasing -Wno-missing-field-initializers -Wno-unused-function -Wno-deprecated-declarations \
 				 -Wno-unused-variable -Wno-unused-parameter -Wno-unused-value
 
-# 这4个标志位是互斥的
 CXXFLAGS       += -DUSE_PUBLISH
-#CXXFLAGS       += -DUSE_VP8_WEBM
-#CXXFLAGS       += -DUSE_VP9_WEBM
-#CXXFLAGS       += -DUSE_TRANSCODER
-
 CXXFLAGS       += -D__STDC_CONSTANT_MACROS
 # ==========================================================
 SOURCES += $(wildcard ./*.cpp)

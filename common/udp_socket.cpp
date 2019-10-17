@@ -36,7 +36,7 @@ int UdpSocket::OnRead()
 
         if (bytes > 0)
         {
-            cout << LMSG << "udp recv from:" << client_ip_ << ":" << client_port_ << endl;
+            //cout << LMSG << "udp recv from:" << client_ip_ << ":" << client_port_ << endl;
 
             if (handler_)
             {
@@ -52,7 +52,7 @@ int UdpSocket::OnRead()
         {
 			if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
             {   
-                cout << LMSG << "block" << endl;
+                //cout << LMSG << "block" << endl;
             }
 
             break;

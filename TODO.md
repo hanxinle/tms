@@ -1,3 +1,3 @@
-* 转码
-* MediaCenter(触发式流分发)
-* log
+* sdp解析
+* 多上行, 房间管理
+* rtp转rtmp

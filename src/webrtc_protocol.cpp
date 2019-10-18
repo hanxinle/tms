@@ -89,6 +89,17 @@ static uint32_t get_host_priority(uint16_t local_pref, bool is_rtp)
     return (pref << 24) + (local_pref << 8) + ((256 - (is_rtp ? 1 : 2)) << 0); 
 }
 
+enum class WebRTCPayloadType
+{
+    VP8 = 96,
+    VP9 = 98,
+    H264 = 102,
+    OPUS = 111,
+};
+
+const uint32_t kVideoSSRC = 3233846889;
+const uint32_t kAudioSSRC = 3233846890;
+
 WebrtcProtocol::WebrtcProtocol(Epoller* epoller, Fd* socket)
     :
     MediaPublisher(),
@@ -186,10 +197,10 @@ void WebrtcProtocol::SendVideoData(const uint8_t* data, const int& size, const u
         {   
             RtpHeader rtp_header;
 
-            rtp_header.setSSRC(3233846889);
+            rtp_header.setSSRC(kVideoSSRC);
             rtp_header.setMarker(last_packet ? 1 : 0); 
             rtp_header.setSeqNumber(++video_seq_);
-            rtp_header.setPayloadType(96);
+            rtp_header.setPayloadType((uint8_t)WebRTCPayloadType::VP8);
             rtp_header.setTimestamp((uint32_t)(timestamp) * 90);
 
             memcpy(rtp, &rtp_header, rtp_header.getHeaderLength()/*rtp head size*/);
@@ -224,9 +235,9 @@ void WebrtcProtocol::SendAudioData(const uint8_t* data, const int& size, const u
 
     static uint32_t audio_seq_ = 0;
 
-    rtp_header.setSSRC(3233846889+1);
+    rtp_header.setSSRC(kAudioSSRC);
     rtp_header.setSeqNumber(++audio_seq_);
-    rtp_header.setPayloadType(111);
+    rtp_header.setPayloadType((uint8_t)WebRTCPayloadType::OPUS);
 
     rtp_header.setTimestamp((uint32_t)timestamp * 48);
 
@@ -1529,7 +1540,7 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
         //cout << LMSG << "rtp have read bytes:" << rtp_bit_buffer.HaveReadBytes() << endl;
 
         // 解析
-        if (payload_type == 96)
+        if (payload_type == (uint8_t)WebRTCPayloadType::VP8)
         {
             RtpDepacketizer::ParsedPayload parsed_payload;
 
@@ -1541,7 +1552,7 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
 
             cout << LMSG << "parse vp8 success" << endl;
         }
-        else if (payload_type == 98)
+        else if (payload_type == (uint8_t)WebRTCPayloadType::VP9)
         {
             RtpDepacketizer::ParsedPayload parsed_payload;
 
@@ -1582,7 +1593,7 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
 #endif
                  << endl;
         }
-        else if (payload_type == 102) // H264
+        else if (payload_type == (uint8_t)WebRTCPayloadType::H264) // H264
         {
             RtpDepacketizer::ParsedPayload parsed_payload;
             if (! h264_depacket_.Parse(&parsed_payload, unprotect_buf + rtp_bit_buffer.HaveReadBytes(), unprotect_buf_len - rtp_bit_buffer.HaveReadBytes()))
@@ -1604,16 +1615,16 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
 #endif
                          << endl;
         }
-        else if (payload_type == 111)
+        else if (payload_type == (uint8_t)WebRTCPayloadType::OPUS)
         {
         }
 
         // 转发
         RtpHeader* rtp_header = (RtpHeader*)unprotect_buf;
-        if (payload_type == 96 || payload_type == 98 || payload_type == 102)
+        if (payload_type == (uint8_t)WebRTCPayloadType::VP8 || payload_type == (uint8_t)WebRTCPayloadType::VP9 || payload_type == (uint8_t)WebRTCPayloadType::H264)
         {
             video_publisher_ssrc_ = ssrc;
-            rtp_header->setSSRC(3233846889);
+            rtp_header->setSSRC(kVideoSSRC);
 
             // 视频带了MID的extension, 将其玻璃, 不然某些版本chrome会demux failed
             if (rtp_header->getExtension())
@@ -1635,10 +1646,10 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
                 g_webrtc_mgr->__DebugBroadcast(unprotect_buf, unprotect_buf_len);
             }
         }
-        else if (payload_type == 111)
+        else if (payload_type == (uint8_t)WebRTCPayloadType::OPUS)
         {
             audio_publisher_ssrc_ = ssrc;
-            rtp_header->setSSRC(3233846889 + 1);
+            rtp_header->setSSRC(kAudioSSRC);
             g_webrtc_mgr->__DebugBroadcast(unprotect_buf, unprotect_buf_len);
         }
     }
@@ -1908,7 +1919,7 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
             bs_pli.WriteBits(5, 0x01);
             bs_pli.WriteBytes(1, 206);
             bs_pli.WriteBytes(2, 2); // PLI没有参数
-            bs_pli.WriteBytes(4, 3233846889);
+            bs_pli.WriteBytes(4, kVideoSSRC);
             bs_pli.WriteBytes(4, video_publisher_ssrc_);
 
             uint8_t protect_buf[1500];
@@ -1953,7 +1964,7 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
 		    RtcpHeader rtcp_pli;
     	    rtcp_pli.setPacketType(RTCP_PS_Feedback_PT);
     	    rtcp_pli.setBlockCount(1);
-    	    rtcp_pli.setSSRC(3233846889);
+    	    rtcp_pli.setSSRC(kVideoSSRC);
     	    rtcp_pli.setSourceSSRC(video_publisher_ssrc_);
     	    rtcp_pli.setLength(2);
 
@@ -2184,10 +2195,10 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
 
             RtpHeader rtp_header;
 
-            rtp_header.setSSRC(3233846889);
+            rtp_header.setSSRC(kVideoSSRC);
             rtp_header.setMarker(last_packet ? 1 : 0); 
             rtp_header.setSeqNumber(video_seq_);
-            rtp_header.setPayloadType(102);
+            rtp_header.setPayloadType((uint8_t)WebRTCPayloadType::H264);
             rtp_header.setTimestamp(dts * 90);
 
             memcpy(rtp, &rtp_header, rtp_header.getHeaderLength()/*rtp head size*/);
@@ -2232,6 +2243,7 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
 	delete rtp_packetizer;
 
     // 构造一个假的音频包过去
+#if 0
 	RtpHeader rtp_header;
 
     uint8_t rtp[1500];
@@ -2239,9 +2251,9 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
 
     static uint32_t audio_seq_ = 0;
 
-    rtp_header.setSSRC(3233846889+1);
+    rtp_header.setSSRC(kAudioSSRC);
     rtp_header.setSeqNumber(++audio_seq_);
-    rtp_header.setPayloadType(111);
+    rtp_header.setPayloadType((uint8_t)WebRTCPayloadType::OPUS);
 
     rtp_header.setTimestamp(dts * 48);
 
@@ -2261,6 +2273,7 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
     {
         cout << LMSG << "srtp_protect faile:" << ret << endl;
     }
+#endif
 }
 
 bool WebrtcProtocol::CheckCanClose()

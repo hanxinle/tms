@@ -20,12 +20,12 @@ string SdpGenerate::Generate()
 
     if (! audio_support_.empty())
     {
-        os << " audio";
+        os << " 0";
     }
 
     if (! video_support_.empty())
     {
-        os << " video";
+        os << " 1";
     }
     os << CRLF;
 
@@ -48,7 +48,7 @@ string SdpGenerate::Generate()
         os << "a=ice-options:trickle" << CRLF;
         os << "a=fingerprint:sha-256 " << fingerprint_ << CRLF;
         //os << "a=setup:actpass" << CRLF;
-        os << "a=mid:audio" << CRLF;
+        os << "a=mid:0" << CRLF;
         os << "a=extmap:1 urn:ietf:params:rtp-hdrext:ssrc-audio-level" << CRLF;
         os << "a=" << type_ << CRLF;
         os << "a=rtcp-mux" << CRLF;
@@ -83,7 +83,7 @@ string SdpGenerate::Generate()
         os << "a=ice-options:trickle" << CRLF;
         os << "a=fingerprint:sha-256 " << fingerprint_ << CRLF;
         //os << "a=setup:actpass" << CRLF;
-        os << "a=mid:video" << CRLF;
+        os << "a=mid:1" << CRLF;
         os << "a=extmap:2 urn:ietf:params:rtp-hdrext:toffset" << CRLF;
         os << "a=extmap:3 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time" << CRLF;
         os << "a=extmap:4 urn:3gpp:video-orientation" << CRLF;

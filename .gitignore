@@ -22,3 +22,4 @@ depend/lib/
 depend/share/
 depend/tmp/
 *_generated.h
+log

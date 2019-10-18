@@ -264,7 +264,7 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
             Util::Replace(webrtc_test_sdp, "a=fingerprint:sha-256\r\n", "a=fingerprint:sha-256 " + g_dtls_fingerprint + "\r\n");
 
 			g_local_ice_ufrag = Util::GenRandom(15);
-            g_local_ice_pwd = Util::GenRandom(22);
+            g_local_ice_pwd = Util::GenRandom(24);
 
             cout << LMSG << "g_local_ice_ufrag:" << Util::Bin2Hex(g_local_ice_ufrag) << endl;
             cout << LMSG << "g_local_ice_pwd:" << Util::Bin2Hex(g_local_ice_pwd) << endl;
@@ -279,21 +279,22 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
 
             sdp_generate.SetType("sendrecv");
             sdp_generate.SetServerIp(g_server_ip);
-            sdp_generate.SetServerPort(5000);
-            sdp_generate.SetMsid("xiao");
-            sdp_generate.SetCname("zhi");
-            sdp_generate.SetLabel("hong");
+            sdp_generate.SetServerPort(11445);
+            sdp_generate.SetMsid("xzh_msid");
+            sdp_generate.SetCname("xzh_cname");
+            sdp_generate.SetLabel("xzh_label");
             sdp_generate.SetIceUfrag(g_local_ice_ufrag);
             sdp_generate.SetIcePwd(g_local_ice_pwd);
             sdp_generate.SetFingerprint(g_dtls_fingerprint);
             sdp_generate.AddAudioSupport(111);
             sdp_generate.AddVideoSupport(96);
             sdp_generate.AddVideoSupport(98);
-            sdp_generate.AddVideoSupport(100);
+            sdp_generate.AddVideoSupport(102);
             sdp_generate.SetAudioSsrc(3233846889 + 1);
             sdp_generate.SetVideoSsrc(3233846889);
 
             //webrtc_test_sdp = sdp_generate.Generate();
+            //cout << LMSG << "@gen sdp=\n" << webrtc_test_sdp << endl;
 
             // a=sendrecv sdp中这个影响chrome推流
 #if 1 // 标准流程都是这么做的, sdpMid需要跟sdp中的mid:对齐, datachannel一定要走到这里来

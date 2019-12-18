@@ -40,3 +40,7 @@ make
 
 ## Example
 ### publish rtmp using obs, play flv/hls/rtmp using vlc
+# ![obs_publish_rtmp](docs/images/obs_publish_rtmp.png)
+# ![vlc_play_flv](docs/images/vlc_play_flv.png)
+# ![vlc_play_hls](docs/images/vlc_play_hls.png)
+# ![vlc_play_rtmp](docs/images/vlc_play_rtmp.png)

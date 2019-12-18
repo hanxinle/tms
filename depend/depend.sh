@@ -1,6 +1,6 @@
 #!/bin/bash
 
-depend_dir="${HOME}/git/Trs/depend"
+depend_dir="${HOME}/git/tms/depend"
 
 if [ ! -d "${depend_dir}" ]; then
     mkdir "${depend_dir}"

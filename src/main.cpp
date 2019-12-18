@@ -70,45 +70,6 @@ void AvLogCallback(void* ptr, int level, const char* fmt, va_list vl)
 
 int main(int argc, char* argv[])
 {
-    CRC32 crc32(CRC32_STUN);
-
-    uint8_t crc[] = {1, 2, 3, 4, 5, 6};
-    cout << LMSG << crc32.GetCrc32(crc, 6) << endl;
-
-    {
-        static uint8_t kSps[] = {0x67, 0x64, 0x00, 0x33, 0xAC,0x2C,0xAC,0x07,0x80,0x22,0x7E,0x5C,0x05,0xA8,0x08,0x08,0x0A,0x00,0x00,0x07,0xD0,0x00,0x01,0xD4,0xC1,0x08};
-        static uint8_t kPps[] = {0x68, 0xEE, 0x3C, 0xB0};
-
-        string tmp((const char*)kSps, sizeof(kSps));
-
-        string t;
-        Base64::Encode(tmp, t);
-        cout << t << endl;
-    }
-
-    string raw = "Man is distinguished, not only by his reason, but by this singular passion from other animals, which is a lust of the mind, that by a perseverance of delight in the continued and indefatigable generation of knowledge, exceeds the short vehemence of any carnal pleasure.";
-
-    string base64;
-
-    Base64::Encode(raw, base64);
-
-    cout << base64 << endl;
-
-    string tmp;
-    Base64::Decode(base64, tmp);
-
-    cout << LMSG <<raw << endl;
-    cout << LMSG <<tmp << endl;
-
-    cout << LMSG << raw.size() << endl;
-    cout << LMSG << base64.size() << endl;
-    cout << LMSG << tmp.size() << endl;
-
-    cout << Util::Bin2Hex(raw, 32, false, "prefix:") << endl;
-    cout << LMSG << endl;
-
-    assert(raw == tmp);
-
 	string server_crt = Util::ReadFile("server.crt");
 	string server_key = Util::ReadFile("server.key");
 

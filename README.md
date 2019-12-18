@@ -18,8 +18,8 @@ tms(toy media server) is a toy media server for myself learning media develop.
 
 **Step 1:** get source code
 ```
-git clone https://github.com/HuyaJohn/trs.git
-cd trs
+git clone https://github.com/HuyaJohn/tms.git
+cd tms
 ```
 
 **Step 2:** fetch depend

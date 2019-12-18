@@ -39,8 +39,19 @@ make
 ```
 
 ## Example
-### publish rtmp using obs, play flv/hls/rtmp using vlc
+
+### 1. publish rtmp using obs, play flv/hls/rtmp using vlc
+
+publish rtmp using obs, I use host "hw.com" to hide my server ip for safety.
 # ![obs_publish_rtmp](docs/images/obs_publish_rtmp.png)
+
+play http-flv using vlc
 # ![vlc_play_flv](docs/images/vlc_play_flv.png)
+
+play hls using vlc
 # ![vlc_play_hls](docs/images/vlc_play_hls.png)
+
+play rtmp using vlc
 # ![vlc_play_rtmp](docs/images/vlc_play_rtmp.png)
+
+### 2. publish using chrome(WebRTC), play using chrome(WebRTC)

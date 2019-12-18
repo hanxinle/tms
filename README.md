@@ -14,6 +14,12 @@ tms(toy media server) is a toy media server for myself learning media develop.
 - [ ] MCU
 - [ ] media server forward, current tms is only a single server node
 
+## Todo
+- sdp generater and sdp parser, instead of hardcode xxx.sdp
+- WebRTC adapt to different version of chrome
+- WebRTC adapt to different video encoder
+- friendly API
+
 ## Usage
 
 **Step 1:** get source code

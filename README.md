@@ -20,6 +20,9 @@ tms(toy media server) is a toy media server for myself learning media develop.
 - WebRTC adapt to different video encoder
 - friendly API
 
+## Bugs
+There are many bugs in WebRTC, because the complexity.
+
 ## Usage
 
 **Step 1:** get source code
@@ -61,7 +64,7 @@ play rtmp using vlc
 # ![vlc_play_rtmp](docs/images/vlc_play_rtmp.png)
 
 ### 2. publish using chrome(WebRTC), play using chrome(WebRTC)
-chrome publish vp9
+chrome publish vp9, I use host "hw.com" to hide my server ip for safety, and it's hardcode in sdp.
 # ![webrtc_publish_vp9](docs/images/webrtc_publish_vp9.png)
 
 chrome play vp9

@@ -25,7 +25,7 @@ cd tms
 **Step 2:** fetch depend
 ```
 cd depend
-sh depend.sh
+./depend.sh
 ```
 
 **Step 3:** build
@@ -33,3 +33,14 @@ sh depend.sh
 cd ../src
 make
 ```
+**Step 4:** run
+```
+./tms -server_ip xxx.xxx.xxx.xxx
+```
+
+## Example
+### publish rtmp using obs, play flv/hls/rtmp using vlc
+# ![obs_publish_rtmp](docs/images/obs_publish_rtmp.png)
+# ![vlc_play_flv](docs/images/vlc_play_flv.png)
+# ![vlc_play_hls](docs/images/vlc_play_hls.png)
+# ![vlc_play_rtmp](docs/images/vlc_play_rtmp.png)

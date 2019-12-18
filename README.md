@@ -55,3 +55,8 @@ play rtmp using vlc
 # ![vlc_play_rtmp](docs/images/vlc_play_rtmp.png)
 
 ### 2. publish using chrome(WebRTC), play using chrome(WebRTC)
+chrome publish vp9
+# ![webrtc_publish_vp9](docs/images/webrtc_publish_vp9.png)
+
+chrome play vp9
+# ![webrtc_play_vp9](docs/images/webrtc_play_vp9.png)

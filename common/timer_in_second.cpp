@@ -2,9 +2,12 @@
 
 #include <string.h>
 
+#include "common_define.h"
 #include "timer_in_second.h"
 #include "timer_handle.h"
 #include "util.h"
+
+using namespace std;
 
 TimerInSecond::TimerInSecond(IoLoop* io_loop)
     :

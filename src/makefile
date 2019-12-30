@@ -1,6 +1,7 @@
 # =========================================================
 INCLUDE_DIR    += -I. -I./include/ -I../rpc -I../common -I../common/ssl/ -I../depend/include -I../
 
+LIB_DIR        += ../depend/lib/libsrt.a
 LIB_DIR        += ../depend/lib/libssl.a
 LIB_DIR        += ../depend/lib/libcrypto.a
 LIB_DIR        += ../depend/lib/libsrtp2.a

@@ -1,8 +1,6 @@
 #ifndef __FD_H__
 #define __FD_H__
 
-#include "socket_handle.h"
-
 #include <unistd.h>
 #include <stdint.h>
 

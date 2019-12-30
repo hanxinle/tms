@@ -16,6 +16,10 @@
 #include "ref_ptr.h"
 #include "rtmp_mgr.h"
 #include "socket_util.h"
+#include "srt_epoller.h"
+#include "srt_mgr.h"
+#include "srt_socket_util.h"
+#include "srt_socket.h"
 #include "ssl_socket.h"
 #include "tcp_socket.h"
 #include "timer_in_second.h"
@@ -48,6 +52,7 @@ HttpFlvMgr*             g_https_flv_mgr = NULL;
 HttpHlsMgr*             g_http_hls_mgr = NULL;
 HttpHlsMgr*             g_https_hls_mgr = NULL;
 RtmpMgr*                g_rtmp_mgr = NULL;
+SrtMgr*                 g_srt_mgr = NULL;
 WebrtcMgr*              g_webrtc_mgr = NULL;
 SSL_CTX*                g_tls_ctx = NULL;
 SSL_CTX*                g_dtls_ctx = NULL;
@@ -532,10 +537,27 @@ int main(int argc, char* argv[])
     UdpSocket server_webrtc_socket(&epoller, webrtc_fd, &webrtc_mgr);
     server_webrtc_socket.EnableRead();
 
+    SrtEpoller srt_epoller;
+    srt_epoller.Create();
+
+    int server_srt_fd = srt_socket_util::CreateSrtSocket();
+    srt_socket_util::SetBlock(server_srt_fd, false);
+    srt_socket_util::Bind(server_srt_fd, "0.0.0.0", 9000);
+    srt_socket_util::Listen(server_srt_fd);
+
+    SrtMgr srt_mgr(&srt_epoller);
+    timer_in_second.AddTimerSecondHandle(&srt_mgr);
+    g_srt_mgr = &srt_mgr;
+
+    SrtSocket server_srt_socket(&srt_epoller, server_srt_fd, &srt_mgr);
+    server_srt_socket.EnableRead();
+    server_srt_socket.AsServerSocket();
+
     // Event Loop
     while (true)
     {
-        epoller.RunIOLoop();
+        epoller.WaitIO(100);
+        srt_epoller.WaitIO(0);
     }
 
     return 0;

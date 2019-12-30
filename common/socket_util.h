@@ -83,6 +83,95 @@ namespace socket_util
         port = ntohs(addr_in.sin_port);
     }
 
+	inline int IpStrToNet(const string& str, uint32_t& net)
+	{
+	    in_addr out = {0};
+	
+	    int ret = inet_pton(AF_INET, str.c_str(), &out);
+	
+	    if (ret <= 0)
+	    {
+	        cout << LMSG << "inet_pton" << endl;
+	        return -1;
+	    }
+	
+	    net = out.s_addr;
+	
+	    return 0;
+	}
+	
+	inline int IpNetToStr(const uint32_t& net, string& str)
+	{
+	    in_addr in = {0};
+	    in.s_addr = net;
+	
+	    char out_buf[INET6_ADDRSTRLEN] = {0};
+	
+	    const char* pc = inet_ntop(AF_INET, &in, out_buf, sizeof(out_buf));
+	
+	    if (pc == NULL)
+	    {
+	        cout << LMSG << "inet_ntop" << endl;
+	        return -1;
+	    }
+	
+	    str.assign(pc);
+	
+	    return 0;
+	}
+	
+	inline int IpStrToHost(const string& str, uint32_t& host)
+	{
+	    uint32_t net = 0;
+	    int ret = IpStrToNet(str, net);
+	
+	    host = be32toh(net);
+	
+	    return ret;
+	}
+
+
+	inline int IpPortToSocketAddr(const string& ip, const uint16_t& port, sockaddr_in& addr)
+	{
+	    int ret = 0;
+	
+	    bzero(&addr, sizeof(addr));
+	
+	    uint32_t net = 0;
+	    ret = IpStrToNet(ip, net);
+	
+	    if (ret < 0)
+	    {
+	        return ret;
+	    }
+	
+	    addr.sin_family = AF_INET;
+	    addr.sin_addr.s_addr = net;
+	    addr.sin_port = htons(port);
+	
+	    return 0;
+	}
+	
+	inline int SocketAddrToIpPort(const sockaddr_in& addr, string& ip, uint16_t& port)
+	{
+	    uint32_t net = addr.sin_addr.s_addr;
+	    int ret = IpNetToStr(net, ip);
+	
+	    if (ret < 0)
+	    {
+	        return -1;
+	    }
+	
+	    port = ntohs(addr.sin_port);
+	
+	    return 0;
+	}
+	
+	inline int IpHostToStr(const uint32_t& host, string& str)
+	{
+	    return IpNetToStr(be32toh(host), str);
+	}
+	
     inline int CreateTcpSocket()
     {
         int fd = socket(AF_INET, SOCK_STREAM, 0);

@@ -1,15 +1,17 @@
-#ifndef __EPOLLER_H__
-#define __EPOLLER_H__
+#ifndef __SRT_EPOLLER_H__
+#define __SRT_EPOLLER_H__
 
 #include "io_loop.h"
 
+#include <map>
+
 class Fd;
 
-class Epoller : public IoLoop
+class SrtEpoller : public IoLoop
 {
 public:
-    Epoller();
-    ~Epoller();
+    SrtEpoller();
+    ~SrtEpoller();
 
     int Create();
     void RunIOLoop(const int& timeout_in_millsecond);
@@ -19,6 +21,9 @@ public:
     int ModFd(Fd* fd);
 
     void WaitIO(const int& timeout_in_millsecond);
+
+private:
+    std::map<int, Fd*> srt_socket_map_;
 };
     
-#endif // __EPOLLER_H__
+#endif // __SRT_EPOLLER_H__

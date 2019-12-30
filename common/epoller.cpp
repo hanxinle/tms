@@ -1,3 +1,4 @@
+#include "common_define.h"
 #include "epoller.h"
 #include "fd.h"
 #include "util.h"
@@ -43,11 +44,12 @@ int Epoller::Create()
     return 0;
 }
 
-void Epoller::RunIOLoop()
+void Epoller::RunIOLoop(const int& timeout_in_millsecond)
 {
-    Create();
-
-    WaitIO(100);
+    while (! quit_)
+    {
+        WaitIO(timeout_in_millsecond);
+    }
 }
 
 int Epoller::AddFd(Fd* fd)
@@ -102,48 +104,45 @@ void Epoller::WaitIO(const int& timeout_in_millsecond)
 {
     static epoll_event events[1024];
 
-    while (! quit_)
+    int num_event = epoll_wait(poll_fd_, events, sizeof(events), timeout_in_millsecond);
+
+    if (num_event > 0)
     {
-        int num_event = epoll_wait(poll_fd_, events, sizeof(events), timeout_in_millsecond);
-
-        if (num_event > 0)
+        for (int i = 0; i < num_event; ++i)
         {
-            for (int i = 0; i < num_event; ++i)
+            Fd* fd = (Fd*)(events[i].data.ptr);
+
+            if (fd == NULL)
             {
-                Fd* fd = (Fd*)(events[i].data.ptr);
+                assert(false);
+            }
 
-                if (fd == NULL)
+            if (events[i].events & (EPOLLIN | EPOLLHUP))
+            {
+                int ret = fd->OnRead();
+                if (ret == kClose || ret == kError)
                 {
-                    assert(false);
+                    cout << LMSG << "closed, ret:" << ret << endl;
+                    delete fd;
+                    return;
                 }
+            }
 
-                if (events[i].events & (EPOLLIN | EPOLLHUP))
+            if (events[i].events & EPOLLOUT)
+            {
+                int ret = fd->OnWrite();
+                if (ret < 0)
                 {
-                    int ret = fd->OnRead();
-                    if (ret == kClose || ret == kError)
-                    {
-                        cout << LMSG << "closed, ret:" << ret << endl;
-                        delete fd;
-                        continue;
-                    }
-                }
-
-                if (events[i].events & EPOLLOUT)
-                {
-                    int ret = fd->OnWrite();
-                    if (ret < 0)
-                    {
-                        delete fd;
-                    }
+                    delete fd;
                 }
             }
         }
-        else if (num_event < 0)
-        {
-            cout << LMSG << "epoll_wait failed, ret=" <<num_event << endl;
-        }
-        else
-        {
-        }
+    }
+    else if (num_event < 0)
+    {
+        cout << LMSG << "epoll_wait failed, ret=" <<num_event << endl;
+    }
+    else
+    {
     }
 }

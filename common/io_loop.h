@@ -18,13 +18,12 @@ public:
     virtual ~IoLoop() {}
 
     virtual int Create() = 0;
-    virtual void RunIOLoop() = 0;
+    virtual void RunIOLoop(const int& timeout_in_millsecond) = 0;
 
     virtual int AddFd(Fd* fd) = 0;
     virtual int DelFd(Fd* fd) = 0;
     virtual int ModFd(Fd* fd) = 0;
 
-protected:
     virtual void WaitIO(const int& timeout_in_millsecond) = 0;
 
 protected:

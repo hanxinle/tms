@@ -5,6 +5,7 @@
 #include "epoller.h"
 #include "http_flv_mgr.h"
 #include "http_hls_mgr.h"
+#include "srt_mgr.h"
 #include "rtmp_mgr.h"
 #include "webrtc_mgr.h"
 #include <openssl/ssl.h>

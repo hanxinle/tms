@@ -12,7 +12,7 @@ class TimerSecondHandle;
 class TimerInSecond : public Fd
 {
 public:
-    TimerInSecond(Epoller* epoller);
+    TimerInSecond(IoLoop* io_loop);
     ~TimerInSecond();
 
     bool AddTimerSecondHandle(TimerSecondHandle* handle)
@@ -33,6 +33,10 @@ public:
     }
 
     int OnRead();
+    int OnWrite() 
+    { 
+        return 0;
+    }
 
 private:
     set<TimerSecondHandle*> second_handle_;

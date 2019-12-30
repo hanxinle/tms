@@ -34,7 +34,7 @@ int HttpFileMgr::HandleClose(IoBuffer& io_buffer, Fd& socket)
     http_protocol->OnStop();
 
     delete http_protocol;
-    fd_protocol_.erase(socket.GetFd());
+    fd_protocol_.erase(socket.fd());
 
     return kSuccess;
 }
@@ -48,7 +48,7 @@ int HttpFileMgr::HandleError(IoBuffer& io_buffer, Fd& socket)
     http_protocol->OnStop();
 
     delete http_protocol;
-    fd_protocol_.erase(socket.GetFd());
+    fd_protocol_.erase(socket.fd());
 
     return kSuccess;
 }
@@ -62,7 +62,7 @@ int HttpFileMgr::HandleConnected(Fd& socket)
 
 HttpFileProtocol* HttpFileMgr::GetOrCreateProtocol(Fd& socket)
 {
-    int fd = socket.GetFd();
+    int fd = socket.fd();
     if (fd_protocol_.count(fd) == 0)
     {   
         fd_protocol_[fd] = new HttpFileProtocol(epoller_, &socket);

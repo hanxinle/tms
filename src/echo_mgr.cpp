@@ -47,7 +47,7 @@ int EchoMgr::HandleConnected(Fd& socket)
 
 EchoProtocol* EchoMgr::GetOrCreateProtocol(Fd& socket)
 {
-    int fd = socket.GetFd();
+    int fd = socket.fd();
     if (fd_protocol_.count(fd) == 0)
     {   
         fd_protocol_[fd] = new EchoProtocol(epoller_, &socket);

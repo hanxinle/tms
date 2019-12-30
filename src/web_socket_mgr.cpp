@@ -34,7 +34,7 @@ int WebSocketMgr::HandleClose(IoBuffer& io_buffer, Fd& socket)
     web_socket_protocol->OnStop();
 
     delete web_socket_protocol;
-    fd_protocol_.erase(socket.GetFd());
+    fd_protocol_.erase(socket.fd());
 
     return kSuccess;
 }
@@ -48,7 +48,7 @@ int WebSocketMgr::HandleError(IoBuffer& io_buffer, Fd& socket)
     web_socket_protocol->OnStop();
 
     delete web_socket_protocol;
-    fd_protocol_.erase(socket.GetFd());
+    fd_protocol_.erase(socket.fd());
 
     return kSuccess;
 }
@@ -62,7 +62,7 @@ int WebSocketMgr::HandleConnected(Fd& socket)
 
 WebSocketProtocol* WebSocketMgr::GetOrCreateProtocol(Fd& socket)
 {
-    int fd = socket.GetFd();
+    int fd = socket.fd();
     if (fd_protocol_.count(fd) == 0)
     {   
         fd_protocol_[fd] = new WebSocketProtocol(epoller_, &socket);

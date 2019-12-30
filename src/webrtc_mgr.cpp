@@ -47,7 +47,7 @@ int WebrtcMgr::HandleConnected(Fd& socket)
 
 WebrtcProtocol* WebrtcMgr::GetOrCreateProtocol(Fd& socket)
 {
-    int fd = socket.GetFd();
+    int fd = socket.fd();
     if (fd_protocol_.count(fd) == 0)
     {   
         fd_protocol_[fd] = new WebrtcProtocol(epoller_, &socket);

@@ -12,7 +12,7 @@ class TimerMillSecondHandle;
 class TimerInMillSecond : public Fd
 {
 public:
-    TimerInMillSecond(Epoller* epoller);
+    TimerInMillSecond(IoLoop* io_loop);
     ~TimerInMillSecond();
 
     int RunEveryNMillSecond();
@@ -33,6 +33,10 @@ public:
     }
 
     int OnRead();
+    int OnWrite()
+    {
+        return 0;
+    }
 
 private:
     set<TimerMillSecondHandle*> millsecond_handle_;

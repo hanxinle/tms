@@ -1,17 +1,17 @@
 #ifndef __TCP_SOCKET_H__
 #define __TCP_SOCKET_H__
 
-#include "epoller.h"
+#include "io_loop.h"
 #include "io_buffer.h"
 #include "fd.h"
 
-class Epoller;
+class IoLoop;
 class SocketHandle;
 
 class TcpSocket : public Fd
 {
 public:
-    TcpSocket(Epoller* epoller, const int& fd, SocketHandle* handler);
+    TcpSocket(IoLoop* io_loop, const int& fd, SocketHandle* handler);
     ~TcpSocket();
 
     void AsServerSocket()

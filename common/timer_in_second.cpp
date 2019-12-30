@@ -6,9 +6,9 @@
 #include "timer_handle.h"
 #include "util.h"
 
-TimerInSecond::TimerInSecond(Epoller* epoller)
+TimerInSecond::TimerInSecond(IoLoop* io_loop)
     :
-    Fd(epoller, timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC)),
+    Fd(io_loop, timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC)),
     now_in_ms_(Util::GetNowMs()),
     count_(1)
 {

@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include "common_define.h"
+#include "fd.h"
 #include "socket_util.h"
 #include "socket_handle.h"
 #include "ssl_socket.h"
@@ -12,9 +13,9 @@ extern SSL_CTX* g_tls_ctx;
 using namespace std;
 using namespace socket_util;
 
-SslSocket::SslSocket(Epoller* epoller, const int& fd, SocketHandle* handler)
+SslSocket::SslSocket(IoLoop* io_loop, const int& fd, SocketHandle* handler)
     :
-    Fd(epoller, fd),
+    Fd(io_loop, fd),
     server_socket_(false),
     handler_(handler)
 {
@@ -48,7 +49,7 @@ int SslSocket::OnRead()
 
             NoCloseWait(client_fd);
 
-            SslSocket* ssl_socket = new SslSocket(epoller_, client_fd, handler_);
+            SslSocket* ssl_socket = new SslSocket(io_loop_, client_fd, handler_);
             SetNonBlock(client_fd);
 
             ssl_socket->SetConnected();

@@ -123,7 +123,7 @@ WebrtcProtocol::WebrtcProtocol(Epoller* epoller, Fd* socket)
 
 WebrtcProtocol::~WebrtcProtocol()
 {
-    close(socket_->GetFd());
+    close(socket_->fd());
 }
 
 int WebrtcProtocol::Parse(IoBuffer& io_buffer)

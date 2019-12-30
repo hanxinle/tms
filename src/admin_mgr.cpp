@@ -18,7 +18,7 @@ AdminMgr::~AdminMgr()
 
 AdminProtocol* AdminMgr::GetOrCreateProtocol(Fd& socket)
 {
-    int fd = socket.GetFd();
+    int fd = socket.fd();
     if (fd_protocol_.count(fd) == 0)
     {   
         fd_protocol_[fd] = new AdminProtocol(epoller_, &socket);
@@ -49,7 +49,7 @@ int AdminMgr::HandleClose(IoBuffer& io_buffer, Fd& socket)
     admin_protocol->OnStop();
 
     delete admin_protocol;
-    fd_protocol_.erase(socket.GetFd());
+    fd_protocol_.erase(socket.fd());
 
     return kSuccess;
 }
@@ -63,7 +63,7 @@ int AdminMgr::HandleError(IoBuffer& io_buffer, Fd& socket)
     admin_protocol->OnStop();
 
     delete admin_protocol;
-    fd_protocol_.erase(socket.GetFd());
+    fd_protocol_.erase(socket.fd());
 
     return kSuccess;
 }

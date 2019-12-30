@@ -346,6 +346,7 @@ int main(int argc, char* argv[])
     DEBUG << argv[0] << " starting..." << endl;
 
     Epoller epoller;
+    epoller.Create();
     g_epoll = &epoller;
 
     // === Init Timer ===
@@ -534,7 +535,7 @@ int main(int argc, char* argv[])
     // Event Loop
     while (true)
     {
-        epoller.Run();
+        epoller.RunIOLoop();
     }
 
     return 0;

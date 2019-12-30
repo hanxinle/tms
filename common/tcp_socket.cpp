@@ -10,9 +10,9 @@
 using namespace std;
 using namespace socket_util;
 
-TcpSocket::TcpSocket(Epoller* epoller, const int& fd, SocketHandle* handler)
+TcpSocket::TcpSocket(IoLoop* io_loop, const int& fd, SocketHandle* handler)
     :
-    Fd(epoller, fd),
+    Fd(io_loop, fd),
     server_socket_(false),
     handler_(handler)
 {
@@ -37,7 +37,7 @@ int TcpSocket::OnRead()
 
             NoCloseWait(client_fd);
 
-            TcpSocket* tcp_socket = new TcpSocket(epoller_, client_fd, handler_);
+            TcpSocket* tcp_socket = new TcpSocket(io_loop_, client_fd, handler_);
             SetNonBlock(client_fd);
             tcp_socket->SetConnected();
 

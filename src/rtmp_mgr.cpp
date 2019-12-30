@@ -38,7 +38,7 @@ int RtmpMgr::HandleClose(IoBuffer& io_buffer, Fd& socket)
     rtmp_protocol->OnStop();
 
     delete rtmp_protocol;
-    fd_protocol_.erase(socket.GetFd());
+    fd_protocol_.erase(socket.fd());
 
     return kSuccess;
 }
@@ -55,7 +55,7 @@ int RtmpMgr::HandleError(IoBuffer& io_buffer, Fd& socket)
     rtmp_protocol->OnStop();
 
     delete rtmp_protocol;
-    fd_protocol_.erase(socket.GetFd());
+    fd_protocol_.erase(socket.fd());
 
     return kSuccess;
 }
@@ -71,7 +71,7 @@ int RtmpMgr::HandleConnected(Fd& socket)
 
 RtmpProtocol* RtmpMgr::GetOrCreateProtocol(Fd& socket)
 {
-    int fd = socket.GetFd();
+    int fd = socket.fd();
     if (fd_protocol_.count(fd) == 0)
     {
         fd_protocol_[fd] = new RtmpProtocol(epoller_, &socket);

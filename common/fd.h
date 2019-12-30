@@ -1,84 +1,46 @@
-#ifndef __SOCKET_H__
-#define __SOCKET_H__
+#ifndef __FD_H__
+#define __FD_H__
+
+#include "socket_handle.h"
 
 #include <unistd.h>
+#include <stdint.h>
 
-#include <iostream>
-#include <string>
-
-#include "common_define.h"
-#include "epoller.h"
-
-using std::cout;
-using std::endl;
-using std::string;
+class IoLoop;
 
 class Fd
 {
 public:
-    Fd(Epoller* epoller, const int& fd)
-        :
-        epoller_(epoller),
-        fd_(fd)
-    {
-    }
+    explicit Fd(IoLoop* io_loop, const int& fd = -1);
+    virtual ~Fd();
 
-    virtual ~Fd()
-    {
-        cout << LMSG << "remove " << fd_ << " in epoller and close it" << endl;
-        epoller_->RemoveSocket(this);
-        close(fd_);
-    }
+    void EnableRead();
+    void EnableWrite();
+    void DisableRead();
+    void DisableWrite();
 
-    void SetFd(const int& fd)
-    {
-        fd_ = fd;
-    }
+    virtual int OnRead()    = 0;
+    virtual int OnWrite()   = 0;
 
-    virtual int OnRead()
-    {
-        return 0;
-    }
-
-    virtual int OnWrite()
-    {
-        return 0;
-    }
-
-    virtual int EnableRead()
-    {
-        return epoller_->EnableSocket(this, EPOLLIN);
-    }
-
-    virtual int EnableWrite()
-    {
-        return epoller_->EnableSocket(this, EPOLLOUT);
-    }
-
-    virtual int DisableWrite()
-    {
-        return epoller_->DisableSocket(this, EPOLLOUT);
-    }
-
-    virtual int DisableRead()
-    {
-        return epoller_->DisableSocket(this, EPOLLIN);
-    }
-
-    int GetFd()
+    int fd() const 
     {
         return fd_;
     }
 
-    virtual int Send(const uint8_t* data, const size_t& len) = 0;
-    virtual int SendTo(const uint8_t* data, const size_t& len, const string& dst_ip, const uint16_t& dst_port)
+    uint32_t events() const 
+    {
+        return events_;
+    }
+
+    virtual int Send(const uint8_t* data, const size_t& len)
     {
         return 0;
-    };
+    }
 
 protected:
-    Epoller* epoller_;
+    uint32_t events_;
     int fd_;
+    IoLoop* io_loop_;
 };
 
-#endif // __SOCKET_H__
+#endif // __FD_H__

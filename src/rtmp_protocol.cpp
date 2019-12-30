@@ -690,7 +690,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
                             io_buffer.WriteU32(server_time);
                             io_buffer.Write(buf, 1528);
 
-                            io_buffer.WriteToFd(socket_->GetFd());
+                            io_buffer.WriteToFd(socket_->fd());
 
                             handshake_status_ = kStatus_2;
                             return kSuccess;
@@ -806,7 +806,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
                                 io_buffer.WriteU8(3);
                                 io_buffer.Write(s1, s1_len);
                                 io_buffer.Write(s2, s2_len);
-                                io_buffer.WriteToFd(socket_->GetFd());
+                                io_buffer.WriteToFd(socket_->fd());
 
                                 handshake_status_ = kStatus_2;
                                 return kSuccess;

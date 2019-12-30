@@ -1,19 +1,18 @@
 #ifndef __SSL_SOCKET_H__
 #define __SSL_SOCKET_H__
 
-#include "epoller.h"
 #include "ssl_io_buffer.h"
 #include "fd.h"
 
 #include "openssl/ssl.h"
 
-class Epoller;
+class IoLoop;
 class SocketHandle;
 
 class SslSocket : public Fd
 {
 public:
-    SslSocket(Epoller* epoller, const int& fd, SocketHandle* handler);
+    SslSocket(IoLoop* io_loop, const int& fd, SocketHandle* handler);
     ~SslSocket();
 
     void AsServerSocket()

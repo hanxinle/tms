@@ -36,7 +36,7 @@ int HttpHlsMgr::HandleClose(IoBuffer& io_buffer, Fd& socket)
     http_protocol->OnStop();
 
     delete http_protocol;
-    fd_protocol_.erase(socket.GetFd());
+    fd_protocol_.erase(socket.fd());
 
     return kSuccess;
 }
@@ -50,7 +50,7 @@ int HttpHlsMgr::HandleError(IoBuffer& io_buffer, Fd& socket)
     http_protocol->OnStop();
 
     delete http_protocol;
-    fd_protocol_.erase(socket.GetFd());
+    fd_protocol_.erase(socket.fd());
 
     return kSuccess;
 }
@@ -64,7 +64,7 @@ int HttpHlsMgr::HandleConnected(Fd& socket)
 
 HttpHlsProtocol* HttpHlsMgr::GetOrCreateProtocol(Fd& socket)
 {
-    int fd = socket.GetFd();
+    int fd = socket.fd();
     if (fd_protocol_.count(fd) == 0)
     {   
         fd_protocol_[fd] = new HttpHlsProtocol(epoller_, &socket);

@@ -114,11 +114,11 @@ static int HmacEncode(const string& algo, const uint8_t* key, const int& key_len
     return 0;   
 }
 
-RtmpProtocol::RtmpProtocol(Epoller* epoller, Fd* fd)
+RtmpProtocol::RtmpProtocol(IoLoop* io_loop, Fd* fd)
     :
     MediaPublisher(),
     MediaSubscriber(kRtmp),
-    epoller_(epoller),
+    io_loop_(io_loop),
     socket_(fd),
     handshake_status_(kStatus_0),
     role_(RtmpRole::kUnknownRtmpRole),
@@ -2363,7 +2363,7 @@ int RtmpProtocol::ConnectForwardRtmpServer(const string& ip, const uint16_t& por
         return -1;
     }
 
-    Fd* socket = new TcpSocket(epoller_, fd, (SocketHandle*)g_rtmp_mgr);
+    Fd* socket = new TcpSocket(io_loop_, fd, (SocketHandle*)g_rtmp_mgr);
 
     RtmpProtocol* rtmp_forward = g_rtmp_mgr->GetOrCreateProtocol(*socket);
 

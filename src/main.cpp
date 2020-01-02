@@ -7,7 +7,6 @@
 #include "base_64.h"
 #include "bit_buffer.h"
 #include "bit_stream.h"
-#include "echo_mgr.h"
 #include "epoller.h"
 #include "http_file_mgr.h"
 #include "http_flv_mgr.h"
@@ -28,6 +27,7 @@
 #include "util.h"
 #include "webrtc_mgr.h"
 #include "web_socket_mgr.h"
+#include "protocol_mgr.h"
 
 #include "openssl/ssl.h"
 
@@ -44,25 +44,25 @@ static void sighandler(int sig_no)
 	exit(0);
 } 
 
-LocalStreamCenter       g_local_stream_center;
-Epoller*                g_epoll = NULL;
-HttpFlvMgr*             g_http_flv_mgr = NULL;
-HttpFlvMgr*             g_https_flv_mgr = NULL;
-HttpHlsMgr*             g_http_hls_mgr = NULL;
-HttpHlsMgr*             g_https_hls_mgr = NULL;
-RtmpMgr*                g_rtmp_mgr = NULL;
-SrtMgr*                 g_srt_mgr = NULL;
-WebrtcMgr*              g_webrtc_mgr = NULL;
-SSL_CTX*                g_tls_ctx = NULL;
-SSL_CTX*                g_dtls_ctx = NULL;
-string                  g_dtls_fingerprint = "";
-string                  g_local_ice_pwd = "";
-string                  g_local_ice_ufrag = "";
-string                  g_remote_ice_pwd = "";
-string                  g_remote_ice_ufrag = "";
-string                  g_server_ip = "";
-WebrtcProtocol*         g_debug_webrtc = NULL;
-int                     g_srt_client_fd = -1;
+LocalStreamCenter               g_local_stream_center;
+Epoller*                        g_epoll = NULL;
+ProtocolMgr<HttpFlvProtocol>*   g_http_flv_mgr;
+ProtocolMgr<HttpFlvProtocol>*   g_https_flv_mgr;
+ProtocolMgr<HttpHlsProtocol>*   g_http_hls_mgr;
+ProtocolMgr<HttpHlsProtocol>*   g_https_hls_mgr;
+ProtocolMgr<RtmpProtocol>*      g_rtmp_mgr = NULL;
+ProtocolMgr<SrtProtocol>*       g_srt_mgr;
+WebrtcMgr*                      g_webrtc_mgr = NULL;
+SSL_CTX*                        g_tls_ctx = NULL;
+SSL_CTX*                        g_dtls_ctx = NULL;
+string                          g_dtls_fingerprint = "";
+string                          g_local_ice_pwd = "";
+string                          g_local_ice_ufrag = "";
+string                          g_remote_ice_pwd = "";
+string                          g_remote_ice_ufrag = "";
+string                          g_server_ip = "";
+WebrtcProtocol*                 g_debug_webrtc = NULL;
+int                             g_srt_client_fd = -1;
 
 void AvLogCallback(void* ptr, int level, const char* fmt, va_list vl)
 {
@@ -365,7 +365,7 @@ int main(int argc, char* argv[])
     Listen(server_rtmp_fd);
     SetNonBlock(server_rtmp_fd);
 
-    RtmpMgr rtmp_mgr(&epoller);
+    ProtocolMgr<RtmpProtocol> rtmp_mgr(&epoller);
     timer_in_second.AddTimerSecondHandle(&rtmp_mgr);
     g_rtmp_mgr = &rtmp_mgr;
 
@@ -381,7 +381,7 @@ int main(int argc, char* argv[])
     Listen(server_http_flv_fd);
     SetNonBlock(server_http_flv_fd);
 
-    HttpFlvMgr http_flv_mgr(&epoller);
+    ProtocolMgr<HttpFlvProtocol> http_flv_mgr(&epoller);
 
     g_http_flv_mgr = &http_flv_mgr;
 
@@ -397,7 +397,7 @@ int main(int argc, char* argv[])
     Listen(server_https_flv_fd);
     SetNonBlock(server_https_flv_fd);
 
-    HttpFlvMgr https_flv_mgr(&epoller);
+    ProtocolMgr<HttpFlvProtocol> https_flv_mgr(&epoller);
 
     g_https_flv_mgr = &https_flv_mgr;
 
@@ -413,7 +413,7 @@ int main(int argc, char* argv[])
     Listen(server_http_hls_fd);
     SetNonBlock(server_http_hls_fd);
 
-    HttpHlsMgr http_hls_mgr(&epoller, &rtmp_mgr);
+    ProtocolMgr<HttpHlsProtocol> http_hls_mgr(&epoller);
 
     g_http_hls_mgr = &http_hls_mgr;
 
@@ -429,7 +429,7 @@ int main(int argc, char* argv[])
     Listen(server_https_hls_fd);
     SetNonBlock(server_https_hls_fd);
 
-    HttpHlsMgr https_hls_mgr(&epoller, &rtmp_mgr);
+    ProtocolMgr<HttpHlsProtocol> https_hls_mgr(&epoller);
 
     g_https_hls_mgr = &https_hls_mgr;
 
@@ -445,7 +445,7 @@ int main(int argc, char* argv[])
     Listen(admin_fd);
     SetNonBlock(admin_fd);
 
-    AdminMgr admin_mgr(&epoller);
+    ProtocolMgr<AdminProtocol> admin_mgr(&epoller);
 
     TcpSocket admin_socket(&epoller, admin_fd, &admin_mgr);
     admin_socket.EnableRead();
@@ -459,7 +459,7 @@ int main(int argc, char* argv[])
     Listen(web_socket_fd);
     SetNonBlock(web_socket_fd);
 
-    WebSocketMgr web_socket_mgr(&epoller);
+    ProtocolMgr<WebSocketProtocol> web_socket_mgr(&epoller);
 
     TcpSocket web_socket_socket(&epoller, web_socket_fd, &web_socket_mgr);
     web_socket_socket.EnableRead();
@@ -487,7 +487,7 @@ int main(int argc, char* argv[])
     Listen(server_https_file_fd);
     SetNonBlock(server_https_file_fd);
 
-    HttpFileMgr https_file_mgr(&epoller);
+    ProtocolMgr<HttpFileProtocol> https_file_mgr(&epoller);
 
     SslSocket server_https_file_socket(&epoller, server_https_file_fd, &https_file_mgr);
     server_https_file_socket.EnableRead();
@@ -501,7 +501,7 @@ int main(int argc, char* argv[])
     Listen(server_http_file_fd);
     SetNonBlock(server_http_file_fd);
 
-    HttpFileMgr http_file_mgr(&epoller);
+    ProtocolMgr<HttpFileProtocol> http_file_mgr(&epoller);
 
     TcpSocket server_http_file_socket(&epoller, server_http_file_fd, &http_file_mgr);
     server_http_file_socket.EnableRead();
@@ -514,7 +514,7 @@ int main(int argc, char* argv[])
     Bind(echo_fd, "0.0.0.0", echo_port);
     SetNonBlock(echo_fd);
 
-    EchoMgr echo_mgr(&epoller);
+    ProtocolMgr<EchoProtocol> echo_mgr(&epoller);
 
     UdpSocket server_echo_socket(&epoller, echo_fd, &echo_mgr);
     server_echo_socket.EnableRead();
@@ -544,9 +544,10 @@ int main(int argc, char* argv[])
     srt_socket_util::Bind(server_srt_fd, "0.0.0.0", 9000);
     srt_socket_util::Listen(server_srt_fd);
 
-    SrtMgr srt_mgr(&srt_epoller);
-    timer_in_second.AddTimerSecondHandle(&srt_mgr);
+    ProtocolMgr<SrtProtocol> srt_mgr(&srt_epoller);
     g_srt_mgr = &srt_mgr;
+
+    timer_in_second.AddTimerSecondHandle(&srt_mgr);
 
     SrtSocket server_srt_socket(&srt_epoller, server_srt_fd, &srt_mgr);
     server_srt_socket.EnableRead();

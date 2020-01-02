@@ -8,9 +8,9 @@
 
 using namespace std;
 
-EchoProtocol::EchoProtocol(Epoller* epoller, Fd* socket)
+EchoProtocol::EchoProtocol(IoLoop* io_loop, Fd* socket)
     :
-    epoller_(epoller),
+    io_loop_(io_loop),
     socket_(socket)
 {
 }
@@ -31,9 +31,10 @@ int EchoProtocol::Parse(IoBuffer& io_buffer)
         cout << LMSG << Util::Bin2Hex(data, len) << endl;
 
         GetUdpSocket()->Send(data, len);
+        return kSuccess;
     }
 
-    return kSuccess;
+    return kNoEnoughData;
 }
 
 int EchoProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)

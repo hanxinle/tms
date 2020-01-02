@@ -3,9 +3,9 @@
 #include "webrtc_mgr.h"
 #include "webrtc_protocol.h"
 
-WebrtcMgr::WebrtcMgr(Epoller* epoller)
+WebrtcMgr::WebrtcMgr(IoLoop* io_loop)
     :
-    epoller_(epoller)
+    io_loop_(io_loop)
 {
 }
 
@@ -50,7 +50,7 @@ WebrtcProtocol* WebrtcMgr::GetOrCreateProtocol(Fd& socket)
     int fd = socket.fd();
     if (fd_protocol_.count(fd) == 0)
     {   
-        fd_protocol_[fd] = new WebrtcProtocol(epoller_, &socket);
+        fd_protocol_[fd] = new WebrtcProtocol(io_loop_, &socket);
     }   
 
     return fd_protocol_[fd];

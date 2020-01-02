@@ -14,9 +14,9 @@
 
 using namespace std;
 
-WebSocketProtocol::WebSocketProtocol(Epoller* epoller, Fd* socket)
+WebSocketProtocol::WebSocketProtocol(IoLoop* io_loop, Fd* socket)
     :
-    epoller_(epoller),
+    io_loop_(io_loop),
     socket_(socket),
     upgrade_(false)
 {

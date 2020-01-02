@@ -12,9 +12,9 @@
 
 using namespace std;
 
-HttpFileProtocol::HttpFileProtocol(Epoller* epoller, Fd* socket)
+HttpFileProtocol::HttpFileProtocol(IoLoop* io_loop, Fd* socket)
     :
-    epoller_(epoller),
+    io_loop_(io_loop),
     socket_(socket),
     upgrade_(false)
 {

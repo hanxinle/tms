@@ -22,6 +22,7 @@ public:
     int OnConnected();
 
     int EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
+    int EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count) { return 0; }
 
     SrtSocket* GetSrtSocket()
     {

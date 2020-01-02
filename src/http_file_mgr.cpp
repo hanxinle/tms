@@ -2,9 +2,9 @@
 #include "http_file_mgr.h"
 #include "http_file_protocol.h"
 
-HttpFileMgr::HttpFileMgr(Epoller* epoller)
+HttpFileMgr::HttpFileMgr(IoLoop* io_loop)
     :
-    epoller_(epoller)
+    io_loop_(io_loop)
 {
 }
 
@@ -65,7 +65,7 @@ HttpFileProtocol* HttpFileMgr::GetOrCreateProtocol(Fd& socket)
     int fd = socket.fd();
     if (fd_protocol_.count(fd) == 0)
     {   
-        fd_protocol_[fd] = new HttpFileProtocol(epoller_, &socket);
+        fd_protocol_[fd] = new HttpFileProtocol(io_loop_, &socket);
     }   
 
     return fd_protocol_[fd];

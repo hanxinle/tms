@@ -9,14 +9,14 @@
 using std::map;
 using std::set;
 
-class Epoller;
+class IoLoop;
 class Fd;
 class HttpFileProtocol;
 
 class HttpFileMgr : public SocketHandle
 {
 public:
-    HttpFileMgr(Epoller* epoller);
+    HttpFileMgr(IoLoop* io_loop);
     ~HttpFileMgr();
 
     virtual int HandleRead(IoBuffer& io_buffer, Fd& socket);
@@ -28,7 +28,7 @@ private:
     HttpFileProtocol* GetOrCreateProtocol(Fd& socket);
 
 private:
-    Epoller* epoller_;
+    IoLoop* io_loop_;
     map<int, HttpFileProtocol*> fd_protocol_;
 };
 

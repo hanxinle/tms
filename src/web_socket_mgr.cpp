@@ -2,9 +2,9 @@
 #include "web_socket_mgr.h"
 #include "web_socket_protocol.h"
 
-WebSocketMgr::WebSocketMgr(Epoller* epoller)
+WebSocketMgr::WebSocketMgr(IoLoop* io_loop)
     :
-    epoller_(epoller)
+    io_loop_(io_loop)
 {
 }
 
@@ -65,7 +65,7 @@ WebSocketProtocol* WebSocketMgr::GetOrCreateProtocol(Fd& socket)
     int fd = socket.fd();
     if (fd_protocol_.count(fd) == 0)
     {   
-        fd_protocol_[fd] = new WebSocketProtocol(epoller_, &socket);
+        fd_protocol_[fd] = new WebSocketProtocol(io_loop_, &socket);
     }   
 
     return fd_protocol_[fd];

@@ -6,9 +6,9 @@
 
 using namespace socket_util;
 
-AdminMgr::AdminMgr(Epoller* epoller)
+AdminMgr::AdminMgr(IoLoop* io_loop)
     :
-    epoller_(epoller)
+    io_loop_(io_loop)
 {
 }
 
@@ -21,7 +21,7 @@ AdminProtocol* AdminMgr::GetOrCreateProtocol(Fd& socket)
     int fd = socket.fd();
     if (fd_protocol_.count(fd) == 0)
     {   
-        fd_protocol_[fd] = new AdminProtocol(epoller_, &socket);
+        fd_protocol_[fd] = new AdminProtocol(io_loop_, &socket);
     }   
 
     return fd_protocol_[fd];

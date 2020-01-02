@@ -7,16 +7,15 @@
 
 using std::map;
 
-class Epoller;
+class IoLoop;
 class Fd;
 class HttpHlsProtocol;
 class ServerMgr;
-class RtmpMgr;
 
 class HttpHlsMgr : public SocketHandle
 {
 public:
-    HttpHlsMgr(Epoller* epoller, RtmpMgr* stream_mgr);
+    HttpHlsMgr(IoLoop* io_loop);
     ~HttpHlsMgr();
 
     virtual int HandleRead(IoBuffer& io_buffer, Fd& socket);
@@ -28,9 +27,8 @@ private:
     HttpHlsProtocol* GetOrCreateProtocol(Fd& socket);
 
 private:
-    Epoller* epoller_;
+    IoLoop* io_loop_;
     map<int, HttpHlsProtocol*> fd_protocol_;
-    RtmpMgr* rtmp_mgr_;
 };
 
 #endif // __HTTP_HLS_MGR_H__

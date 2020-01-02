@@ -9,16 +9,15 @@
 using std::map;
 using std::set;
 
-class Epoller;
+class IoLoop;
 class Fd;
 class HttpFlvProtocol;
 class ServerMgr;
-class RtmpMgr;
 
 class HttpFlvMgr : public SocketHandle
 {
 public:
-    HttpFlvMgr(Epoller* epoller);
+    HttpFlvMgr(IoLoop* io_loop);
     ~HttpFlvMgr();
 
     virtual int HandleRead(IoBuffer& io_buffer, Fd& socket);
@@ -32,7 +31,7 @@ private:
     HttpFlvProtocol* GetOrCreateProtocol(Fd& socket);
 
 private:
-    Epoller* epoller_;
+    IoLoop* io_loop_;
     map<int, HttpFlvProtocol*> fd_protocol_;
 };
 

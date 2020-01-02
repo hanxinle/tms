@@ -3,9 +3,9 @@
 #include "fd.h"
 #include "rtmp_mgr.h"
 
-RtmpMgr::RtmpMgr(Epoller* epoller)
+RtmpMgr::RtmpMgr(IoLoop* io_loop)
     :
-    epoller_(epoller)
+    io_loop_(io_loop)
 {
 }
 
@@ -74,7 +74,7 @@ RtmpProtocol* RtmpMgr::GetOrCreateProtocol(Fd& socket)
     int fd = socket.fd();
     if (fd_protocol_.count(fd) == 0)
     {
-        fd_protocol_[fd] = new RtmpProtocol(epoller_, &socket);
+        fd_protocol_[fd] = new RtmpProtocol(io_loop_, &socket);
     }
 
     return fd_protocol_[fd];

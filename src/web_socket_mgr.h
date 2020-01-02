@@ -9,14 +9,14 @@
 using std::map;
 using std::set;
 
-class Epoller;
+class IoLoop;
 class Fd;
 class WebSocketProtocol;
 
 class WebSocketMgr : public SocketHandle
 {
 public:
-    WebSocketMgr(Epoller* epoller);
+    WebSocketMgr(IoLoop* io_loop);
     ~WebSocketMgr();
 
     virtual int HandleRead(IoBuffer& io_buffer, Fd& socket);
@@ -28,7 +28,7 @@ private:
     WebSocketProtocol* GetOrCreateProtocol(Fd& socket);
 
 private:
-    Epoller* epoller_;
+    IoLoop* io_loop_;
     map<int, WebSocketProtocol*> fd_protocol_;
 };
 

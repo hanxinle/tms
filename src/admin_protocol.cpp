@@ -7,9 +7,9 @@
 
 using namespace socket_util;
 
-AdminProtocol::AdminProtocol(Epoller* epoller, Fd* socket)
+AdminProtocol::AdminProtocol(IoLoop* io_loop, Fd* socket)
     :
-    epoller_(epoller),
+    io_loop_(io_loop),
     socket_(socket)
 {
 }
@@ -125,7 +125,7 @@ int AdminProtocol::ProcAdminMsg(const string& admin_msg)
     			        return -1;
     			    }
 
-                    Fd* socket = new TcpSocket(epoller_, fd, (SocketHandle*)g_rtmp_mgr);
+                    Fd* socket = new TcpSocket(io_loop_, fd, (SocketHandle*)g_rtmp_mgr);
 
 				    RtmpProtocol* rtmp_player = g_rtmp_mgr->GetOrCreateProtocol(*socket);
 
@@ -195,7 +195,7 @@ int AdminProtocol::ProcAdminMsg(const string& admin_msg)
     			        return -1;
     			    }
 
-                    Fd* socket = new TcpSocket(epoller_, fd, (SocketHandle*)g_rtmp_mgr);
+                    Fd* socket = new TcpSocket(io_loop_, fd, (SocketHandle*)g_rtmp_mgr);
 
 				    RtmpProtocol* rtmp_player = g_rtmp_mgr->GetOrCreateProtocol(*socket);
 

@@ -12,10 +12,10 @@
 
 using namespace std;
 
-HttpHlsProtocol::HttpHlsProtocol(Epoller* epoller, Fd* socket)
+HttpHlsProtocol::HttpHlsProtocol(IoLoop* io_loop, Fd* socket)
     :
     MediaSubscriber(kHttpHls),
-    epoller_(epoller),
+    io_loop_(io_loop),
     socket_(socket),
     media_publisher_(NULL)
 {

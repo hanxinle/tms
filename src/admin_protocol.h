@@ -6,7 +6,7 @@
 
 #include <string>
 
-class Epoller;
+class IoLoop;
 class Fd;
 class IoBuffer;
 class TcpSocket;
@@ -14,7 +14,7 @@ class TcpSocket;
 class AdminProtocol
 {
 public:
-    AdminProtocol(Epoller* epoller, Fd* socket);
+    AdminProtocol(IoLoop* io_loop, Fd* socket);
     ~AdminProtocol();
 
 	int Parse(IoBuffer& io_buffer);
@@ -22,6 +22,8 @@ public:
     int OnConnected();
 
     int EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
+    int EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count) { return 0; }
+
 
     TcpSocket* GetTcpSocket()
     {
@@ -32,7 +34,7 @@ private:
     int ProcAdminMsg(const std::string& admin_msg);
 
 private:
-	Epoller* epoller_;
+	IoLoop* io_loop_;
     Fd* socket_;
 };
 

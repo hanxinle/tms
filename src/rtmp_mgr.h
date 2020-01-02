@@ -10,7 +10,7 @@
 using std::map;
 using std::string;
 
-class Epoller;
+class IoLoop;
 class Fd;
 class RtmpProtocol;
 class ServerMgr;
@@ -18,7 +18,7 @@ class ServerMgr;
 class RtmpMgr : public SocketHandle, public TimerSecondHandle
 {
 public:
-    RtmpMgr(Epoller* epoller);
+    RtmpMgr(IoLoop* io_loop);
     ~RtmpMgr();
 
     virtual int HandleRead(IoBuffer& io_buffer, Fd& socket);
@@ -31,7 +31,7 @@ public:
     RtmpProtocol* GetOrCreateProtocol(Fd& socket);
 
 private:
-    Epoller* epoller_;
+    IoLoop* io_loop_;
     map<int, RtmpProtocol*> fd_protocol_;
 };
 

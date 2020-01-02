@@ -11,14 +11,14 @@
 using std::map;
 using std::string;
 
-class Epoller;
+class IoLoop;
 class Fd;
 class AdminProtocol;
 
 class AdminMgr : public SocketHandle, public TimerSecondHandle
 {
 public:
-    AdminMgr(Epoller* epoller);
+    AdminMgr(IoLoop* io_loop);
     ~AdminMgr();
 
     AdminProtocol* GetOrCreateProtocol(Fd& socket);
@@ -31,7 +31,7 @@ public:
     virtual int HandleTimerInSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
 
 private:
-    Epoller* epoller_;
+    IoLoop* io_loop_;
     map<int, AdminProtocol*> fd_protocol_;
 };
 

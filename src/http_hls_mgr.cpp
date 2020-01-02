@@ -1,12 +1,9 @@
 #include "fd.h"
 #include "http_hls_mgr.h"
 #include "http_hls_protocol.h"
-#include "rtmp_mgr.h"
 
-HttpHlsMgr::HttpHlsMgr(Epoller* epoller, RtmpMgr* rtmp_mgr)
-    :
-    epoller_(epoller),
-    rtmp_mgr_(rtmp_mgr)
+HttpHlsMgr::HttpHlsMgr(IoLoop* io_loop)
+    : io_loop_(io_loop)
 {
 }
 
@@ -67,7 +64,7 @@ HttpHlsProtocol* HttpHlsMgr::GetOrCreateProtocol(Fd& socket)
     int fd = socket.fd();
     if (fd_protocol_.count(fd) == 0)
     {   
-        fd_protocol_[fd] = new HttpHlsProtocol(epoller_, &socket);
+        fd_protocol_[fd] = new HttpHlsProtocol(io_loop_, &socket);
     }   
 
     return fd_protocol_[fd];

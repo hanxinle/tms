@@ -7,7 +7,7 @@
 
 #include "http_parse.h"
 
-class Epoller;
+class IoLoop;
 class Fd;
 class IoBuffer;
 class Payload;
@@ -18,7 +18,7 @@ using std::string;
 class WebSocketProtocol
 {
 public:
-    WebSocketProtocol(Epoller* epoller, Fd* socket);
+    WebSocketProtocol(IoLoop* io_loop, Fd* socket);
     ~WebSocketProtocol();
 
     int Parse(IoBuffer& io_buffer);
@@ -26,6 +26,8 @@ public:
 
     int OnStop();
     int EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
+    int OnConnected() { return 0; }
+    int EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count) { return 0; }
 
 private:
     TcpSocket* GetTcpSocket()
@@ -34,7 +36,7 @@ private:
     }
 
 private:
-    Epoller* epoller_;
+    IoLoop* io_loop_;
     Fd* socket_;
 
     bool upgrade_;

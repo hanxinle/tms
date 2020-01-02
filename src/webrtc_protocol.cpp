@@ -100,11 +100,11 @@ enum class WebRTCPayloadType
 const uint32_t kVideoSSRC = 3233846889;
 const uint32_t kAudioSSRC = 3233846890;
 
-WebrtcProtocol::WebrtcProtocol(Epoller* epoller, Fd* socket)
+WebrtcProtocol::WebrtcProtocol(IoLoop* io_loop, Fd* socket)
     :
     MediaPublisher(),
     MediaSubscriber(kWebRtc),
-    epoller_(epoller),
+    io_loop_(io_loop),
     socket_(socket),
     create_time_ms_(Util::GetNowMs()),
     dtls_hello_send_(false),

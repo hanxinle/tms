@@ -15,10 +15,10 @@
 
 using namespace std;
 
-HttpFlvProtocol::HttpFlvProtocol(Epoller* epoller, Fd* socket)
+HttpFlvProtocol::HttpFlvProtocol(IoLoop* io_loop, Fd* socket)
     :
     MediaSubscriber(kHttpFlv),
-    epoller_(epoller),
+    io_loop_(io_loop),
     socket_(socket),
     media_publisher_(NULL),
     pre_tag_size_(0)

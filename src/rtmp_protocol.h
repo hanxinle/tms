@@ -20,7 +20,7 @@ using std::ostringstream;
 using std::set;
 
 class AmfCommand;
-class Epoller;
+class IoLoop;
 class Fd;
 class HttpFlvProtocol;
 class IoBuffer;
@@ -134,7 +134,7 @@ struct RtmpMessage
 class RtmpProtocol : public MediaPublisher, public MediaSubscriber
 {
 public:
-    RtmpProtocol(Epoller* epoller, Fd* socket);
+    RtmpProtocol(IoLoop* io_loop, Fd* socket);
     ~RtmpProtocol();
 
     bool IsServerRole()
@@ -187,6 +187,7 @@ public:
     int OnConnected();
 
     int EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
+    int EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count) { return 0; }
 
     int SendHandShakeStatus0();
     int SendHandShakeStatus1();
@@ -298,7 +299,7 @@ private:
     void GenerateRandom(uint8_t* data, const int& len);
 
 private:
-    Epoller* epoller_;
+    IoLoop* io_loop_;
     Fd* socket_;
     HandShakeStatus handshake_status_;
 

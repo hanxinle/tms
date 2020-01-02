@@ -5,7 +5,7 @@
 
 #include <string>
 
-class Epoller;
+class IoLoop;
 class Fd;
 class IoBuffer;
 class EchoMgr;
@@ -16,11 +16,16 @@ using std::string;
 class EchoProtocol
 {
 public:
-    EchoProtocol(Epoller* epoller, Fd* socket);
+    EchoProtocol(IoLoop* io_loop, Fd* socket);
     ~EchoProtocol();
 
     int Parse(IoBuffer& io_buffer);
     int EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
+
+	int OnStop() { return 0; }
+    int OnConnected() { return 0; }
+
+    int EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count) { return 0; }
 
 private:
     UdpSocket* GetUdpSocket()
@@ -29,7 +34,7 @@ private:
     }
 
 private:
-    Epoller* epoller_;
+    IoLoop* io_loop_;
     Fd* socket_;
 };
 

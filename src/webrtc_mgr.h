@@ -10,14 +10,14 @@
 using std::map;
 using std::set;
 
-class Epoller;
+class IoLoop;
 class Fd;
 class WebrtcProtocol;
 
 class WebrtcMgr : public SocketHandle, public TimerSecondHandle, public TimerMillSecondHandle
 {
 public:
-    WebrtcMgr(Epoller* epoller);
+    WebrtcMgr(IoLoop* io_loop);
     ~WebrtcMgr();
 
     virtual int HandleRead(IoBuffer& io_buffer, Fd& socket);
@@ -45,7 +45,7 @@ public:
     WebrtcProtocol* GetOrCreateProtocol(Fd& socket);
 
 private:
-    Epoller* epoller_;
+    IoLoop* io_loop_;
     map<int, WebrtcProtocol*> fd_protocol_;
 
     set<string> remote_ufrags_;

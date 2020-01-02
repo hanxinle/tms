@@ -1,11 +1,10 @@
 #include "fd.h"
 #include "http_flv_mgr.h"
 #include "http_flv_protocol.h"
-#include "rtmp_mgr.h"
 
-HttpFlvMgr::HttpFlvMgr(Epoller* epoller)
+HttpFlvMgr::HttpFlvMgr(IoLoop* io_loop)
     :
-    epoller_(epoller)
+    io_loop_(io_loop)
 {
 }
 
@@ -66,7 +65,7 @@ HttpFlvProtocol* HttpFlvMgr::GetOrCreateProtocol(Fd& socket)
     int fd = socket.fd();
     if (fd_protocol_.count(fd) == 0)
     {   
-        fd_protocol_[fd] = new HttpFlvProtocol(epoller_, &socket);
+        fd_protocol_[fd] = new HttpFlvProtocol(io_loop_, &socket);
     }   
 
     return fd_protocol_[fd];

@@ -17,7 +17,7 @@
 #include "webrtc/modules/rtp_rtcp/source/rtp_format_vp9.h"
 #include "webrtc/modules/rtp_rtcp/source/rtp_format_h264.h"
 
-class Epoller;
+class IoLoop;
 class Fd;
 class IoBuffer;
 class WebrtcMgr;
@@ -169,7 +169,7 @@ struct MediaSlice
 class WebrtcProtocol : public MediaPublisher, public MediaSubscriber
 {
 public:
-    WebrtcProtocol(Epoller* epoller, Fd* socket);
+    WebrtcProtocol(IoLoop* io_loop, Fd* socket);
     ~WebrtcProtocol();
 
     int Parse(IoBuffer& io_buffer);
@@ -251,7 +251,7 @@ private:
     }
 
 private:
-    Epoller* epoller_;
+    IoLoop* io_loop_;
     Fd* socket_;
 
     uint64_t create_time_ms_;

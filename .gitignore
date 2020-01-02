@@ -2,7 +2,6 @@
 *.d
 debug*
 tags*
-trs*
 *.swp
 rtmp_1936
 *.txt
@@ -23,3 +22,4 @@ depend/share/
 depend/tmp/
 *_generated.h
 log
+tms*

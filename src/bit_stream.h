@@ -4,7 +4,6 @@
 #include <string.h>
 
 #include "common_define.h"
-#include "trace_tool.h"
 
 class BitStream
 {

@@ -39,7 +39,7 @@ int HttpFileProtocol::Parse(IoBuffer& io_buffer)
                 http_rsp.SetStatus("404");
                 http_rsp.SetContentType("html");
                 http_rsp.SetClose();
-                http_rsp.SetContent("fuck you");
+                http_rsp.SetContent("no found");
 
                 string http_response = http_rsp.Encode();
 

@@ -13,7 +13,6 @@
 #include "media_struct.h"
 #include "ref_ptr.h"
 #include "socket_util.h"
-#include "trace_tool.h"
 
 using std::map;
 using std::ostringstream;
@@ -149,20 +148,6 @@ public:
         return ret;
     }
 
-    bool GetForwardToggleBit()
-    {
-        bool ret = forward_toggle_bit_;
-
-        if (forward_toggle_bit_)
-        {
-            cout << LMSG << "forward_toggle_bit_ " << forward_toggle_bit_ << "->" << false << endl;
-        }
-
-        forward_toggle_bit_ = false;
-
-        return ret;
-    }
-
     int OnAudio(Payload& payload);
     int OnVideo(Payload& payload);
     int OnMetaData(const string& metadata);
@@ -203,8 +188,6 @@ private:
     string vps_;
     string sps_;
     string pps_;
-
-    bool forward_toggle_bit_;
 
     // ======== ts ========
     string invalid_ts_;

@@ -13,7 +13,6 @@
 #include "media_subscriber.h"
 #include "ref_ptr.h"
 #include "socket_util.h"
-#include "trace_tool.h"
 
 using std::map;
 using std::string;
@@ -248,9 +247,6 @@ public:
     virtual int SendAudioHeader(const string& header);
     virtual int SendMetaData(const string& metadata);
 
-    int OpenDumpFile();
-    int DumpRtmp(const uint8_t* data, const int& size);
-
 private:
     double GetTransactionId()
     {
@@ -339,17 +335,6 @@ private:
 
     uint64_t video_frame_send_;
     uint64_t audio_frame_send_;
-
-    uint32_t last_video_timestamp_;
-    uint32_t last_video_timestamp_delta_;
-    uint32_t last_audio_timestamp_;
-    uint32_t last_audio_timestamp_delta_;
-    uint32_t last_video_message_length_;
-    uint32_t last_audio_message_length_;
-    uint8_t last_message_type_id_;
-
-    bool dump_;
-    int dump_fd_;
 };
 
 #endif // __RTMP_PROTOCOL_H__

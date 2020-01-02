@@ -24,7 +24,6 @@
 #include "tcp_socket.h"
 #include "timer_in_second.h"
 #include "timer_in_millsecond.h"
-#include "trace_tool.h"
 #include "udp_socket.h"
 #include "util.h"
 #include "webrtc_mgr.h"

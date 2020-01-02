@@ -25,9 +25,10 @@ int SrtProtocol::Parse(IoBuffer& io_buffer)
 
     if (len > 0)
     {
-        cout << LMSG << endl;
+        return kSuccess;
     }
-    return kSuccess;
+
+    return kNoEnoughData;
 }
 
 int SrtProtocol::OnStop()

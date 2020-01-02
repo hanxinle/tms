@@ -22,7 +22,6 @@ MediaMuxer::MediaMuxer(MediaPublisher* media_publisher)
     video_calc_fps_(0),
     audio_calc_fps_(0),
     pre_calc_fps_ms_(0),
-    forward_toggle_bit_(false),
     ts_seq_(0),
     ts_couter_(0),
     ts_video_pid_(0x100),
@@ -666,14 +665,11 @@ int MediaMuxer::OnVideoHeader(const string& video_header)
 {
     cout << LMSG << endl;
 
-    bool wait_arrive = false;
+    bool pending_arrive = false;
 
     if (video_header_.empty() && ! video_header.empty() && ! audio_header_.empty())
     {
-        cout << LMSG << "forward_toggle_bit_ " << forward_toggle_bit_ << "->" << true << endl;
-        forward_toggle_bit_ = true;
-
-        wait_arrive = true;
+        pending_arrive = true;
     }
 
     if (video_header_ == video_header)
@@ -684,7 +680,7 @@ int MediaMuxer::OnVideoHeader(const string& video_header)
 
     video_header_ = video_header;
 
-    if (wait_arrive)
+    if (pending_arrive)
     {
         if (media_publisher_ != NULL)
         {
@@ -766,14 +762,11 @@ int MediaMuxer::OnVideoHeader(const string& video_header)
 
 int MediaMuxer::OnAudioHeader(const string& audio_header)
 {
-    bool wait_arrive = false;
+    bool pending_arrive = false;
 
     if (audio_header_.empty() && ! audio_header.empty() && ! video_header_.empty())
     {
-        cout << LMSG << "forward_toggle_bit_ " << forward_toggle_bit_ << "->" << true << endl;
-        forward_toggle_bit_ = true;
-
-        wait_arrive = true;
+        pending_arrive = true;
     }
 
     if (audio_header_ == audio_header)
@@ -784,7 +777,7 @@ int MediaMuxer::OnAudioHeader(const string& audio_header)
 
     audio_header_ = audio_header;
 
-    if (wait_arrive)
+    if (pending_arrive)
     {
         if (media_publisher_ != NULL)
         {

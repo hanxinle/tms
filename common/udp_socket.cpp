@@ -32,12 +32,8 @@ int UdpSocket::OnRead()
 
         int bytes = io_buffer.ReadFromFdAndWrite(fd_, &src_addr_, &src_addr_len_);
 
-        SocketAddrInetToIpPort(*(sockaddr_in*)(&src_addr_), client_ip_, client_port_);
-
         if (bytes > 0)
         {
-            //cout << LMSG << "udp recv from:" << client_ip_ << ":" << client_port_ << endl;
-
             if (handler_)
             {
                 handler_->HandleRead(io_buffer, *this);
@@ -72,10 +68,5 @@ int UdpSocket::Send(const uint8_t* data, const size_t& len)
 {
     sendto(fd_, data, len, 0, &src_addr_, src_addr_len_);
 
-    return kSuccess;
-}
-
-int UdpSocket::SendTo(const uint8_t* data, const size_t& len, const string& dst_ip, const uint16_t& dst_port)
-{
     return kSuccess;
 }

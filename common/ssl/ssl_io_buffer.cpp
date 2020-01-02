@@ -5,7 +5,6 @@
 
 #include "common_define.h"
 #include "ssl_io_buffer.h"
-#include "trace_tool.h"
 #include "util.h"
 
 #include "openssl/err.h"

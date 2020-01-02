@@ -154,9 +154,11 @@ int WebrtcProtocol::Parse(IoBuffer& io_buffer)
         {
             cout << LMSG << (long)this <<", unknown" <<endl;
         }
+
+        return kSuccess;
     }
 
-    return kSuccess;
+    return kNoEnoughData;
 }
 
 void WebrtcProtocol::SendVideoData(const uint8_t* data, const int& size, const uint32_t& timestamp, const int& flag)

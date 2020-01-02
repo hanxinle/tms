@@ -21,15 +21,6 @@
 #include "tcp_socket.h"
 #include "util.h"
 
-#define WS "ws.upstream.huya.com"
-#define TX "tx.direct.huya.com"
-#define AL "al.direct.huya.com"
-#define WS_PUSH "ws1.upstream.huya.com"
-#define TX_PUSH "tx.push.huya.com"
-#define AL_PUSH "al.push.huya.com"
-
-#define CDN_PORT 1935
-
 using namespace std;
 using namespace socket_util;
 
@@ -138,25 +129,9 @@ RtmpProtocol::RtmpProtocol(Epoller* epoller, Fd* fd)
     out_chunk_size_(128),
     transaction_id_(0.0),
     media_publisher_(NULL),
-    can_publish_(false),
-    video_frame_send_(0),
-    audio_frame_send_(0),
-    last_video_timestamp_(0),
-    last_video_timestamp_delta_(0),
-    last_audio_timestamp_(0),
-    last_audio_timestamp_delta_(0),
-    last_video_message_length_(0),
-    last_audio_message_length_(0),
-    last_message_type_id_(0),
-    dump_(false),
-    dump_fd_(-1)
+    can_publish_(false)
 {
     cout << LMSG << endl;
-
-    if (dump_)
-    {
-        OpenDumpFile();
-    }
 }
 
 RtmpProtocol::~RtmpProtocol()
@@ -363,19 +338,6 @@ void RtmpProtocol::GenerateRandom(uint8_t* data, const int& len)
 
 int RtmpProtocol::Parse(IoBuffer& io_buffer)
 {
-    // FIXME: 这个dump方法是不对的,可能会重复
-    if (dump_)
-    {
-        int io_buffer_size = io_buffer.Size();
-        uint8_t* dump = NULL;
-        io_buffer.Peek(dump, 0, io_buffer_size);
-
-        if (dump != NULL && io_buffer_size > 0)
-        {
-            DumpRtmp(dump, io_buffer_size);
-        }
-    }
-    
     if (IsHandshakeDone())
     {
         bool one_message_done = false;
@@ -986,31 +948,6 @@ int RtmpProtocol::OnAudio(RtmpMessage& rtmp_msg)
                 {
                     sub->SendMediaData(audio_payload);
                 }
-
-                /*
-                for (auto& dst : rtmp_forwards_)
-                {
-                    if (dst->CanPublish())
-                    {
-                        dst->SendMediaData(audio_payload);
-                    }
-                }
-
-                for (auto& player : rtmp_player_)
-                {
-                    player->SendMediaData(audio_payload);
-                }
-
-                for (auto& player : flv_player_)
-                {
-                    player->SendMediaData(audio_payload);
-                }
-
-                for (auto& follow : server_follow_)
-                {
-                    follow->SendMediaData(audio_payload);
-                }
-                */
             }
         }
     }
@@ -1082,7 +1019,7 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
 
                         Payload video_payload(video_raw_data, nalu_len + 4);
 
-                        cout << LMSG << "nalu_unit_type:" << (int)nalu_unit_type << endl;
+                        //cout << LMSG << "nalu_unit_type:" << (int)nalu_unit_type << endl;
                         // SEI不能传给webrtc,不然会导致只能解码关键帧,其他帧都无法解码
                         if (nalu_unit_type != 6)
                         {
@@ -1154,44 +1091,12 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
 
                         if (to_media_muxer)
                         {
-                            if (media_muxer_.GetForwardToggleBit())
-                            {
-                                //ConnectForwardRtmpServer(WS_PUSH, CDN_PORT);
-                                //ConnectForwardRtmpServer(AL_PUSH, CDN_PORT);
-                                //ConnectForwardRtmpServer(TX_PUSH, CDN_PORT);
-                            }
-
                             media_muxer_.OnVideo(video_payload);
 
                             for (auto& sub : subscriber_)
                             {
                                 sub->SendMediaData(video_payload);
                             }
-
-                            /*
-                            for (auto& dst : rtmp_forwards_)
-                            {
-                                if (dst->CanPublish())
-                                {
-                                    dst->SendMediaData(video_payload);
-                                }
-                            }
-
-                            for (auto& player : rtmp_player_)
-                            {
-                                player->SendMediaData(video_payload);
-                            }
-
-                            for (auto& player : flv_player_)
-                            {
-                                player->SendMediaData(video_payload);
-                            }
-
-                            for (auto& follow : server_follow_)
-                            {
-                                follow->SendMediaData(video_payload);
-                            }
-                            */
                         }
 
                         cur_len += nalu_len + 4;
@@ -2081,44 +1986,6 @@ int RtmpProtocol::SendMetaData(const string& metadata)
     SendRtmpMessage(4, 1, kMetaData_AMF0, (const uint8_t*)metadata.data(), metadata.size());
 
     return 0;
-}
-
-int RtmpProtocol::OpenDumpFile()
-{
-    if (dump_fd_ > 0)
-    {
-        return 0;
-    }
-
-    ostringstream os;
-    os << Util::GetNowStr() << "-rtmp" << this << ".dump";
-    string dump_file_name = os.str();
-    dump_fd_ = open(dump_file_name.c_str(), O_CREAT|O_TRUNC|O_RDWR, 0664);
-
-    if (dump_fd_ < 0)
-    {
-        cout << LMSG << "open " << dump_file_name << " failed" << endl;
-        return -1;
-    }
-
-    return 0;
-}
-
-int RtmpProtocol::DumpRtmp(const uint8_t* data, const int& size)
-{
-    if (dump_fd_ < 0)
-    {
-        return -1;
-    }
-
-    int nbytes = write(dump_fd_, data, size);
-
-    if (nbytes < 0)
-    {
-        cout << LMSG << "write failed" << endl;
-    }
-
-    return nbytes;
 }
 
 int RtmpProtocol::SendHandShakeStatus0()

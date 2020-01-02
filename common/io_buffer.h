@@ -9,7 +9,6 @@
 #include <string>
 
 #include "common_define.h"
-#include "trace_tool.h"
 
 using std::string;
 using std::cout;

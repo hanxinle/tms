@@ -7,7 +7,6 @@
 #include <iostream>
 
 #include "common_define.h"
-#include "trace_tool.h"
 
 using std::atomic;
 using std::cout;
@@ -78,34 +77,6 @@ public:
         frame_type_(kUnknownFrame),
         payload_type_(kUnknownPayload)
     {
-    }
-
-    uint32_t GetMask() const
-    {
-        uint32_t mask = 0;
-        if (IsAudio())
-        {
-            MaskAudio(mask);
-        }
-        else if (IsVideo())
-        {
-            MaskVideo(mask);
-        }
-
-        if (IsPFrame())
-        {
-            MaskPFrame(mask);
-        }
-        else if (IsIFrame())
-        {
-            MaskIFrame(mask);
-        }
-        else if (IsBFrame())
-        {
-            MaskBFrame(mask);
-        }
-
-        return mask;
     }
 
     void SetIFrame() { frame_type_ = kIframe; }

@@ -1,3 +1,4 @@
+#include "global.h"
 #include "srt_socket.h"
 #include "srt_socket_util.h"
 #include "util.h"
@@ -13,16 +14,18 @@
 using namespace std;
 
 SrtSocket::SrtSocket(IoLoop* io_loop, const int& fd, SocketHandle* handle)
-    :
-    Fd(io_loop, fd),
-    connect_status_(kDisconnected),
-    handle_(handle),
-    server_socket_(false)
+    : Fd(io_loop, fd)
+    , connect_status_(kDisconnected)
+    , handle_(handle)
+    , server_socket_(false)
+    , stream_id_("")
 {
+    cout << LMSG << "fd=" << fd_ << ",srt socket=" << this << endl;
 }
 
 SrtSocket::~SrtSocket()
 {
+    cout << LMSG << "fd=" << fd_ << ",srt socket=" << this << endl;
 }
 
 int SrtSocket::OnRead()
@@ -39,6 +42,8 @@ int SrtSocket::OnRead()
             SrtSocket* srt_socket = new SrtSocket(io_loop_, client_srt_socket, handle_);
             srt_socket->SetConnected();
             srt_socket->EnableRead();
+            srt_socket->SetStreamId(UDT::getstreamid(client_srt_socket));
+            g_srt_mgr->GetOrCreateProtocol(*srt_socket);
 
             std::string client_ip = ""; 
             uint16_t client_port = 0;
@@ -54,26 +59,47 @@ int SrtSocket::OnRead()
     }
     else
     {
-        uint8_t buf[1024*8];
-        int ret = srt_recvmsg(fd(), (char*)buf, sizeof(buf));
-
-        if (ret == SRT_ERROR)
-        {
-            handle_->HandleError(read_buffer_, *this);
-            return kError;
-        }
-
-        //cout << LMSG << "srt recv:" << ret << " bytes, " << Util::Bin2Hex(buf, ret) << endl;
-
-        read_buffer_.Write(buf, ret);
-        ret = handle_->HandleRead(read_buffer_, *this);
-
-		if (ret == kClose || ret == kError)
+        SRT_SOCKSTATUS srt_status = srt_getsockstate(fd());
+        if (srt_status == SRTS_CLOSED || srt_status == SRTS_BROKEN)
         {   
-            cout << LMSG << "read error:" << ret << endl;
+            cout << LMSG << "srt socket=" << fd() << ", srt_status=" << (int)srt_status << endl;
             handle_->HandleClose(read_buffer_, *this);
             return kClose;
-        } 
+        }
+
+        uint8_t buf[1024*8];
+        int msg_count = 0;
+        while (true)
+        {
+            int ret = srt_recvmsg(fd(), (char*)buf, sizeof(buf));
+
+            if (ret == SRT_ERROR && srt_getlasterror(NULL) == (MJ_AGAIN * 1000 + MN_RDAVAIL))
+            {
+                cout << LMSG << "msg_count=" << msg_count << ", no more data to read" << endl;
+                break;
+            }
+
+            if (ret == SRT_ERROR)
+            {
+                cout << LMSG << "srt error " << endl;
+                handle_->HandleError(read_buffer_, *this);
+                return kError;
+            }
+
+            ++msg_count;
+
+            //cout << LMSG << "srt recv:" << ret << " bytes, " << Util::Bin2Hex(buf, ret) << endl;
+
+            read_buffer_.Write(buf, ret);
+            ret = handle_->HandleRead(read_buffer_, *this);
+
+		    if (ret == kClose || ret == kError)
+            {   
+                cout << LMSG << "read error:" << ret << endl;
+                handle_->HandleClose(read_buffer_, *this);
+                return kClose;
+            } 
+        }
     }
 
     return kSuccess;
@@ -81,45 +107,6 @@ int SrtSocket::OnRead()
 
 int SrtSocket::OnWrite()
 {
-    if (IsConnected())
-    {
-        if (write_buffer_.Empty())
-        {
-            return 0;
-        }
-
-        int ret = write_buffer_.WriteToFd(fd_);
-
-        cout << LMSG << "write " << ret << " nbytes" << endl;
-
-        if (write_buffer_.Empty())
-        {
-            DisableWrite();
-        }
-
-        return ret;
-    }
-
-    int err = 0;
-    int ret = socket_util::GetSocketError(fd_, err);
-
-    if (ret < 0 || err < 0)
-    {
-        cout << LMSG << "ret:" << ret << ", err:" << err << endl;
-        SetDisConnected();
-
-        handle_->HandleError(read_buffer_, *this);
-        return kError;
-    }
-
-    cout << LMSG << "connected" << endl;
-    SetConnected();
-
-    handle_->HandleConnected(*this);
-
-    EnableRead();
-
-
     return kSuccess;
 }
 
@@ -161,40 +148,7 @@ int SrtSocket::ConnectHost(const std::string& host, const uint16_t& port)
 
 int SrtSocket::Send(const uint8_t* data, const size_t& len)
 {
-    int nbytes = 0;
-    if (write_buffer_.Empty())
-    {
-        nbytes = write(fd_, data, len);
+    srt_sendmsg(fd(), (const char*)data, len, -1, 0);
 
-        if (nbytes < 0 && errno != EAGAIN && errno != EWOULDBLOCK)
-        {
-            cout << LMSG << "write failed, ret=" << nbytes << endl;
-            return nbytes;
-        }
-        
-        if (nbytes > 0 && (size_t)nbytes < len)
-        {
-            nbytes += write_buffer_.Write(data + nbytes, len - nbytes);
-            EnableWrite();
-        }
-    }
-    else
-    {
-        nbytes = write_buffer_.Write(data, len);
-    }
-
-    if (write_buffer_.Size() > 0)
-    {
-        if (write_buffer_.WriteToFd(fd_) < 0 && errno != EAGAIN && errno != EWOULDBLOCK)
-        {
-            return kError;
-        }
-    }
-
-    if (write_buffer_.Empty())
-    {
-        DisableWrite();
-    }
-
-    return nbytes;
+    return kSuccess;
 }

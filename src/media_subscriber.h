@@ -30,35 +30,15 @@ public:
         }
     }
 
-    void SetPublisher(MediaPublisher* publisher)
-    {
-        publisher_ = publisher;
-    }
+    void SetPublisher(MediaPublisher* publisher) { publisher_ = publisher; }
 
-    uint16_t GetType() const
-    {
-        return type_;
-    }
+    uint16_t GetType() const { return type_; }
 
-    bool IsRtmp()
-    {
-        return type_ == kRtmp;
-    }
+    bool IsRtmp() { return type_ == kRtmp; }
 
-    bool IsTcpServer()
-    {
-        return type_ == kTcpServer;
-    }
+    bool IsHttpFlv() { return type_ == kHttpFlv; }
 
-    bool IsHttpFlv()
-    {
-        return type_ == kHttpFlv;
-    }
-
-    bool IsHttpHls()
-    {
-        return type_ == kHttpHls;
-    }
+    bool IsHttpHls() { return type_ == kHttpHls; }
 
     virtual int SendVideoHeader(const string& header)
     {
@@ -81,6 +61,12 @@ public:
     virtual int SendMediaData(const Payload& payload)
     {
         UNUSED(payload);
+        return 0;
+    }
+
+    virtual int SendData(const string& data)
+    {
+        UNUSED(data);
         return 0;
     }
 

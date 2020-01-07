@@ -69,7 +69,7 @@ enum SubscriberType
     kRtmp = 0,
     kHttpFlv = 1,
     kHttpHls = 2,
-    kTcpServer = 3,
+    kSrt = 3,
     kWebRtc = 4,
 };
 

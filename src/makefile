@@ -11,8 +11,8 @@ LIB_DIR        += -lpthread -lbz2 -lz -ldl
 CC             = gcc
 CXX 		   = g++
 #CXX 		   = clang
-CFLAGS         = -g -W -Wall -Werror -O2 -pg
-CXXFLAGS       = -g -std=c++0x -DWEBRTC_POSIX -W -Wall -Werror -O2 -pg -Wno-strict-aliasing -Wno-missing-field-initializers -Wno-unused-function -Wno-deprecated-declarations \
+CFLAGS         = -g -W -Wall -Werror -O0 -pg
+CXXFLAGS       = -g -std=c++0x -DWEBRTC_POSIX -W -Wall -Werror -O0 -pg -Wno-strict-aliasing -Wno-missing-field-initializers -Wno-unused-function -Wno-deprecated-declarations \
 				 -Wno-unused-variable -Wno-unused-parameter -Wno-unused-value
 
 CXXFLAGS       += -DUSE_PUBLISH

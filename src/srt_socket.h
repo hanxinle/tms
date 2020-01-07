@@ -50,6 +50,9 @@ public:
     IoBuffer& read_buffer() { return read_buffer_; }
     IoBuffer& write_buffer() { return write_buffer_; }
 
+    void SetStreamId(const std::string& stream_id) { stream_id_ = stream_id; }
+    std::string GetStreamId() const { return stream_id_; }
+
 protected:
     IoBuffer read_buffer_;
     IoBuffer write_buffer_;
@@ -59,6 +62,8 @@ protected:
     SocketHandle* handle_;
 
     bool server_socket_;
+
+    std::string stream_id_;
 };
 
 #endif // __SRT_SOCKET_H__

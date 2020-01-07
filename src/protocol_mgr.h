@@ -7,6 +7,7 @@
 #include "socket_handle.h"
 #include "timer_handle.h"
 
+#include "admin_protocol.h"
 #include "echo_protocol.h"
 #include "http_flv_protocol.h"
 #include "http_file_protocol.h"

@@ -3,7 +3,6 @@
 
 #include "local_stream_center.h"
 #include "epoller.h"
-#include "srt_mgr.h"
 #include "protocol_mgr.h"
 #include "webrtc_mgr.h"
 #include <openssl/ssl.h>

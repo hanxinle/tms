@@ -94,6 +94,7 @@ int SrtEpoller::AddFd(Fd* fd)
 
 int SrtEpoller::DelFd(Fd* fd)
 {
+    cout << LMSG << "del srt socket:" << fd->fd() << endl;
     int ret = srt_epoll_remove_usock(poll_fd_, fd->fd());
 
     if (ret == SRT_ERROR)
@@ -161,17 +162,13 @@ void SrtEpoller::WaitIO(const int& timeout_in_millsecond)
             continue;
         }
 
-        SRT_SOCKSTATUS srt_status = srt_getsockstate(srt_socket);
-
-        if (srt_status == SRTS_CLOSED || srt_status == SRTS_BROKEN)
-        {
-            cout << LMSG << "srt socket:" << srt_socket << ", srt_status:" << (int)srt_status << endl;
-            delete fd;
-        }
-        else
-        {
-            fd->OnRead();
-        }
+        int ret = fd->OnRead();
+		if (ret == kClose || ret == kError)
+		{   
+			cout << LMSG << "closed, ret:" << ret << endl;
+			delete fd; 
+			return;
+		}
 	}
 
     for (int i = 0; i < can_write_srt_sockets_num; ++i)
@@ -197,16 +194,14 @@ void SrtEpoller::WaitIO(const int& timeout_in_millsecond)
             continue;
         }
 
-        SRT_SOCKSTATUS srt_status = srt_getsockstate(srt_socket);
-
-        cout << LMSG << "srt socket:" << srt_socket << ", srt_status:" << (int)srt_status << endl;
-
-        if (srt_status == SRTS_CLOSED)
-        {
-        }
-        else
-        {
-            fd->OnWrite();
-        }
+        //SRT_SOCKSTATUS srt_status = srt_getsockstate(srt_socket);
+        //cout << LMSG << "srt socket:" << srt_socket << ", srt_status:" << (int)srt_status << endl;
+        //if (srt_status == SRTS_CLOSED)
+        //{
+        //}
+        //else
+        //{
+        //    fd->OnWrite();
+        //}
     }
 }

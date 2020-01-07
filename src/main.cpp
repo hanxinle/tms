@@ -2,21 +2,15 @@
 
 #include <iostream>
 
-#include "admin_mgr.h"
 #include "any.h"
 #include "base_64.h"
 #include "bit_buffer.h"
 #include "bit_stream.h"
 #include "epoller.h"
-#include "http_file_mgr.h"
-#include "http_flv_mgr.h"
-#include "http_hls_mgr.h"
 #include "local_stream_center.h"
 #include "ref_ptr.h"
-#include "rtmp_mgr.h"
 #include "socket_util.h"
 #include "srt_epoller.h"
-#include "srt_mgr.h"
 #include "srt_socket_util.h"
 #include "srt_socket.h"
 #include "ssl_socket.h"
@@ -26,7 +20,6 @@
 #include "udp_socket.h"
 #include "util.h"
 #include "webrtc_mgr.h"
-#include "web_socket_mgr.h"
 #include "protocol_mgr.h"
 
 #include "openssl/ssl.h"
@@ -473,7 +466,7 @@ int main(int argc, char* argv[])
     Listen(ssl_web_socket_fd);
     SetNonBlock(ssl_web_socket_fd);
 
-    WebSocketMgr ssl_web_socket_mgr(&epoller);
+    ProtocolMgr<WebSocketProtocol> ssl_web_socket_mgr(&epoller);
 
     SslSocket ssl_web_socket_socket(&epoller, ssl_web_socket_fd, &ssl_web_socket_mgr);
     ssl_web_socket_socket.EnableRead();
@@ -536,11 +529,20 @@ int main(int argc, char* argv[])
     UdpSocket server_webrtc_socket(&epoller, webrtc_fd, &webrtc_mgr);
     server_webrtc_socket.EnableRead();
 
+    srt_startup();
+    srt_setloglevel(srt_logging::LogLevel::note);
+
     SrtEpoller srt_epoller;
     srt_epoller.Create();
 
     int server_srt_fd = srt_socket_util::CreateSrtSocket();
+    srt_socket_util::SetTransTypeLive(server_srt_fd);
     srt_socket_util::SetBlock(server_srt_fd, false);
+    srt_socket_util::SetSendBufSize(server_srt_fd, 10*1024*1024);
+    srt_socket_util::SetRecvBufSize(server_srt_fd, 10*1024*1024);
+    srt_socket_util::SetUdpSendBufSize(server_srt_fd, 10*1024*1024);
+    srt_socket_util::SetUdpRecvBufSize(server_srt_fd, 10*1024*1024);
+    srt_socket_util::SetLatency(server_srt_fd, 1000);
     srt_socket_util::Bind(server_srt_fd, "0.0.0.0", 9000);
     srt_socket_util::Listen(server_srt_fd);
 

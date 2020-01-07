@@ -3,14 +3,12 @@
 
 #include "common_define.h"
 #include "global.h"
-#include "http_flv_mgr.h"
 #include "http_flv_protocol.h"
 #include "http_sender.h"
 #include "io_buffer.h"
 #include "local_stream_center.h"
 #include "ref_ptr.h"
 #include "rtmp_protocol.h"
-#include "rtmp_mgr.h"
 #include "tcp_socket.h"
 
 using namespace std;

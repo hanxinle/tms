@@ -6,12 +6,17 @@
 
 #include <string>
 
+#include "media_publisher.h"
+#include "media_subscriber.h"
+
 class IoLoop;
 class Fd;
 class IoBuffer;
 class SrtSocket;
 
 class SrtProtocol
+    : public MediaPublisher
+    , public MediaSubscriber
 {
 public:
     SrtProtocol(IoLoop* io_loop, Fd* socket);
@@ -29,9 +34,17 @@ public:
         return (SrtSocket*)socket_;
     }
 
+	void SetMediaPublisher(MediaPublisher* media_publisher)
+    {   
+        media_publisher_ = media_publisher;
+    }
+
+    int SendData(const std::string& data);
+
 private:
 	IoLoop* io_loop_;
     Fd* socket_;
+    MediaPublisher* media_publisher_;
 };
 
 #endif // __SRT_PROTOCOL_H__

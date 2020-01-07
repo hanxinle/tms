@@ -17,7 +17,6 @@
 #include "local_stream_center.h"
 #include "rtmp_protocol.h"
 #include "fd.h"
-#include "rtmp_mgr.h"
 #include "tcp_socket.h"
 #include "util.h"
 

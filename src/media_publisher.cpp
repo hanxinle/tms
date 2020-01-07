@@ -27,11 +27,6 @@ bool MediaPublisher::AddSubscriber(MediaSubscriber* subscriber)
 
 bool MediaPublisher::RemoveSubscriber(MediaSubscriber* subscriber)
 {   
-    if (subscriber_.find(subscriber) == subscriber_.end())
-    {   
-        return false;
-    }   
-
     subscriber_.erase(subscriber);
     wait_header_subscriber_.erase(subscriber);
 

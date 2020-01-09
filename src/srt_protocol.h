@@ -8,6 +8,7 @@
 
 #include "media_publisher.h"
 #include "media_subscriber.h"
+#include "ts_reader.h"
 
 class IoLoop;
 class Fd;
@@ -42,9 +43,16 @@ public:
     int SendData(const std::string& data);
 
 private:
+    void OpenDumpFile();
+    void Dump(const uint8_t* data, const int& len);
+
+private:
 	IoLoop* io_loop_;
     Fd* socket_;
     MediaPublisher* media_publisher_;
+    TsReader ts_reader_;
+
+    int dump_fd_;
 };
 
 #endif // __SRT_PROTOCOL_H__

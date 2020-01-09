@@ -14,6 +14,7 @@ SrtProtocol::SrtProtocol(IoLoop* io_loop, Fd* socket)
     , io_loop_(io_loop)
     , socket_(socket)
     , media_publisher_(NULL)
+    , dump_fd_(-1)
 {
     cout << LMSG << "new srt protocol, fd=" << socket->fd() << ", socket=" << (void*)socket_ << ", stream=" << GetSrtSocket()->GetStreamId() << endl;
 	MediaPublisher* media_publisher = g_local_stream_center.GetMediaPublisherByAppStream("srt", GetSrtSocket()->GetStreamId());
@@ -47,6 +48,9 @@ int SrtProtocol::Parse(IoBuffer& io_buffer)
     uint8_t* data = NULL;
     int len = io_buffer.Read(data, io_buffer.Size());
 
+    OpenDumpFile();
+    Dump(data, len);
+
     if (len > 0)
     {
         // FIXME: register one time
@@ -57,6 +61,31 @@ int SrtProtocol::Parse(IoBuffer& io_buffer)
             g_local_stream_center.RegisterStream("srt", GetSrtSocket()->GetStreamId(), this);
             cout << LMSG << "register publisher " << this << ", streamid=" << GetSrtSocket()->GetStreamId() << endl;
             reg = true;
+        }
+
+        ts_reader_.ParseTs(data, len);
+
+		if (data[0] == 0x47)
+        {
+            const uint8_t* ts_header = data;
+            int l = len;
+            while (l >= 188)
+            {
+                if (ts_header[1] & 0x40)
+                {
+                    uint8_t adaptation_field_length = ts_header[4];
+                    uint16_t pid = ((ts_header[1] & 0x1F) << 8) | ts_header[2];
+                    cout << LMSG << "first ts segment, stream id=" << (int)(ts_header[4 + adaptation_field_length + 3]) << ", pid=" << pid << endl;
+                    cout << LMSG << "peek 64 bytes\n" << Util::Bin2Hex(ts_header, 64) << endl;
+                }
+                cout << LMSG << "counter=" << (int)(ts_header[3] & 0x0F) << endl;
+                l -= 188;
+                ts_header += 188;
+            }
+        }
+        else
+        {
+            cout << LMSG << "no ts header, len=" << len << endl;
         }
 
         string media_payload((const char*)data, len);
@@ -75,7 +104,7 @@ int SrtProtocol::Parse(IoBuffer& io_buffer)
         static int counter = 0;
         if (counter % 100 == 0)
         {
-            cout << LMSG << "srt payload\n" << Util::Bin2Hex(media_payload) << endl;
+            //cout << LMSG << "srt payload\n" << Util::Bin2Hex(media_payload) << endl;
         }
         ++counter;
 
@@ -117,4 +146,23 @@ int SrtProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interva
 int SrtProtocol::SendData(const std::string& data)
 {
     return GetSrtSocket()->Send((const uint8_t*)data.data(), data.size());
+}
+
+void SrtProtocol::OpenDumpFile()
+{
+    if (dump_fd_ == -1)
+    {
+        ostringstream os;
+        os << this << ".ts";
+        dump_fd_ = open(os.str().c_str(), O_CREAT|O_TRUNC|O_RDWR, 0664);
+    }
+}
+
+void SrtProtocol::Dump(const uint8_t* data, const int& len)
+{
+    if (dump_fd_ != -1)
+    {
+        int nbytes = write(dump_fd_, data, len);
+        UNUSED(nbytes);
+    }
 }

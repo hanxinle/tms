@@ -102,6 +102,11 @@ public:
         return cur_pos_ / 8;
     }
 
+    const uint8_t* CurData() const
+    {
+        return data_ + cur_pos_ / 8;
+    }
+
 private:
     const uint8_t* data_;
     size_t bit_len_;

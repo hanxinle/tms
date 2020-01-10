@@ -193,7 +193,6 @@ private:
     string invalid_ts_;
 
     map<uint64_t, TsMedia> ts_queue_;
-    string  srt_send_buf_;
 
     string m3u8_;
     string ts_pat_;

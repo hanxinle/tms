@@ -117,13 +117,6 @@ void MediaMuxer::PacketTs(const Payload& payload)
         ts_queue_[ts_seq_].ts_data.append(PacketTsPat());
         ts_queue_[ts_seq_].ts_data.append(PacketTsPmt());
         ts_queue_[ts_seq_].first_dts = payload.GetDts();
-
-        srt_send_buf_ = ts_queue_[ts_seq_].ts_data;
-
-        if (g_srt_client_fd != -1)
-        {
-			//srt_send(g_srt_client_fd, srt_send_buf_.data(), srt_send_buf_.size());
-        }
     }
 
     ts_queue_[ts_seq_].duration = (payload.GetDts() - ts_queue_[ts_seq_].first_dts) / 1000.0;
@@ -455,11 +448,6 @@ void MediaMuxer::PacketTs(const Payload& payload)
 
         assert(ts_bs.SizeInBytes() == 188);
         ts_queue_[ts_seq_].ts_data.append((const char*)ts_bs.GetData(), ts_bs.SizeInBytes());
-
-        if (g_srt_client_fd != -1)
-        {
-            //srt_send(g_srt_client_fd, (const char*)ts_bs.GetData(), ts_bs.SizeInBytes());
-        }
 
         data += bytes_left;
         i += bytes_left;

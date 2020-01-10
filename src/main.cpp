@@ -55,7 +55,6 @@ string                          g_remote_ice_pwd = "";
 string                          g_remote_ice_ufrag = "";
 string                          g_server_ip = "";
 WebrtcProtocol*                 g_debug_webrtc = NULL;
-int                             g_srt_client_fd = -1;
 
 void AvLogCallback(void* ptr, int level, const char* fmt, va_list vl)
 {

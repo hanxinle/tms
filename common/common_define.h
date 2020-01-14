@@ -48,6 +48,24 @@ enum VideoCodec
     kHEVC = 12,
 };
 
+enum H264NalType 
+{
+    H264NalType_SLICE           = 1,  
+    H264NalType_DPA             = 2,  
+    H264NalType_DPB             = 3,  
+    H264NalType_DPC             = 4,  
+    H264NalType_IDR_SLICE       = 5,  
+    H264NalType_SEI             = 6,  
+    H264NalType_SPS             = 7,  
+    H264NalType_PPS             = 8,  
+    H264NalType_AUD             = 9,  
+    H264NalType_END_SEQUENCE    = 10, 
+    H264NalType_END_STREAM      = 11, 
+    H264NalType_FILLER_DATA     = 12, 
+    H264NalType_SPS_EXT         = 13, 
+    H264NalType_AUXILIARY_SLICE = 19, 
+};
+
 enum AudioCodec
 {
     kAAC = 0x0F,

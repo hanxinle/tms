@@ -42,6 +42,9 @@ public:
 
     int SendData(const std::string& data);
 
+    void OnFrame(const Payload& video_frame);
+    void OnHeader(const Payload& header_frame);
+
 private:
     void OpenDumpFile();
     void Dump(const uint8_t* data, const int& len);

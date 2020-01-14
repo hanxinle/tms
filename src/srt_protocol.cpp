@@ -37,6 +37,9 @@ SrtProtocol::SrtProtocol(IoLoop* io_loop, Fd* socket)
             cout << LMSG << "random publisher " << media_publisher << " add subscriber for app " << app << ", stream " << stream << endl;
         }
     }
+
+    ts_reader_.SetFrameCallback(std::bind(&SrtProtocol::OnFrame, this, std::placeholders::_1));
+    ts_reader_.SetHeaderCallback(std::bind(&SrtProtocol::OnHeader, this, std::placeholders::_1));
 }
 
 SrtProtocol::~SrtProtocol()
@@ -165,4 +168,17 @@ void SrtProtocol::Dump(const uint8_t* data, const int& len)
         int nbytes = write(dump_fd_, data, len);
         UNUSED(nbytes);
     }
+}
+
+void SrtProtocol::OnFrame(const Payload& frame)
+{
+    if (frame.IsVideo())
+    {
+        cout << LMSG << "I=" << frame.IsIFrame() << ",P=" << frame.IsPFrame() << ",B=" << frame.IsBFrame() << ",pts=" << frame.GetPts() << ",dts=" << frame.GetDts() << endl;
+    }
+}
+
+void SrtProtocol::OnHeader(const Payload& header_frame)
+{
+    cout << LMSG << "header=" << Util::Bin2Hex(header_frame.GetAllData(), header_frame.GetAllLen()) << endl;
 }

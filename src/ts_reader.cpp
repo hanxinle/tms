@@ -1,9 +1,11 @@
 #include <assert.h>
 #include <fcntl.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "bit_buffer.h"
 #include "common_define.h"
+#include "ref_ptr.h"
 #include "ts_reader.h"
 #include "util.h"
 
@@ -11,6 +13,8 @@ using namespace std;
 
 const int kTsSegmentFixedSize = 188;
 const uint8_t kTsHeaderSyncByte = 0x47;
+
+const uint8_t kStartCode[] = {0x00, 0x00, 0x00, 0x01};
 
 static bool IsVideoStreamType(const uint8_t& stream_type)
 {
@@ -27,6 +31,7 @@ TsReader::TsReader()
     , video_pid_(0xFFFF)
     , audio_pid_(0xFFFF)
     , video_dump_fd_(-1)
+    , audio_dump_fd_(-1)
 {
 }
 
@@ -560,6 +565,9 @@ int TsReader::ParsePES(std::string& pes)
 
         cout << LMSG << "PES_header_data_length=" << (int)PES_header_data_length << endl;
 
+        uint32_t pts = 0;
+        uint32_t dts = 0;
+
 	    if (PTS_DTS_flags == 2) 
         {
 	        uint8_t zero = 0;
@@ -579,7 +587,7 @@ int TsReader::ParsePES(std::string& pes)
 	        uint32_t PTS_14_0 = 0;
             bit_buffer.GetBits(15, PTS_14_0);
 
-            uint32_t pts = (PTS_32_30 << 29) | (PTS_29_15 << 14) | PTS_14_0;
+            pts = (PTS_32_30 << 29) | (PTS_29_15 << 14) | PTS_14_0;
             cout << LMSG << "pts=" << pts << endl;
 
             bit_buffer.GetBits(1, marker_bit);
@@ -603,7 +611,7 @@ int TsReader::ParsePES(std::string& pes)
 	        uint32_t PTS_14_0 = 0;
             bit_buffer.GetBits(15, PTS_14_0);
 
-            uint32_t pts = (PTS_32_30 << 29) | (PTS_29_15 << 14) | PTS_14_0;
+            pts = (PTS_32_30 << 29) | (PTS_29_15 << 14) | PTS_14_0;
             cout << LMSG << "pts=" << pts << endl;
 
             bit_buffer.GetBits(1, marker_bit);
@@ -623,7 +631,7 @@ int TsReader::ParsePES(std::string& pes)
 	        uint32_t DTS_14_0 = 0;
             bit_buffer.GetBits(15, DTS_14_0);
 
-            uint32_t dts = (PTS_32_30 << 29) | (PTS_29_15 << 14) | PTS_14_0;
+            dts = (PTS_32_30 << 29) | (PTS_29_15 << 14) | PTS_14_0;
             cout << LMSG << "dts=" << dts << endl;
 
             bit_buffer.GetBits(1, marker_bit);
@@ -816,10 +824,31 @@ int TsReader::ParsePES(std::string& pes)
             {
                 write(video_dump_fd_, bit_buffer.CurData(), bit_buffer.BytesLeft());
             }
+
+			OnVideo(bit_buffer, pts, dts);
         }
         else
         {
             cout << LMSG << "is audio" << endl;
+            if (audio_dump_fd_ < 0)
+            {
+                audio_dump_fd_ = open("audio.aac", O_CREAT|O_TRUNC|O_RDWR, 0664);
+            }
+
+            if (audio_dump_fd_ > 0)
+            {
+                write(audio_dump_fd_, bit_buffer.CurData(), bit_buffer.BytesLeft());
+            }
+
+            if (frame_callback_)
+            {
+                Payload audio_frame;
+                audio_frame.SetAudio();
+                audio_frame.SetDts(dts);
+                audio_frame.SetIFrame();
+
+                frame_callback_(audio_frame);
+            }
         }
 	    //for (int i = 0; i < N1; i++) 
         //{
@@ -1012,4 +1041,115 @@ int TsReader::CollectVideoPES(BitBuffer& bit_buffer)
     cout << "video pes=\n" << Util::Bin2Hex(bit_buffer.CurData(), bit_buffer.BytesLeft() > 128 ? 128 : bit_buffer.BytesLeft()) << endl;
 
     return 0;
+}
+
+void TsReader::OnVideo(BitBuffer& bit_buffer, const uint32_t& pts, const uint32_t& dts)
+{
+	const uint8_t* p = bit_buffer.CurData();
+    uint32_t len = bit_buffer.BytesLeft();
+    size_t i = 0;
+
+    //cout << "nal=\n" << Util::Bin2Hex(bit_buffer.CurData(), bit_buffer.BytesLeft()) << endl;
+    vector<pair<const uint8_t*, int>> nals;
+
+	if (p[i] == 0x00 && p[i+1] == 0x00 && p[i+2] == 0x00 && p[i+3] == 0x01)
+    {   
+        const uint8_t* nal = NULL;
+        while (i + 3 < len)
+        {   
+            if (p[i] != 0x00 || p[i+1] != 0x00 || p[i+2] != 0x01)
+            {   
+                ++i;
+                continue;
+            }   
+
+            if (nal != NULL)
+            {   
+                nals.push_back(make_pair(nal, p + i - nal));
+            }   
+
+            i += 3;
+            nal = p + i;
+        }   
+
+        if (nal != NULL)
+        {   
+            nals.push_back(make_pair(nal, p + i - nal));
+        }   
+
+        string header = "";
+        for (const auto& kv :nals)
+        {
+            const uint8_t* nal = kv.first;
+            int len = kv.second;
+            if (nal != NULL)
+            {   
+                cout << "nal=\n" << Util::Bin2Hex(nal, len > 128 ? 128 : len) << endl;
+                uint8_t nal_ref_idc = nal[0] >> 5;
+                uint8_t nal_type = nal[0] & 0x1F;
+
+                cout << LMSG << "nal_ref_idc:" << (int)nal_ref_idc << ", nal_type:" << (int) nal_type << endl;
+
+                bool dispatch = true;
+                if (frame_callback_)
+                {
+                    uint8_t* nal_ref = (uint8_t*)malloc(len);
+                    memcpy(nal_ref, nal, len);
+                    Payload video_frame(nal_ref, len);
+                    video_frame.SetVideo();
+                    video_frame.SetPts(pts);
+                    video_frame.SetDts(dts);
+                    if (nal_type == H264NalType_IDR_SLICE)
+                    {
+                        video_frame.SetIFrame();
+                    }
+                    else if (nal_type == H264NalType_SLICE)
+                    {
+                        if (pts == dts)
+                        {
+                            video_frame.SetPFrame();
+                        }
+                        else
+                        {
+                            video_frame.SetBFrame();
+                        }
+                    }
+                    else if (nal_type == H264NalType_SPS)
+                    {
+                        dispatch = false;
+                        header.append((const char*)kStartCode, 4);
+                        header.append((const char*)nal, len);
+                    }
+                    else if (nal_type == H264NalType_PPS)
+                    {
+                        dispatch = false;
+
+                        bool header_complete = ! header.empty();
+                        header.append((const char*)kStartCode, 4);
+                        header.append((const char*)nal, len);
+
+                        if (header_complete)
+                        {
+                            if (header_callback_)
+                            {
+                                uint8_t* nal_ref = (uint8_t*)malloc(header.size());
+                                memcpy(nal_ref, header.data(), header.size());
+                                Payload header_frame(nal_ref, header.size());
+                                header_callback_(header_frame);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        dispatch = false;
+                    }
+
+                    if (dispatch)
+                    {
+                        frame_callback_(video_frame);
+                    }
+                }
+            }   
+        }
+    }
 }

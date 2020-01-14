@@ -64,8 +64,43 @@ void AvLogCallback(void* ptr, int level, const char* fmt, va_list vl)
     vprintf(fmt, vl);
 }
 
+int TetTsReader()
+{
+    int fd = open("./1578877621_455922.ts", O_RDONLY, 0664);
+    if (fd < 0)
+    {
+        cout << "open ./1578877621_455922.ts failed" << endl;
+        return -1;
+    }
+
+    TsReader ts_reader;
+    while (true)
+    {
+        uint8_t buf[188 * 8];
+        int nbytes = read(fd, buf, sizeof(buf));
+        if (nbytes == 0)
+        {
+            cout << "read EOF" << endl;
+            break;
+        }
+        else if (nbytes < 0)
+        {
+            cout << "read error" << endl;
+            break;
+        }
+        else
+        {
+            ts_reader.ParseTs(buf, nbytes);
+        }
+    }
+
+    return 0;
+}
+
 int main(int argc, char* argv[])
 {
+    //TetTsReader();
+
 	string server_crt = Util::ReadFile("server.crt");
 	string server_key = Util::ReadFile("server.key");
 

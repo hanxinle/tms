@@ -577,7 +577,7 @@ string& MediaMuxer::PacketTsPmt()
     return ts_pmt_;
 }
 
-int MediaMuxer::OnAudio(Payload& audio_payload)
+int MediaMuxer::OnAudio(const Payload& audio_payload)
 {
     audio_queue_.insert(make_pair(audio_frame_id_, audio_payload));
 
@@ -596,7 +596,7 @@ int MediaMuxer::OnAudio(Payload& audio_payload)
     return kSuccess;
 }
 
-int MediaMuxer::OnVideo(Payload& video_payload)
+int MediaMuxer::OnVideo(const Payload& video_payload)
 {
     if (video_payload.IsIFrame())
     {

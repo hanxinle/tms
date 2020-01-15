@@ -174,11 +174,33 @@ void SrtProtocol::OnFrame(const Payload& frame)
 {
     if (frame.IsVideo())
     {
-        cout << LMSG << "I=" << frame.IsIFrame() << ",P=" << frame.IsPFrame() << ",B=" << frame.IsBFrame() << ",pts=" << frame.GetPts() << ",dts=" << frame.GetDts() << endl;
+        cout << LMSG << (frame.IsIFrame() ? "I" : (frame.IsPFrame() ? "P" : (frame.IsBFrame() ? "B" : "Unknown"))) << ",pts=" << frame.GetPts() << ",dts=" << frame.GetDts() << endl;
+        media_muxer_.OnVideo(frame);
+    }
+    else if (frame.IsAudio())
+    {
+        cout << LMSG << "audio, dts=" << frame.GetDts() << endl;
+        media_muxer_.OnAudio(frame);
+    }
+
+	for (auto& sub : subscriber_)
+    {    
+        sub->SendMediaData(frame);
     }
 }
 
 void SrtProtocol::OnHeader(const Payload& header_frame)
 {
     cout << LMSG << "header=" << Util::Bin2Hex(header_frame.GetAllData(), header_frame.GetAllLen()) << endl;
+
+    if (header_frame.IsVideo())
+    {
+        string video_header((const char*)header_frame.GetAllData(), header_frame.GetAllLen());
+        media_muxer_.OnVideoHeader(video_header);
+    }
+    else if (header_frame.IsAudio())
+    {
+        string audio_header((const char*)header_frame.GetAllData(), header_frame.GetAllLen());
+        media_muxer_.OnAudioHeader(audio_header);
+    }
 }

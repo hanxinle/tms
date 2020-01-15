@@ -148,8 +148,8 @@ public:
         return ret;
     }
 
-    int OnAudio(Payload& payload);
-    int OnVideo(Payload& payload);
+    int OnAudio(const Payload& payload);
+    int OnVideo(const Payload& payload);
     int OnMetaData(const string& metadata);
     int OnVideoHeader(const string& video_header);
     int OnAudioHeader(const string& audio_header);

@@ -6,6 +6,7 @@
 #include "crc32.h"
 #include "global.h"
 #include "io_buffer.h"
+#include "protocol_factory.h"
 #include "socket_util.h"
 #include "udp_socket.h"
 #include "webrtc_protocol.h"
@@ -28,8 +29,6 @@ const int kWebRtcRecvTimeoutInMs = 10000;
 
 const int SRTP_MASTER_KEY_KEY_LEN = 16;
 const int SRTP_MASTER_KEY_SALT_LEN = 14;
-
-extern WebrtcProtocol* g_debug_webrtc;
 
 static int HmacEncode(const string& algo, const uint8_t* key, const int& key_length,  
                 	  const uint8_t* input, const int& input_length,  
@@ -82,7 +81,6 @@ static int HmacEncode(const string& algo, const uint8_t* key, const int& key_len
     return 0;  
 }  
 
-
 static uint32_t get_host_priority(uint16_t local_pref, bool is_rtp)
 {   
     uint32_t pref = 126;
@@ -101,29 +99,39 @@ const uint32_t kVideoSSRC = 3233846889;
 const uint32_t kAudioSSRC = 3233846890;
 
 WebrtcProtocol::WebrtcProtocol(IoLoop* io_loop, Fd* socket)
-    :
-    MediaPublisher(),
-    MediaSubscriber(kWebRtc),
-    io_loop_(io_loop),
-    socket_(socket),
-    create_time_ms_(Util::GetNowMs()),
-    dtls_hello_send_(false),
-    dtls_(NULL),
-    dtls_handshake_done_(false),
-    timestamp_base_(0),
-    timestamp_(0),
-    media_input_open_count_(0),
-    media_input_read_video_frame_count(0),
-    send_begin_time_(Util::GetNowMs()),
-    datachannel_open_(false),
-    video_seq_(0),
-    pre_recv_data_time_ms_(Util::GetNowMs())
+    : MediaPublisher()
+      , MediaSubscriber(kWebRtc)
+      , io_loop_(io_loop)
+      , socket_(socket)
+      , create_time_ms_(Util::GetNowMs())
+      , dtls_hello_send_(false)
+      , dtls_(NULL)
+      , dtls_handshake_done_(false)
+      , timestamp_base_(0)
+      , timestamp_(0)
+      , media_input_open_count_(0)
+      , media_input_read_video_frame_count(0)
+      , send_begin_time_(Util::GetNowMs())
+      , datachannel_open_(false)
+      , video_seq_(0)
+      , pre_recv_data_time_ms_(Util::GetNowMs())
 {
 }
 
 WebrtcProtocol::~WebrtcProtocol()
 {
     close(socket_->fd());
+}
+
+int WebrtcProtocol::HandleRead(IoBuffer& io_buffer, Fd& socket)
+{
+    int ret = kError;
+    do  
+    {   
+        ret = Parse(io_buffer);
+    } while (ret == kSuccess);
+
+    return ret;
 }
 
 int WebrtcProtocol::Parse(IoBuffer& io_buffer)
@@ -133,8 +141,6 @@ int WebrtcProtocol::Parse(IoBuffer& io_buffer)
 
     if (len > 0)
     {
-        //cout << LMSG << "instance=" << this << ",webrtc recv\n" << Util::Bin2Hex(data, len) << endl;
-
         pre_recv_data_time_ms_ = Util::GetNowMs();
 
 		if ((data[0] == 0) || (data[0] == 1)) 
@@ -163,8 +169,6 @@ int WebrtcProtocol::Parse(IoBuffer& io_buffer)
 
 void WebrtcProtocol::SendVideoData(const uint8_t* data, const int& size, const uint32_t& timestamp, const int& flag)
 {
-    cout << LMSG << "send vp8 message, size:" << size << endl;
-
     static int picture_id_ = 0;
 
 	RTPVideoTypeHeader rtp_video_head;
@@ -648,10 +652,11 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
             }
 #endif
 
-            if (! g_webrtc_mgr->IsRemoteUfragExist(remote_ufrag))
+            if (true)
+            //if (! g_webrtc_mgr->IsRemoteUfragExist(remote_ufrag))
             {
                 cout << LMSG << "connect udp socket:" << GetUdpSocket()->GetClientIp() << ":" << GetUdpSocket()->GetClientPort() << endl;
-                g_webrtc_mgr->AddRemoteUfrag(remote_ufrag);
+                //g_webrtc_mgr->AddRemoteUfrag(remote_ufrag);
 
                 int fd = CreateNonBlockUdpSocket();
                 ReuseAddr(fd);
@@ -682,16 +687,18 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
                 ret = GetRecvBufSize(fd, new_recv_buf_size);
                 cout << LMSG << "GetRecvBufSize fd:" << fd << ",ret:" << ret << ",new_recv_buf_size:" << new_recv_buf_size << endl;
 
-                UdpSocket* udp_socket = new UdpSocket(g_epoll, fd, g_webrtc_mgr);
+                UdpSocket* udp_socket = new UdpSocket(g_epoll, fd, std::bind(&ProtocolFactory::GenWebrtcProtocol, std::placeholders::_1, std::placeholders::_2));
                 udp_socket->SetSrcAddr(GetUdpSocket()->GetSrcAddr());
                 udp_socket->SetSrcAddrLen(GetUdpSocket()->GetSrcAddrLen());
                 udp_socket->EnableRead();
 
-                cout << LMSG << "new webrtc protocol:" << (long)(g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)) << endl;
-                g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SetLocalUfrag(g_local_ice_ufrag);
-                g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SetLocalPwd(g_local_ice_pwd);
-                g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SetRemoteUfrag(g_remote_ice_ufrag);
-                g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SetRemotePwd(g_remote_ice_pwd);
+                WebrtcProtocol* webrtc_protocol = (WebrtcProtocol*)udp_socket->GetHandler();
+                webrtc_protocol->SetLocalUfrag(g_local_ice_ufrag);
+                webrtc_protocol->SetLocalPwd(g_local_ice_pwd);
+                webrtc_protocol->SetRemoteUfrag(g_remote_ice_ufrag);
+                webrtc_protocol->SetRemotePwd(g_remote_ice_pwd);
+
+                /*
                 // FIXME:这里可能需要根据角色,比如客户端是上行还是下行来做SetConnectState还是SetAcceptState
 #if 1
                 g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SetConnectState();
@@ -700,6 +707,7 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
                 g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SetAcceptState();
 #endif
                 //g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SendBindingRequest();
+                */
             }
             else
             {
@@ -740,10 +748,6 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
         }
         break;
     }
-
-    cout << LMSG << TRACE << endl;
-
-
 
     return kSuccess;
 }
@@ -1641,18 +1645,18 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
 
                 rtp_header = (RtpHeader*)changed_buf;
                 rtp_header->setExtension(0);
-                g_webrtc_mgr->__DebugBroadcast(changed_buf, changed_buf_len);
+                //g_webrtc_mgr->__DebugBroadcast(changed_buf, changed_buf_len);
             }
             else
             {
-                g_webrtc_mgr->__DebugBroadcast(unprotect_buf, unprotect_buf_len);
+                //g_webrtc_mgr->__DebugBroadcast(unprotect_buf, unprotect_buf_len);
             }
         }
         else if (payload_type == (uint8_t)WebRTCPayloadType::OPUS)
         {
             audio_publisher_ssrc_ = ssrc;
             rtp_header->setSSRC(kAudioSSRC);
-            g_webrtc_mgr->__DebugBroadcast(unprotect_buf, unprotect_buf_len);
+            //g_webrtc_mgr->__DebugBroadcast(unprotect_buf, unprotect_buf_len);
         }
     }
 
@@ -1674,8 +1678,6 @@ int WebrtcProtocol::Handshake()
             dtls_handshake_done_ = true;
 
             send_begin_time_ = Util::GetNowMs();
-
-            g_debug_webrtc = this;
 
             cout << LMSG << "handshake done" << endl;
 

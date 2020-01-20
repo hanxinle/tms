@@ -139,12 +139,9 @@ void SrtEpoller::WaitIO(const int& timeout_in_millsecond)
                   timeout_in_millsecond, 
                   NULL, NULL, NULL, NULL);
 
-    cout << LMSG << "ret=" << ret << ",can_read_srt_sockets_num=" << can_write_srt_sockets_num 
-         << ",can_write_srt_sockets_num=" << can_write_srt_sockets_num << endl;
-
     if (ret < 0)
     {
-        cout << LMSG << "srt epoll error, " << srt_getlasterror_str() << endl;
+        //cout << LMSG << "srt epoll error, " << srt_getlasterror_str() << endl;
         return;
     }
 

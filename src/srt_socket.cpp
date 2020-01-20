@@ -13,14 +13,15 @@
 
 using namespace std;
 
-SrtSocket::SrtSocket(IoLoop* io_loop, const int& fd, SocketHandle* handle)
+SrtSocket::SrtSocket(IoLoop* io_loop, const int& fd, HandlerFactoryT handler_factory)
     : Fd(io_loop, fd)
     , connect_status_(kDisconnected)
-    , handle_(handle)
+    , handler_factory_(handler_factory)
     , server_socket_(false)
     , stream_id_("")
 {
     cout << LMSG << "fd=" << fd_ << ",srt socket=" << this << endl;
+    handler_ = handler_factory_(io_loop_, this);
 }
 
 SrtSocket::~SrtSocket()
@@ -39,11 +40,10 @@ int SrtSocket::OnRead()
 
         if (client_srt_socket != SRT_INVALID_SOCK)
         {   
-            SrtSocket* srt_socket = new SrtSocket(io_loop_, client_srt_socket, handle_);
+            SrtSocket* srt_socket = new SrtSocket(io_loop_, client_srt_socket, handler_factory_);
             srt_socket->SetConnected();
             srt_socket->EnableRead();
             srt_socket->SetStreamId(UDT::getstreamid(client_srt_socket));
-            g_srt_mgr->GetOrCreateProtocol(*srt_socket);
 
             std::string client_ip = ""; 
             uint16_t client_port = 0;
@@ -63,7 +63,7 @@ int SrtSocket::OnRead()
         if (srt_status == SRTS_CLOSED || srt_status == SRTS_BROKEN)
         {   
             cout << LMSG << "srt socket=" << fd() << ", srt_status=" << (int)srt_status << endl;
-            handle_->HandleClose(read_buffer_, *this);
+            handler_->HandleClose(read_buffer_, *this);
             return kClose;
         }
 
@@ -82,7 +82,7 @@ int SrtSocket::OnRead()
             if (ret == SRT_ERROR)
             {
                 cout << LMSG << "srt error " << endl;
-                handle_->HandleError(read_buffer_, *this);
+                handler_->HandleError(read_buffer_, *this);
                 return kError;
             }
 
@@ -91,12 +91,12 @@ int SrtSocket::OnRead()
             //cout << LMSG << "srt recv:" << ret << " bytes, " << Util::Bin2Hex(buf, ret) << endl;
 
             read_buffer_.Write(buf, ret);
-            ret = handle_->HandleRead(read_buffer_, *this);
+            ret = handler_->HandleRead(read_buffer_, *this);
 
 		    if (ret == kClose || ret == kError)
             {   
                 cout << LMSG << "read error:" << ret << endl;
-                handle_->HandleClose(read_buffer_, *this);
+                handler_->HandleClose(read_buffer_, *this);
                 return kClose;
             } 
         }

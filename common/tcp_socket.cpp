@@ -4,22 +4,23 @@
 
 #include "common_define.h"
 #include "socket_util.h"
-#include "socket_handle.h"
+#include "socket_handler.h"
 #include "tcp_socket.h"
 
 using namespace std;
 using namespace socket_util;
 
-TcpSocket::TcpSocket(IoLoop* io_loop, const int& fd, SocketHandle* handler)
-    :
-    Fd(io_loop, fd),
-    server_socket_(false),
-    handler_(handler)
+TcpSocket::TcpSocket(IoLoop* io_loop, const int& fd, HandlerFactoryT handler_factory)
+    : Fd(io_loop, fd)
+    , server_socket_(false)
+    , handler_factory_(handler_factory)
 {
+    handler_ = handler_factory_(io_loop, this);
 }
 
 TcpSocket::~TcpSocket()
 {
+    delete handler_;
 }
 
 int TcpSocket::OnRead()
@@ -37,7 +38,7 @@ int TcpSocket::OnRead()
 
             NoCloseWait(client_fd);
 
-            TcpSocket* tcp_socket = new TcpSocket(io_loop_, client_fd, handler_);
+            TcpSocket* tcp_socket = new TcpSocket(io_loop_, client_fd, handler_factory_);
             SetNonBlock(client_fd);
             tcp_socket->SetConnected();
 
@@ -58,7 +59,6 @@ int TcpSocket::OnRead()
                 int bytes = read_buffer_.ReadFromFdAndWrite(fd_);
                 if (bytes > 0)
                 {
-                    //cout << LMSG << "read " << bytes << " bytes" << endl;
                     if (handler_ != NULL)
                     {
                         int ret = handler_->HandleRead(read_buffer_, *this);
@@ -151,8 +151,6 @@ int TcpSocket::Send(const uint8_t* data, const size_t& len)
 
         if (ret > 0)
         {
-            //VERBOSE << LMSG << "direct send " << ret << " bytes" << ",left:" << (len - ret) << " bytes" << endl;
-
             if (ret < (int)len)
             {
                 write_buffer_.Write(data + ret, len - ret);

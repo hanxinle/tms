@@ -6,6 +6,7 @@
 #include <string>
 
 #include "http_parse.h"
+#include "socket_handler.h"
 
 class IoLoop;
 class Fd;
@@ -16,10 +17,16 @@ class TcpSocket;
 using std::string;
 
 class WebSocketProtocol
+    : public SocketHandler
 {
 public:
     WebSocketProtocol(IoLoop* io_loop, Fd* socket);
     ~WebSocketProtocol();
+
+	virtual int HandleRead(IoBuffer& io_buffer, Fd& socket);
+	virtual int HandleClose(IoBuffer& io_buffer, Fd& socket) { return OnStop(); }
+	virtual int HandleError(IoBuffer& io_buffer, Fd& socket) { return OnStop(); }
+	virtual int HandleConnected(Fd& socket) { return OnConnected(); }
 
     int Parse(IoBuffer& io_buffer);
     int Send(const uint8_t* data, const size_t& len);

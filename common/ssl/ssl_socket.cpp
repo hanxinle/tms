@@ -5,7 +5,7 @@
 #include "common_define.h"
 #include "fd.h"
 #include "socket_util.h"
-#include "socket_handle.h"
+#include "socket_handler.h"
 #include "ssl_socket.h"
 
 extern SSL_CTX* g_tls_ctx;
@@ -13,11 +13,10 @@ extern SSL_CTX* g_tls_ctx;
 using namespace std;
 using namespace socket_util;
 
-SslSocket::SslSocket(IoLoop* io_loop, const int& fd, SocketHandle* handler)
-    :
-    Fd(io_loop, fd),
-    server_socket_(false),
-    handler_(handler)
+SslSocket::SslSocket(IoLoop* io_loop, const int& fd, HandlerFactoryT handler_factory)
+    : Fd(io_loop, fd)
+    , server_socket_(false)
+    , handler_factory_(handler_factory)
 {
     assert(g_tls_ctx != NULL);
     ssl_ = SSL_new(g_tls_ctx);
@@ -28,6 +27,8 @@ SslSocket::SslSocket(IoLoop* io_loop, const int& fd, SocketHandle* handler)
 
     read_buffer_.SetSsl(ssl_);
     write_buffer_.SetSsl(ssl_);
+
+    handler_ = handler_factory_(io_loop, this);
 }
 
 SslSocket::~SslSocket()
@@ -49,7 +50,7 @@ int SslSocket::OnRead()
 
             NoCloseWait(client_fd);
 
-            SslSocket* ssl_socket = new SslSocket(io_loop_, client_fd, handler_);
+            SslSocket* ssl_socket = new SslSocket(io_loop_, client_fd, handler_factory_);
             SetNonBlock(client_fd);
 
             ssl_socket->SetConnected();
@@ -103,11 +104,6 @@ int SslSocket::OnRead()
                     {
                         break;
                     }
-
-                    // XXX:DEBUG CODE
-                    // char buf[1024];
-                    // int bytes = read(fd_, buf, sizeof(buf));
-                    // cout << LMSG << "bytes:" << bytes << ",err:" << strerror(errno) << endl;
 
                     cout << LMSG << "ssl read err:" << err << endl;
 					if (handler_ != NULL)
@@ -171,66 +167,13 @@ int SslSocket::Send(const uint8_t* data, const size_t& len)
     assert(connect_status_ == kHandshaked);
     int ret = -1;
 
-#if 0 // 下面的写法会造成when write would block, 再次发送就发不出去了
-    if (write_buffer_.Empty())
-    {
-        ret = SSL_write(ssl_, data, len);
-
-        cout << LMSG << "ssl write " << len << " ret:" << ret << ",err:" << strerror(errno) << endl;
-
-        if (ret > 0)
-        {
-            //VERBOSE << LMSG << "direct send " << ret << " bytes" << ",left:" << (len - ret) << " bytes" << endl;
-
-            if (ret < (int)len)
-            {
-                write_buffer_.Write(data + ret, len - ret);
-                EnableWrite();
-            }
-        }
-        else if (ret == 0)
-        {
-            if (len != 0)
-            {
-                assert(false);
-            }
-        }
-        else
-        {
-            int err = SSL_get_error(ssl_, ret);
-            cout << LMSG << "ssl write err:" << err << endl;
-            cout << LMSG << "buffer size:" << write_buffer_.Size() << endl;
-
-            if (err == SSL_ERROR_WANT_WRITE)
-            {
-                write_buffer_.Write(data, len);
-                EnableWrite();
-                cout << LMSG << "buffer size:" << write_buffer_.Size() << endl;
-                cout << LMSG << "peek:" << Util::Bin2Hex(data, 10) << endl;
-            }
-        }
-
-        return ret;
-    }
-    else
-    {
-        if (write_buffer_.Empty())
-        {
-            EnableWrite();
-        }
-        cout << LMSG << "buffer size:" << write_buffer_.Size() << endl;
-        ret = write_buffer_.Write(data, len);
-        cout << LMSG << "buffer size:" << write_buffer_.Size() << endl;
-    }
-#else
     if (write_buffer_.Empty())
     {   
         EnableWrite();
     }   
 
-    // FIXME:SSL暂时不能在缓冲区空的时候直接写,不然就会发不出去, 一定要放到send buffer里面, 依靠事件循环触发, 目前搞不懂是为什么
+    // FIXME: SSL暂时不能在缓冲区空的时候直接写,不然就会发不出去, 一定要放到send buffer里面, 依靠事件循环触发, 目前搞不懂是为什么
     ret = write_buffer_.Write(data, len);
-#endif
 
     // avoid warning
     return ret;

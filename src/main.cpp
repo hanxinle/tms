@@ -8,6 +8,7 @@
 #include "bit_stream.h"
 #include "epoller.h"
 #include "local_stream_center.h"
+#include "protocol_factory.h"
 #include "ref_ptr.h"
 #include "socket_util.h"
 #include "srt_epoller.h"
@@ -19,13 +20,8 @@
 #include "timer_in_millsecond.h"
 #include "udp_socket.h"
 #include "util.h"
-#include "webrtc_mgr.h"
-#include "protocol_mgr.h"
 
 #include "openssl/ssl.h"
-
-// debug
-#include "webrtc_protocol.h"
 
 using namespace any;
 using namespace std;
@@ -39,13 +35,6 @@ static void sighandler(int sig_no)
 
 LocalStreamCenter               g_local_stream_center;
 Epoller*                        g_epoll = NULL;
-ProtocolMgr<HttpFlvProtocol>*   g_http_flv_mgr;
-ProtocolMgr<HttpFlvProtocol>*   g_https_flv_mgr;
-ProtocolMgr<HttpHlsProtocol>*   g_http_hls_mgr;
-ProtocolMgr<HttpHlsProtocol>*   g_https_hls_mgr;
-ProtocolMgr<RtmpProtocol>*      g_rtmp_mgr = NULL;
-ProtocolMgr<SrtProtocol>*       g_srt_mgr;
-WebrtcMgr*                      g_webrtc_mgr = NULL;
 SSL_CTX*                        g_tls_ctx = NULL;
 SSL_CTX*                        g_dtls_ctx = NULL;
 string                          g_dtls_fingerprint = "";
@@ -54,7 +43,6 @@ string                          g_local_ice_ufrag = "";
 string                          g_remote_ice_pwd = "";
 string                          g_remote_ice_ufrag = "";
 string                          g_server_ip = "";
-WebrtcProtocol*                 g_debug_webrtc = NULL;
 
 void AvLogCallback(void* ptr, int level, const char* fmt, va_list vl)
 {
@@ -64,44 +52,8 @@ void AvLogCallback(void* ptr, int level, const char* fmt, va_list vl)
     vprintf(fmt, vl);
 }
 
-int TetTsReader()
-{
-    string ts_file = "recv.srt";
-    int fd = open(ts_file.c_str(), O_RDONLY, 0664);
-    if (fd < 0)
-    {
-        cout << "open " << ts_file << " failed" << endl;
-        return -1;
-    }
-
-    TsReader ts_reader;
-    while (true)
-    {
-        uint8_t buf[188 * 8];
-        int nbytes = read(fd, buf, sizeof(buf));
-        if (nbytes == 0)
-        {
-            cout << "read EOF" << endl;
-            break;
-        }
-        else if (nbytes < 0)
-        {
-            cout << "read error" << endl;
-            break;
-        }
-        else
-        {
-            ts_reader.ParseTs(buf, nbytes);
-        }
-    }
-
-    return 0;
-}
-
 int main(int argc, char* argv[])
 {
-    //TetTsReader();
-
 	string server_crt = Util::ReadFile("server.crt");
 	string server_key = Util::ReadFile("server.key");
 
@@ -304,10 +256,8 @@ int main(int argc, char* argv[])
     uint16_t http_flv_port          = 8787;
     uint16_t https_hls_port         = 8843;
     uint16_t http_hls_port          = 8888;
-    uint16_t admin_port             = 11000;
     uint16_t web_socket_port        = 8901;
     uint16_t ssl_web_socket_port    = 8943;
-    uint16_t echo_port              = 11345;
     uint16_t webrtc_port            = 11445;
     bool daemon                     = false;
 
@@ -315,7 +265,6 @@ int main(int argc, char* argv[])
     auto iter_rtmp_port     = args_map.find("rtmp_port");
     auto iter_http_flv_port = args_map.find("http_flv_port");
     auto iter_http_hls_port = args_map.find("http_hls_port");
-    auto iter_admin_port    = args_map.find("admin_port");
     auto iter_daemon        = args_map.find("daemon");
 
     if (iter_server_ip == args_map.end())
@@ -347,14 +296,6 @@ int main(int argc, char* argv[])
         if (! iter_http_hls_port->second.empty())
         {
             http_hls_port = Util::Str2Num<uint16_t>(iter_http_hls_port->second);
-        }
-    }
-
-    if (iter_admin_port != args_map.end())
-    {
-        if (! iter_admin_port->second.empty())
-        {
-            admin_port = Util::Str2Num<uint16_t>(iter_admin_port->second);
         }
     }
 
@@ -393,11 +334,7 @@ int main(int argc, char* argv[])
     Listen(server_rtmp_fd);
     SetNonBlock(server_rtmp_fd);
 
-    ProtocolMgr<RtmpProtocol> rtmp_mgr(&epoller);
-    timer_in_second.AddTimerSecondHandle(&rtmp_mgr);
-    g_rtmp_mgr = &rtmp_mgr;
-
-    TcpSocket server_rtmp_socket(&epoller, server_rtmp_fd, &rtmp_mgr);
+    TcpSocket server_rtmp_socket(&epoller, server_rtmp_fd, std::bind(&ProtocolFactory::GenRtmpProtocol, std::placeholders::_1, std::placeholders::_2));
     server_rtmp_socket.EnableRead();
     server_rtmp_socket.AsServerSocket();
 
@@ -409,11 +346,7 @@ int main(int argc, char* argv[])
     Listen(server_http_flv_fd);
     SetNonBlock(server_http_flv_fd);
 
-    ProtocolMgr<HttpFlvProtocol> http_flv_mgr(&epoller);
-
-    g_http_flv_mgr = &http_flv_mgr;
-
-    TcpSocket server_http_flv_socket(&epoller, server_http_flv_fd, &http_flv_mgr);
+    TcpSocket server_http_flv_socket(&epoller, server_http_flv_fd, std::bind(&ProtocolFactory::GenHttpFlvProtocol, std::placeholders::_1, std::placeholders::_2));
     server_http_flv_socket.EnableRead();
     server_http_flv_socket.AsServerSocket();
 
@@ -425,11 +358,7 @@ int main(int argc, char* argv[])
     Listen(server_https_flv_fd);
     SetNonBlock(server_https_flv_fd);
 
-    ProtocolMgr<HttpFlvProtocol> https_flv_mgr(&epoller);
-
-    g_https_flv_mgr = &https_flv_mgr;
-
-    SslSocket server_https_flv_socket(&epoller, server_https_flv_fd, &https_flv_mgr);
+    SslSocket server_https_flv_socket(&epoller, server_https_flv_fd, std::bind(&ProtocolFactory::GenHttpFlvProtocol, std::placeholders::_1, std::placeholders::_2));
     server_https_flv_socket.EnableRead();
     server_https_flv_socket.AsServerSocket();
 
@@ -441,11 +370,7 @@ int main(int argc, char* argv[])
     Listen(server_http_hls_fd);
     SetNonBlock(server_http_hls_fd);
 
-    ProtocolMgr<HttpHlsProtocol> http_hls_mgr(&epoller);
-
-    g_http_hls_mgr = &http_hls_mgr;
-
-    TcpSocket server_http_hls_socket(&epoller, server_http_hls_fd, &http_hls_mgr);
+    TcpSocket server_http_hls_socket(&epoller, server_http_hls_fd, std::bind(&ProtocolFactory::GenHttpHlsProtocol, std::placeholders::_1, std::placeholders::_2));
     server_http_hls_socket.EnableRead();
     server_http_hls_socket.AsServerSocket();
 
@@ -457,27 +382,9 @@ int main(int argc, char* argv[])
     Listen(server_https_hls_fd);
     SetNonBlock(server_https_hls_fd);
 
-    ProtocolMgr<HttpHlsProtocol> https_hls_mgr(&epoller);
-
-    g_https_hls_mgr = &https_hls_mgr;
-
-    SslSocket server_https_hls_socket(&epoller, server_https_hls_fd, &https_hls_mgr);
+    SslSocket server_https_hls_socket(&epoller, server_https_hls_fd, std::bind(&ProtocolFactory::GenHttpHlsProtocol, std::placeholders::_1, std::placeholders::_2));
     server_https_hls_socket.EnableRead();
     server_https_hls_socket.AsServerSocket();
-
-    // === Init Admin Socket ===
-    int admin_fd = CreateNonBlockTcpSocket();
-
-    ReuseAddr(admin_fd);
-    Bind(admin_fd, "0.0.0.0", admin_port);
-    Listen(admin_fd);
-    SetNonBlock(admin_fd);
-
-    ProtocolMgr<AdminProtocol> admin_mgr(&epoller);
-
-    TcpSocket admin_socket(&epoller, admin_fd, &admin_mgr);
-    admin_socket.EnableRead();
-    admin_socket.AsServerSocket();
 
     // === Init WebSocket Socket ===
     int web_socket_fd = CreateNonBlockTcpSocket();
@@ -487,9 +394,7 @@ int main(int argc, char* argv[])
     Listen(web_socket_fd);
     SetNonBlock(web_socket_fd);
 
-    ProtocolMgr<WebSocketProtocol> web_socket_mgr(&epoller);
-
-    TcpSocket web_socket_socket(&epoller, web_socket_fd, &web_socket_mgr);
+    TcpSocket web_socket_socket(&epoller, web_socket_fd, std::bind(&ProtocolFactory::GenWebSocketProtocol, std::placeholders::_1, std::placeholders::_2));
     web_socket_socket.EnableRead();
     web_socket_socket.AsServerSocket();
 
@@ -501,9 +406,7 @@ int main(int argc, char* argv[])
     Listen(ssl_web_socket_fd);
     SetNonBlock(ssl_web_socket_fd);
 
-    ProtocolMgr<WebSocketProtocol> ssl_web_socket_mgr(&epoller);
-
-    SslSocket ssl_web_socket_socket(&epoller, ssl_web_socket_fd, &ssl_web_socket_mgr);
+    SslSocket ssl_web_socket_socket(&epoller, ssl_web_socket_fd, std::bind(&ProtocolFactory::GenWebSocketProtocol, std::placeholders::_1, std::placeholders::_2));
     ssl_web_socket_socket.EnableRead();
     ssl_web_socket_socket.AsServerSocket();
 
@@ -515,9 +418,7 @@ int main(int argc, char* argv[])
     Listen(server_https_file_fd);
     SetNonBlock(server_https_file_fd);
 
-    ProtocolMgr<HttpFileProtocol> https_file_mgr(&epoller);
-
-    SslSocket server_https_file_socket(&epoller, server_https_file_fd, &https_file_mgr);
+    SslSocket server_https_file_socket(&epoller, server_https_file_fd, std::bind(&ProtocolFactory::GenHttpFileProtocol, std::placeholders::_1, std::placeholders::_2));
     server_https_file_socket.EnableRead();
     server_https_file_socket.AsServerSocket();
 
@@ -529,39 +430,18 @@ int main(int argc, char* argv[])
     Listen(server_http_file_fd);
     SetNonBlock(server_http_file_fd);
 
-    ProtocolMgr<HttpFileProtocol> http_file_mgr(&epoller);
-
-    TcpSocket server_http_file_socket(&epoller, server_http_file_fd, &http_file_mgr);
+    TcpSocket server_http_file_socket(&epoller, server_http_file_fd, std::bind(&ProtocolFactory::GenHttpFileProtocol, std::placeholders::_1, std::placeholders::_2));
     server_http_file_socket.EnableRead();
     server_http_file_socket.AsServerSocket();
 
-    // === Init Udp Echo Socket ===
-    int echo_fd = CreateNonBlockUdpSocket();
-
-    ReuseAddr(echo_fd);
-    Bind(echo_fd, "0.0.0.0", echo_port);
-    SetNonBlock(echo_fd);
-
-    ProtocolMgr<EchoProtocol> echo_mgr(&epoller);
-
-    UdpSocket server_echo_socket(&epoller, echo_fd, &echo_mgr);
-    server_echo_socket.EnableRead();
-
-    // === Init Udp Echo Socket ===
+    // === Init WebRTC Socket ===
     int webrtc_fd = CreateNonBlockUdpSocket();
 
     ReuseAddr(webrtc_fd);
     Bind(webrtc_fd, "0.0.0.0", webrtc_port);
     SetNonBlock(webrtc_fd);
 
-    WebrtcMgr webrtc_mgr(&epoller);
-
-    g_webrtc_mgr = &webrtc_mgr;
-
-    timer_in_second.AddTimerSecondHandle(&webrtc_mgr);
-    timer_in_millsecond.AddTimerMillSecondHandle(&webrtc_mgr);
-
-    UdpSocket server_webrtc_socket(&epoller, webrtc_fd, &webrtc_mgr);
+    UdpSocket server_webrtc_socket(&epoller, webrtc_fd, std::bind(&ProtocolFactory::GenWebrtcProtocol, std::placeholders::_1, std::placeholders::_2));
     server_webrtc_socket.EnableRead();
 
     srt_startup();
@@ -582,12 +462,7 @@ int main(int argc, char* argv[])
     srt_socket_util::Bind(server_srt_fd, "0.0.0.0", 9000);
     srt_socket_util::Listen(server_srt_fd);
 
-    ProtocolMgr<SrtProtocol> srt_mgr(&srt_epoller);
-    g_srt_mgr = &srt_mgr;
-
-    timer_in_second.AddTimerSecondHandle(&srt_mgr);
-
-    SrtSocket server_srt_socket(&srt_epoller, server_srt_fd, &srt_mgr);
+    SrtSocket server_srt_socket(&srt_epoller, server_srt_fd, std::bind(&ProtocolFactory::GenSrtProtocol, std::placeholders::_1, std::placeholders::_2));
     server_srt_socket.EnableRead();
     server_srt_socket.AsServerSocket();
 

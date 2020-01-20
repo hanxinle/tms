@@ -12,6 +12,7 @@
 #include "media_publisher.h"
 #include "media_subscriber.h"
 #include "ref_ptr.h"
+#include "socket_handler.h"
 
 #include "webrtc/modules/rtp_rtcp/source/rtp_format_vp8.h"
 #include "webrtc/modules/rtp_rtcp/source/rtp_format_vp9.h"
@@ -166,11 +167,19 @@ struct MediaSlice
     int                     payload_length;
 };
 
-class WebrtcProtocol : public MediaPublisher, public MediaSubscriber
+class WebrtcProtocol 
+    : public MediaPublisher
+    , public MediaSubscriber
+    , public SocketHandler
 {
 public:
     WebrtcProtocol(IoLoop* io_loop, Fd* socket);
     ~WebrtcProtocol();
+
+	virtual int HandleRead(IoBuffer& io_buffer, Fd& socket);
+	virtual int HandleClose(IoBuffer& io_buffer, Fd& socket) { return OnStop(); }
+	virtual int HandleError(IoBuffer& io_buffer, Fd& socket) { return OnStop(); }
+	virtual int HandleConnected(Fd& socket) { return 0; }
 
     int Parse(IoBuffer& io_buffer);
     int EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);

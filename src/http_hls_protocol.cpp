@@ -25,6 +25,17 @@ HttpHlsProtocol::~HttpHlsProtocol()
 {
 }
 
+int HttpHlsProtocol::HandleRead(IoBuffer& io_buffer, Fd& socket)
+{
+    int ret = kError;
+    do  
+    {   
+        ret = Parse(io_buffer);
+    } while (ret == kSuccess);
+
+    return ret;
+}
+
 int HttpHlsProtocol::Parse(IoBuffer& io_buffer)
 {
     uint8_t* data = NULL;

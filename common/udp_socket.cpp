@@ -4,19 +4,20 @@
 
 #include "common_define.h"
 #include "socket_util.h"
-#include "socket_handle.h"
+#include "socket_handler.h"
 #include "udp_socket.h"
 
 using namespace std;
 using namespace socket_util;
 
-UdpSocket::UdpSocket(Epoller* epoller, const int& fd, SocketHandle* handler)
-    :
-    Fd(epoller, fd),
-    handler_(handler)
+UdpSocket::UdpSocket(IoLoop* io_loop, const int& fd, HandlerFactoryT handler_factory)
+    : Fd(io_loop, fd)
+    , handler_factory_(handler_factory)
 {
     memset(&src_addr_, 0, sizeof(src_addr_));
     src_addr_len_ = sizeof(src_addr_);
+
+    handler_ = handler_factory_(io_loop, this);
 }
 
 UdpSocket::~UdpSocket()

@@ -12,6 +12,7 @@
 #include "media_publisher.h"
 #include "media_subscriber.h"
 #include "ref_ptr.h"
+#include "socket_handler.h"
 #include "socket_util.h"
 
 using std::map;
@@ -22,9 +23,7 @@ using std::set;
 class AmfCommand;
 class IoLoop;
 class Fd;
-class HttpFlvProtocol;
 class IoBuffer;
-class RtmpMgr;
 class TcpSocket;
 
 enum HandShakeStatus
@@ -131,11 +130,19 @@ struct RtmpMessage
     uint32_t len;
 };
 
-class RtmpProtocol : public MediaPublisher, public MediaSubscriber
+class RtmpProtocol 
+    : public MediaPublisher
+    , public MediaSubscriber
+    , public SocketHandler
 {
 public:
     RtmpProtocol(IoLoop* io_loop, Fd* socket);
     ~RtmpProtocol();
+
+   	virtual int HandleRead(IoBuffer& io_buffer, Fd& socket);
+    virtual int HandleClose(IoBuffer& io_buffer, Fd& socket) { return OnStop(); }
+    virtual int HandleError(IoBuffer& io_buffer, Fd& socket) { return OnStop(); }
+    virtual int HandleConnected(Fd& socket) { return OnConnected(); }
 
     bool IsServerRole()
     {

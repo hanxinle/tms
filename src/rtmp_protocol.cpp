@@ -15,6 +15,7 @@
 #include "http_flv_protocol.h"
 #include "io_buffer.h"
 #include "local_stream_center.h"
+#include "protocol_factory.h"
 #include "rtmp_protocol.h"
 #include "fd.h"
 #include "tcp_socket.h"
@@ -136,6 +137,17 @@ RtmpProtocol::RtmpProtocol(IoLoop* io_loop, Fd* fd)
 RtmpProtocol::~RtmpProtocol()
 {
     cout << LMSG << endl;
+}
+
+int RtmpProtocol::HandleRead(IoBuffer& io_buffer, Fd& socket)
+{ 
+    int ret = kError;
+    do
+    {
+        ret = Parse(io_buffer);
+    } while (ret == kSuccess);
+
+    return ret;
 }
 
 int RtmpProtocol::ParseRtmpUrl(const string& url, RtmpUrl& rtmp_url)
@@ -1022,7 +1034,7 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
                         // SEI不能传给webrtc,不然会导致只能解码关键帧,其他帧都无法解码
                         if (nalu_unit_type != 6)
                         {
-                            g_webrtc_mgr->__DebugSendH264(video_raw_data + 4, nalu_len, rtmp_msg.timestamp_calc);
+                            //g_webrtc_mgr->__DebugSendH264(video_raw_data + 4, nalu_len, rtmp_msg.timestamp_calc);
                         }
 
                         video_payload.SetVideo();
@@ -2362,9 +2374,9 @@ int RtmpProtocol::ConnectForwardRtmpServer(const string& ip, const uint16_t& por
         return -1;
     }
 
-    Fd* socket = new TcpSocket(io_loop_, fd, (SocketHandle*)g_rtmp_mgr);
+    TcpSocket* socket = new TcpSocket(io_loop_, fd, std::bind(&ProtocolFactory::GenRtmpProtocol, std::placeholders::_1, std::placeholders::_2));
 
-    RtmpProtocol* rtmp_forward = g_rtmp_mgr->GetOrCreateProtocol(*socket);
+    RtmpProtocol* rtmp_forward = (RtmpProtocol*)socket->GetHandler();
 
     rtmp_forward->SetApp(app_);
     rtmp_forward->SetStreamName(stream_);

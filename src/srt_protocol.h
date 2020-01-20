@@ -18,10 +18,16 @@ class SrtSocket;
 class SrtProtocol
     : public MediaPublisher
     , public MediaSubscriber
+    , public SocketHandler
 {
 public:
     SrtProtocol(IoLoop* io_loop, Fd* socket);
     ~SrtProtocol();
+
+	virtual int HandleRead(IoBuffer& io_buffer, Fd& socket);
+	virtual int HandleClose(IoBuffer& io_buffer, Fd& socket) { return OnStop(); }
+	virtual int HandleError(IoBuffer& io_buffer, Fd& socket) { return OnStop(); }
+	virtual int HandleConnected(Fd& socket) { return OnConnected(); }
 
 	int Parse(IoBuffer& io_buffer);
     int OnStop();

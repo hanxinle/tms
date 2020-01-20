@@ -6,6 +6,7 @@
 #include <string>
 
 #include "media_subscriber.h"
+#include "socket_handler.h"
 
 class IoLoop;
 class Fd;
@@ -20,11 +21,18 @@ class TcpSocket;
 
 using std::string;
 
-class HttpHlsProtocol : public MediaSubscriber
+class HttpHlsProtocol 
+    : public MediaSubscriber
+    , public SocketHandler
 {
 public:
     HttpHlsProtocol(IoLoop* io_loop, Fd* socket);
     ~HttpHlsProtocol();
+
+	virtual int HandleRead(IoBuffer& io_buffer, Fd& socket);
+    virtual int HandleClose(IoBuffer& io_buffer, Fd& socket) { return OnStop(); }
+    virtual int HandleError(IoBuffer& io_buffer, Fd& socket) { return OnStop(); }
+    virtual int HandleConnected(Fd& socket) { return OnConnected(); }
 
     int Parse(IoBuffer& io_buffer);
 

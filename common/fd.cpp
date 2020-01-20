@@ -6,10 +6,9 @@
 #include <unistd.h>
 
 Fd::Fd(IoLoop* io_loop, const int& fd)
-    : 
-    events_(0),
-    fd_(fd),
-    io_loop_(io_loop)
+    : events_(0)
+    , fd_(fd)
+    , io_loop_(io_loop)
 {
 }
 

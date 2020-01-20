@@ -7,52 +7,26 @@
 #include "openssl/ssl.h"
 
 class IoLoop;
-class SocketHandle;
+class SocketHandler;
 
 class SslSocket : public Fd
 {
 public:
-    SslSocket(IoLoop* io_loop, const int& fd, SocketHandle* handler);
+    SslSocket(IoLoop* io_loop, const int& fd, HandlerFactoryT handler_factory);
     ~SslSocket();
 
-    void AsServerSocket()
-    {
-        server_socket_ = true;
-    }
+    void AsServerSocket() { server_socket_ = true; }
 
     virtual int OnRead();
     virtual int OnWrite();
     virtual int Send(const uint8_t* data, const size_t& len);
 
-    void SetDisconnected()
-    {
-        connect_status_ = kDisconnected;
-    }
-
-    void SetConnecting()
-    {
-        connect_status_ = kConnecting;
-    }
-
-    void SetConnected()
-    {
-        connect_status_ = kConnected;
-    }
-
-    void SetHandshakeing()
-    {
-        connect_status_ = kHandshakeing;
-    }
-
-    void SetHandshaked()
-    {
-        connect_status_ = kHandshaked;
-    }
-
-    void SetDisconnecting()
-    {
-        connect_status_ = kDisconnecting;
-    }
+    void SetDisconnected()  { connect_status_ = kDisconnected; }
+    void SetConnecting()    { connect_status_ = kConnecting; }
+    void SetConnected()     { connect_status_ = kConnected; }
+    void SetHandshakeing()  { connect_status_ = kHandshakeing; }
+    void SetHandshaked()    { connect_status_ = kHandshaked; }
+    void SetDisconnecting() { connect_status_ = kDisconnecting; }
 
 private:
     int DoHandshake();
@@ -60,7 +34,8 @@ private:
 
 private:
     bool            server_socket_;
-    SocketHandle*   handler_;
+    SocketHandler*   handler_;
+    HandlerFactoryT  handler_factory_;
     SslIoBuffer     read_buffer_;
     SslIoBuffer     write_buffer_;
 

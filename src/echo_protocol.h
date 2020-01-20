@@ -8,7 +8,6 @@
 class IoLoop;
 class Fd;
 class IoBuffer;
-class EchoMgr;
 class UdpSocket;
 
 using std::string;

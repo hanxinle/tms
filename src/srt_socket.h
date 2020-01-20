@@ -4,7 +4,7 @@
 #include "common_define.h"
 #include "fd.h"
 #include "io_buffer.h"
-#include "socket_handle.h"
+#include "socket_handler.h"
 #include "socket_util.h"
 
 #include <arpa/inet.h>
@@ -14,12 +14,12 @@
 #include <string>
 
 class IoLoop;
-class SocketHandle;
+class SocketHandler;
 
 class SrtSocket : public Fd
 {
 public:
-    SrtSocket(IoLoop* io_loop, const int& fd, SocketHandle* handle);
+    SrtSocket(IoLoop* io_loop, const int& fd, HandlerFactoryT handler_factory);
     virtual ~SrtSocket();
 
     void AsServerSocket()
@@ -59,7 +59,8 @@ protected:
 
     int connect_status_;
 
-    SocketHandle* handle_;
+    SocketHandler* handler_;
+    HandlerFactoryT handler_factory_;
 
     bool server_socket_;
 

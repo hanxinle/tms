@@ -49,6 +49,17 @@ SrtProtocol::~SrtProtocol()
 {
 }
 
+int SrtProtocol::HandleRead(IoBuffer& io_buffer, Fd& socket)
+{
+    int ret = kError;
+    do  
+    {   
+        ret = Parse(io_buffer);
+    } while (ret == kSuccess);
+
+    return ret;
+}
+
 int SrtProtocol::Parse(IoBuffer& io_buffer)
 {
     uint8_t* data = NULL;

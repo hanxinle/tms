@@ -24,6 +24,18 @@ HttpFileProtocol::~HttpFileProtocol()
 {
 }
 
+int HttpFileProtocol::HandleRead(IoBuffer& io_buffer, Fd& socket)
+{
+    int ret = kError;
+    do  
+    {   
+        ret = Parse(io_buffer);
+    } while (ret == kSuccess);
+
+    return ret;
+}
+
+
 int HttpFileProtocol::Parse(IoBuffer& io_buffer)
 {
     int ret = http_parse_.Decode(io_buffer);

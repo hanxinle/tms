@@ -7,6 +7,7 @@
 
 #include "http_parse.h"
 #include "media_subscriber.h"
+#include "socket_handler.h"
 
 class IoLoop;
 class Fd;
@@ -22,11 +23,18 @@ class TcpSocket;
 
 using std::string;
 
-class HttpFlvProtocol : public MediaSubscriber
+class HttpFlvProtocol 
+    : public MediaSubscriber
+    , public SocketHandler
 {
 public:
     HttpFlvProtocol(IoLoop* io_loop, Fd* socket);
     ~HttpFlvProtocol();
+
+	virtual int HandleRead(IoBuffer& io_buffer, Fd& socket);
+    virtual int HandleClose(IoBuffer& io_buffer, Fd& socket) { return OnStop(); }
+    virtual int HandleError(IoBuffer& io_buffer, Fd& socket) { return OnStop(); }
+    virtual int HandleConnected(Fd& socket) { return 0; }
 
     int Parse(IoBuffer& io_buffer);
 

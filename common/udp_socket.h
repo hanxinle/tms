@@ -1,17 +1,16 @@
 #ifndef __UDP_SOCKET_H__
 #define __UDP_SOCKET_H__
 
-#include "epoller.h"
 #include "io_buffer.h"
 #include "fd.h"
 
-class Epoller;
-class SocketHandle;
+class IoLoop;
+class SocketHandler;
 
 class UdpSocket : public Fd
 {
 public:
-    UdpSocket(Epoller* epoller, const int& fd, SocketHandle* handler);
+    UdpSocket(IoLoop* io_loop, const int& fd, HandlerFactoryT handler_factory);
     ~UdpSocket();
 
     virtual int OnRead();
@@ -25,8 +24,11 @@ public:
     void SetSrcAddr(sockaddr src_addr) { src_addr_ = src_addr; }
     void SetSrcAddrLen(socklen_t src_addr_len) { src_addr_len_ = src_addr_len; }
 
+    SocketHandler* GetHandler() { return handler_; }
+
 private:
-    SocketHandle* handler_;
+    SocketHandler* handler_;
+    HandlerFactoryT handler_factory_;
     sockaddr src_addr_;
     socklen_t src_addr_len_;
 

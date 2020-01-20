@@ -27,6 +27,17 @@ HttpFlvProtocol::~HttpFlvProtocol()
 {
 }
 
+int HttpFlvProtocol::HandleRead(IoBuffer& io_buffer, Fd& socket)
+{
+    int ret = kError;
+    do
+    {
+        ret = Parse(io_buffer);
+    } while (ret == kSuccess);
+
+    return ret;
+}
+
 int HttpFlvProtocol::Parse(IoBuffer& io_buffer)
 {
     int ret = http_parse_.Decode(io_buffer);

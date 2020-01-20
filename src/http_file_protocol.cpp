@@ -59,8 +59,6 @@ int HttpFileProtocol::Parse(IoBuffer& io_buffer)
             }
             else
             {
-                //Util::Replace(html, "hw.com", g_server_ip);
-
 				HttpSender http_rsp;
                 http_rsp.SetStatus("200");
                 http_rsp.SetContentType("html");
@@ -72,6 +70,18 @@ int HttpFileProtocol::Parse(IoBuffer& io_buffer)
                 GetTcpSocket()->Send((const uint8_t*)http_response.data(), http_response.size());
             }
         }
+        else
+        {
+			HttpSender http_rsp;
+            http_rsp.SetStatus("404");
+            http_rsp.SetContentType("html");
+            http_rsp.SetClose();
+            http_rsp.SetContent("no found");
+
+            string http_response = http_rsp.Encode();
+
+            GetTcpSocket()->Send((const uint8_t*)http_response.data(), http_response.size());
+        }
     }
 
     return ret;
@@ -80,11 +90,6 @@ int HttpFileProtocol::Parse(IoBuffer& io_buffer)
 int HttpFileProtocol::Send(const uint8_t* data, const size_t& len)
 {
     return kSuccess;
-}
-
-int HttpFileProtocol::OnStop()
-{
-    return 0;
 }
 
 int HttpFileProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)

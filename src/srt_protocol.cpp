@@ -98,8 +98,11 @@ int SrtProtocol::Parse(IoBuffer& io_buffer)
     return kNoEnoughData;
 }
 
-int SrtProtocol::OnStop()
+int SrtProtocol::HandleClose(IoBuffer& io_buffer, Fd& socket)
 {
+    UNUSED(io_buffer);
+    UNUSED(socket);
+
     cout << LMSG << "srt protocol stop, fd=" << socket_->fd() << ", socket=" << (void*)socket_ 
          << ", stream=" << GetSrtSocket()->GetStreamId() << endl;
 

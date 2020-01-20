@@ -140,9 +140,13 @@ public:
     ~RtmpProtocol();
 
    	virtual int HandleRead(IoBuffer& io_buffer, Fd& socket);
-    virtual int HandleClose(IoBuffer& io_buffer, Fd& socket) { return OnStop(); }
-    virtual int HandleError(IoBuffer& io_buffer, Fd& socket) { return OnStop(); }
-    virtual int HandleConnected(Fd& socket) { return OnConnected(); }
+    virtual int HandleClose(IoBuffer& io_buffer, Fd& socket);
+    virtual int HandleError(IoBuffer& io_buffer, Fd& socket) 
+    { 
+        return HandleClose(io_buffer, socket); 
+    }
+
+    virtual int HandleConnected(Fd& socket);
 
     bool IsServerRole()
     {
@@ -190,8 +194,6 @@ public:
 
 
     int Parse(IoBuffer& io_buffer);
-    int OnStop();
-    int OnConnected();
 
     int EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
     int EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count) { return 0; }

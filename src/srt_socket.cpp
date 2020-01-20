@@ -21,12 +21,13 @@ SrtSocket::SrtSocket(IoLoop* io_loop, const int& fd, HandlerFactoryT handler_fac
     , stream_id_("")
 {
     cout << LMSG << "fd=" << fd_ << ",srt socket=" << this << endl;
-    handler_ = handler_factory_(io_loop_, this);
+    socket_handler_ = handler_factory_(io_loop_, this);
 }
 
 SrtSocket::~SrtSocket()
 {
     cout << LMSG << "fd=" << fd_ << ",srt socket=" << this << endl;
+    delete socket_handler_;
 }
 
 int SrtSocket::OnRead()
@@ -63,7 +64,8 @@ int SrtSocket::OnRead()
         if (srt_status == SRTS_CLOSED || srt_status == SRTS_BROKEN)
         {   
             cout << LMSG << "srt socket=" << fd() << ", srt_status=" << (int)srt_status << endl;
-            handler_->HandleClose(read_buffer_, *this);
+            socket_handler_->HandleClose(read_buffer_, *this);
+
             return kClose;
         }
 
@@ -82,7 +84,8 @@ int SrtSocket::OnRead()
             if (ret == SRT_ERROR)
             {
                 cout << LMSG << "srt error " << endl;
-                handler_->HandleError(read_buffer_, *this);
+                socket_handler_->HandleError(read_buffer_, *this);
+
                 return kError;
             }
 
@@ -91,12 +94,12 @@ int SrtSocket::OnRead()
             //cout << LMSG << "srt recv:" << ret << " bytes, " << Util::Bin2Hex(buf, ret) << endl;
 
             read_buffer_.Write(buf, ret);
-            ret = handler_->HandleRead(read_buffer_, *this);
+            ret = socket_handler_->HandleRead(read_buffer_, *this);
 
 		    if (ret == kClose || ret == kError)
             {   
                 cout << LMSG << "read error:" << ret << endl;
-                handler_->HandleClose(read_buffer_, *this);
+                socket_handler_->HandleClose(read_buffer_, *this);
                 return kClose;
             } 
         }

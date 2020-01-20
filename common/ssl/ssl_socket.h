@@ -34,7 +34,6 @@ private:
 
 private:
     bool            server_socket_;
-    SocketHandler*   handler_;
     HandlerFactoryT  handler_factory_;
     SslIoBuffer     read_buffer_;
     SslIoBuffer     write_buffer_;

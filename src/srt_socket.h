@@ -59,7 +59,6 @@ protected:
 
     int connect_status_;
 
-    SocketHandler* handler_;
     HandlerFactoryT handler_factory_;
 
     bool server_socket_;

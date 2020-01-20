@@ -259,8 +259,3 @@ int HttpHlsProtocol::Parse(IoBuffer& io_buffer)
 
     return kNoEnoughData;
 }
-
-int HttpHlsProtocol::OnStop()
-{
-    return kSuccess;
-}

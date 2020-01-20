@@ -45,14 +45,8 @@ public:
         connect_status_ = kDisconnecting;
     }
 
-    SocketHandler* GetHandler()
-    {
-        return handler_;
-    }
-
 private:
     bool            server_socket_;
-    SocketHandler*   handler_;
     IoBuffer        read_buffer_;
     IoBuffer        write_buffer_;
 

@@ -9,6 +9,7 @@ Fd::Fd(IoLoop* io_loop, const int& fd)
     : events_(0)
     , fd_(fd)
     , io_loop_(io_loop)
+    , socket_handler_(NULL)
 {
 }
 

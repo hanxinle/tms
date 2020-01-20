@@ -692,7 +692,7 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
                 udp_socket->SetSrcAddrLen(GetUdpSocket()->GetSrcAddrLen());
                 udp_socket->EnableRead();
 
-                WebrtcProtocol* webrtc_protocol = (WebrtcProtocol*)udp_socket->GetHandler();
+                WebrtcProtocol* webrtc_protocol = (WebrtcProtocol*)udp_socket->socket_handler();
                 webrtc_protocol->SetLocalUfrag(g_local_ice_ufrag);
                 webrtc_protocol->SetLocalPwd(g_local_ice_pwd);
                 webrtc_protocol->SetRemoteUfrag(g_remote_ice_ufrag);

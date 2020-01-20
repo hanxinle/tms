@@ -380,11 +380,6 @@ int WebSocketProtocol::Send(const uint8_t* data, const size_t& len)
     return kSuccess;
 }
 
-int WebSocketProtocol::OnStop()
-{
-    return 0;
-}
-
 int WebSocketProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)
 {
     return 0;

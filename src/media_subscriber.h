@@ -35,10 +35,9 @@ public:
     uint16_t GetType() const { return type_; }
 
     bool IsRtmp() { return type_ == kRtmp; }
-
     bool IsHttpFlv() { return type_ == kHttpFlv; }
-
     bool IsHttpHls() { return type_ == kHttpHls; }
+    bool IsSrt() { return type_ == kSrt; }
 
     virtual int SendVideoHeader(const string& header)
     {

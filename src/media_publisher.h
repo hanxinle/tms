@@ -35,6 +35,10 @@ public:
         return ret;
     }
 
+    set<MediaSubscriber*> GetSubscriber()
+    {
+        return subscriber_;
+    }
 
     bool AddSubscriber(MediaSubscriber* subscriber);
     bool RemoveSubscriber(MediaSubscriber* subscriber);

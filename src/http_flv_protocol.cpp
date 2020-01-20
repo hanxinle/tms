@@ -286,8 +286,11 @@ int HttpFlvProtocol::SendAudioHeader(const string& audio_header)
     return kSuccess;
 }
 
-int HttpFlvProtocol::OnStop()
+int HttpFlvProtocol::HandleClose(IoBuffer& io_buffer, Fd& socket)
 {
+    UNUSED(io_buffer);
+    UNUSED(socket);
+
     if (media_publisher_ != NULL)
     {
         media_publisher_->RemoveSubscriber(this);

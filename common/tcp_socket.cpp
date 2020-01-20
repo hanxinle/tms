@@ -15,12 +15,12 @@ TcpSocket::TcpSocket(IoLoop* io_loop, const int& fd, HandlerFactoryT handler_fac
     , server_socket_(false)
     , handler_factory_(handler_factory)
 {
-    handler_ = handler_factory_(io_loop, this);
+    socket_handler_ = handler_factory_(io_loop, this);
 }
 
 TcpSocket::~TcpSocket()
 {
-    delete handler_;
+    delete socket_handler_;
 }
 
 int TcpSocket::OnRead()
@@ -42,7 +42,7 @@ int TcpSocket::OnRead()
             SetNonBlock(client_fd);
             tcp_socket->SetConnected();
 
-            handler_->HandleAccept(*tcp_socket);
+            socket_handler_->HandleAccept(*tcp_socket);
 
             tcp_socket->EnableRead();
         }
@@ -59,26 +59,20 @@ int TcpSocket::OnRead()
                 int bytes = read_buffer_.ReadFromFdAndWrite(fd_);
                 if (bytes > 0)
                 {
-                    if (handler_ != NULL)
-                    {
-                        int ret = handler_->HandleRead(read_buffer_, *this);
+                    int ret = socket_handler_->HandleRead(read_buffer_, *this);
 
-                        if (ret == kClose || ret == kError)
-                        {
-                            cout << LMSG << "read error:" << ret << endl;
-                            handler_->HandleClose(read_buffer_, *this);
-                            return kClose;
-                        }
+                    if (ret == kClose || ret == kError)
+                    {
+                        cout << LMSG << "read error:" << ret << endl;
+                        socket_handler_->HandleClose(read_buffer_, *this);
+                        return kClose;
                     }
                 }
                 else if (bytes == 0)
                 {
                     cout << LMSG << "close by peer" << endl;
 
-                    if (handler_ != NULL)
-                    {
-                        handler_->HandleClose(read_buffer_, *this);
-                    }
+                    socket_handler_->HandleClose(read_buffer_, *this);
 
                     return kClose;
                 }
@@ -91,10 +85,7 @@ int TcpSocket::OnRead()
 
                     cout << LMSG << "read err:" << strerror(errno) << endl;
 
-                    if (handler_ != NULL)
-                    {
-                        handler_->HandleError(read_buffer_, *this);
-                    }
+                    socket_handler_->HandleError(read_buffer_, *this);
 
                     return kError;
                 }
@@ -118,7 +109,7 @@ int TcpSocket::OnWrite()
 
         if (ret < 0)
         {
-            // FIXME:write err
+            socket_handler_->HandleError(read_buffer_, *this);
         }
 
         return ret;
@@ -129,13 +120,13 @@ int TcpSocket::OnWrite()
         if (GetSocketError(fd_, err) != 0 || err != 0)
         {
             cout << LMSG << "when socket connected err:" << strerror(err) << endl;
-            handler_->HandleError(read_buffer_, *this);
+            socket_handler_->HandleError(read_buffer_, *this);
         }
         else
         {
             cout << LMSG << "connected" << endl;
             SetConnected();
-            handler_->HandleConnected(*this);
+            socket_handler_->HandleConnected(*this);
         }
     }
 
@@ -157,16 +148,10 @@ int TcpSocket::Send(const uint8_t* data, const size_t& len)
                 EnableWrite();
             }
         }
-        else if (ret == 0)
-        {
-            if (len != 0)
-            {
-                assert(false);
-            }
-        }
         else
         {
             // FIXME:close socket
+            socket_handler_->HandleError(read_buffer_, *this);
         }
 
         return ret;

@@ -17,11 +17,12 @@ UdpSocket::UdpSocket(IoLoop* io_loop, const int& fd, HandlerFactoryT handler_fac
     memset(&src_addr_, 0, sizeof(src_addr_));
     src_addr_len_ = sizeof(src_addr_);
 
-    handler_ = handler_factory_(io_loop, this);
+    socket_handler_ = handler_factory_(io_loop, this);
 }
 
 UdpSocket::~UdpSocket()
 {
+    delete socket_handler_;
 }
 
 int UdpSocket::OnRead()
@@ -35,10 +36,7 @@ int UdpSocket::OnRead()
 
         if (bytes > 0)
         {
-            if (handler_)
-            {
-                handler_->HandleRead(io_buffer, *this);
-            }
+            socket_handler_->HandleRead(io_buffer, *this);
         }
         else if (bytes == 0)
         {

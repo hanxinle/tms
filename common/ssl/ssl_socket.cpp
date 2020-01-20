@@ -28,7 +28,7 @@ SslSocket::SslSocket(IoLoop* io_loop, const int& fd, HandlerFactoryT handler_fac
     read_buffer_.SetSsl(ssl_);
     write_buffer_.SetSsl(ssl_);
 
-    handler_ = handler_factory_(io_loop, this);
+    socket_handler_ = handler_factory_(io_loop, this);
 }
 
 SslSocket::~SslSocket()
@@ -57,7 +57,7 @@ int SslSocket::OnRead()
             ssl_socket->SetFd();
             ssl_socket->SetHandshakeing();
 
-            handler_->HandleAccept(*ssl_socket);
+            socket_handler_->HandleAccept(*ssl_socket);
 
             ssl_socket->EnableRead();
         }
@@ -74,26 +74,20 @@ int SslSocket::OnRead()
 
                 if (ret > 0)
                 {
-					if (handler_ != NULL)
-                    {   
-                        int ret = handler_->HandleRead(read_buffer_, *this);
+                    int ret = socket_handler_->HandleRead(read_buffer_, *this);
 
-                        if (ret == kClose || ret == kError)
-                        {   
-                            cout << LMSG << "read error:" << ret << endl;
-                            handler_->HandleClose(read_buffer_, *this);
-                            return kClose;
-                        }   
+                    if (ret == kClose || ret == kError)
+                    {   
+                        cout << LMSG << "read error:" << ret << endl;
+                        socket_handler_->HandleClose(read_buffer_, *this);
+                        return kClose;
                     }
                 }
                 else if (ret == 0)
                 {
 					cout << LMSG << "close by peer" << endl;
 
-                    if (handler_ != NULL)
-                    {   
-                        handler_->HandleClose(read_buffer_, *this);
-                    }   
+                    socket_handler_->HandleClose(read_buffer_, *this);
 
                     return kClose;
                 }
@@ -106,10 +100,7 @@ int SslSocket::OnRead()
                     }
 
                     cout << LMSG << "ssl read err:" << err << endl;
-					if (handler_ != NULL)
-                    {   
-                        handler_->HandleError(read_buffer_, *this);
-                    }
+                    socket_handler_->HandleError(read_buffer_, *this);
 
                     return kError;
                 }
@@ -149,13 +140,13 @@ int SslSocket::OnWrite()
         if (GetSocketError(fd_, err) != 0 || err != 0)
         {
             cout << LMSG << "when socket connected err:" << strerror(err) << endl;
-            handler_->HandleError(read_buffer_, *this);
+            socket_handler_->HandleError(read_buffer_, *this);
         }
         else
         {
             cout << LMSG << "connected" << endl;
             SetConnected();
-            handler_->HandleConnected(*this);
+            socket_handler_->HandleConnected(*this);
         }
     }
 

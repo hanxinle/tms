@@ -25,13 +25,15 @@ public:
 
     int fd() const { return fd_; }
     uint32_t events() const { return events_; }
+    SocketHandler* socket_handler() { return socket_handler_; }
 
     virtual int Send(const uint8_t* data, const size_t& len) { return 0; }
 
 protected:
-    uint32_t    events_;
-    int         fd_;
-    IoLoop*     io_loop_;
+    uint32_t        events_;
+    int             fd_;
+    IoLoop*         io_loop_;
+    SocketHandler*  socket_handler_;
 };
 
 typedef std::function<SocketHandler*(IoLoop*, Fd*)> HandlerFactoryT;

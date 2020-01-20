@@ -1696,8 +1696,11 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
     return kError;
 }
 
-int RtmpProtocol::OnStop()
+int RtmpProtocol::HandleClose(IoBuffer& io_buffer, Fd& socket)
 {
+    UNUSED(io_buffer);
+    UNUSED(socket);
+
     for (const auto& kv : csid_head_)
     {
         if (kv.second.msg != NULL)
@@ -2374,9 +2377,9 @@ int RtmpProtocol::ConnectForwardRtmpServer(const string& ip, const uint16_t& por
         return -1;
     }
 
-    TcpSocket* socket = new TcpSocket(io_loop_, fd, std::bind(&ProtocolFactory::GenRtmpProtocol, std::placeholders::_1, std::placeholders::_2));
+    Fd* socket = new TcpSocket(io_loop_, fd, std::bind(&ProtocolFactory::GenRtmpProtocol, std::placeholders::_1, std::placeholders::_2));
 
-    RtmpProtocol* rtmp_forward = (RtmpProtocol*)socket->GetHandler();
+    RtmpProtocol* rtmp_forward = (RtmpProtocol*)socket->socket_handler();
 
     rtmp_forward->SetApp(app_);
     rtmp_forward->SetStreamName(stream_);
@@ -2404,9 +2407,9 @@ int RtmpProtocol::ConnectForwardRtmpServer(const string& ip, const uint16_t& por
     return kSuccess;
 }
 
-int RtmpProtocol::OnConnected()
+int RtmpProtocol::HandleConnected(Fd& socket)
 {
-    cout << LMSG << endl;
+    UNUSED(socket);
 
     GetTcpSocket()->SetConnected();
     GetTcpSocket()->EnableRead();

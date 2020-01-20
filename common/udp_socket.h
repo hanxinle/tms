@@ -5,7 +5,6 @@
 #include "fd.h"
 
 class IoLoop;
-class SocketHandler;
 
 class UdpSocket : public Fd
 {
@@ -24,10 +23,7 @@ public:
     void SetSrcAddr(sockaddr src_addr) { src_addr_ = src_addr; }
     void SetSrcAddrLen(socklen_t src_addr_len) { src_addr_len_ = src_addr_len; }
 
-    SocketHandler* GetHandler() { return handler_; }
-
 private:
-    SocketHandler* handler_;
     HandlerFactoryT handler_factory_;
     sockaddr src_addr_;
     socklen_t src_addr_len_;

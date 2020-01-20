@@ -168,9 +168,9 @@ namespace srt_socket_util
         return 0;
     }
 
-    inline int SetPeerIdleTimeout(const int& fd, const int& peer_idle_timeout)
+    inline int SetPeerIdleTimeout(const int& fd, const int& peer_idle_timeout_ms)
     {
-        int ret = srt_setsockopt(fd, SOL_SOCKET, SRTO_PEERIDLETIMEO, &peer_idle_timeout, sizeof(peer_idle_timeout));
+        int ret = srt_setsockopt(fd, SOL_SOCKET, SRTO_PEERIDLETIMEO, &peer_idle_timeout_ms, sizeof(peer_idle_timeout_ms));
         if (ret == SRT_ERROR)
         {
             cout << LMSG << "srt_setsockopt SRTO_PEERIDLETIMEO failed, err=" << srt_getlasterror_str() << endl;

@@ -682,67 +682,107 @@ int MediaMuxer::OnVideoHeader(const string& video_header)
         }
     }
 
-	BitBuffer bit_buffer(video_header_);
-
-    uint8_t configuration_version = 0;
-    bit_buffer.GetBytes(1, configuration_version);
-    cout << "configuration_version:" << (int)configuration_version << endl;
-
-    uint8_t avc_profile_indication = 0;
-    bit_buffer.GetBytes(1, avc_profile_indication);
-    cout << "avc_profile_indication:" << (int)avc_profile_indication << endl;
-
-    uint8_t profile_compatibility = 0;
-    bit_buffer.GetBytes(1, profile_compatibility);
-    cout << "profile_compatibility:" << (int)profile_compatibility << endl;
-    
-    uint8_t avc_level_indication = 0;
-    bit_buffer.GetBytes(1, avc_level_indication);
-    cout << "avc_level_indication:" << (int)avc_level_indication << endl;
-
-    uint8_t resered_6bit = 0;
-    bit_buffer.GetBits(6, resered_6bit);
-    cout << "resered_6bit:" << (int)resered_6bit << endl;
-
-    uint8_t length_size_minus_one = 0;
-    bit_buffer.GetBits(2, length_size_minus_one);
-    cout << "length_size_minus_one:" << (int)length_size_minus_one << endl;
-
-    uint8_t resered_3bit = 0;
-    bit_buffer.GetBits(3, resered_3bit);
-    cout << "resered_3bit:" << (int)resered_3bit << endl;
-
-    uint8_t sps_num = 0;
-    bit_buffer.GetBits(5, sps_num);
-    cout << "sps_num:" << (int)sps_num << endl;
-
-    for (uint8_t i = 0; i < sps_num; ++i)
+    const uint8_t* p = (const uint8_t*)video_header_.data();
+    vector<pair<const uint8_t*, int>> nals;
+    int i = 0;
+    int len = video_header_.size();
+	if (p[i] == 0x00 && p[i+1] == 0x00 && p[i+2] == 0x00 && p[i+3] == 0x01)
     {
-        uint16_t sps_len = 0; 
-        bit_buffer.GetBytes(2, sps_len);
-        cout << "sps_len:" << sps_len << endl;
+        const uint8_t* nal = NULL;
+        while (i + 3 < len)
+        {
+            if (p[i] != 0x00 || p[i+1] != 0x00 || p[i+2] != 0x01)
+            {
+                ++i;
+                continue;
+            }
 
-        bit_buffer.GetString(sps_len, sps_);
+            if (nal != NULL)
+            {
+                nals.push_back(make_pair(nal, p + i - nal - 1));
+            }
 
-        cout << "SPS" << endl;
-        cout << Util::Bin2Hex(sps_) << endl;
+            i += 3;
+            nal = p + i;
+        }
+
+        if (nal != NULL)
+        {
+            nals.push_back(make_pair(nal, p + len - nal));
+        }
+
+        if (nals.size() == 2)
+        {
+            sps_.assign((const char*)nals[0].first, nals[0].second);
+            cout << LMSG << "sps=" << Util::Bin2Hex(sps_) << endl;
+            pps_.assign((const char*)nals[1].first, nals[1].second);
+            cout << LMSG << "pps=" << Util::Bin2Hex(pps_) << endl;
+        }
     }
-
-    uint8_t pps_num = 0; 
-    bit_buffer.GetBytes(1, pps_num);
-    cout << "pps_num:" << (int)pps_num << endl;
-
-    for (uint8_t i = 0; i < pps_num; ++i)
+    else
     {
-        uint16_t pps_len = 0; 
-        bit_buffer.GetBytes(2, pps_len);
+	    BitBuffer bit_buffer(video_header_);
 
-        cout << "pps_len:" << (int)pps_len << endl;
+        uint8_t configuration_version = 0;
+        bit_buffer.GetBytes(1, configuration_version);
+        cout << "configuration_version:" << (int)configuration_version << endl;
 
-        bit_buffer.GetString(pps_len, pps_);
+        uint8_t avc_profile_indication = 0;
+        bit_buffer.GetBytes(1, avc_profile_indication);
+        cout << "avc_profile_indication:" << (int)avc_profile_indication << endl;
 
-        cout << "PPS" << endl;
-        cout << Util::Bin2Hex(pps_) << endl;
+        uint8_t profile_compatibility = 0;
+        bit_buffer.GetBytes(1, profile_compatibility);
+        cout << "profile_compatibility:" << (int)profile_compatibility << endl;
+        
+        uint8_t avc_level_indication = 0;
+        bit_buffer.GetBytes(1, avc_level_indication);
+        cout << "avc_level_indication:" << (int)avc_level_indication << endl;
+
+        uint8_t resered_6bit = 0;
+        bit_buffer.GetBits(6, resered_6bit);
+        cout << "resered_6bit:" << (int)resered_6bit << endl;
+
+        uint8_t length_size_minus_one = 0;
+        bit_buffer.GetBits(2, length_size_minus_one);
+        cout << "length_size_minus_one:" << (int)length_size_minus_one << endl;
+
+        uint8_t resered_3bit = 0;
+        bit_buffer.GetBits(3, resered_3bit);
+        cout << "resered_3bit:" << (int)resered_3bit << endl;
+
+        uint8_t sps_num = 0;
+        bit_buffer.GetBits(5, sps_num);
+        cout << "sps_num:" << (int)sps_num << endl;
+
+        for (uint8_t i = 0; i < sps_num; ++i)
+        {
+            uint16_t sps_len = 0; 
+            bit_buffer.GetBytes(2, sps_len);
+            cout << "sps_len:" << sps_len << endl;
+
+            bit_buffer.GetString(sps_len, sps_);
+
+            cout << "SPS" << endl;
+            cout << Util::Bin2Hex(sps_) << endl;
+        }
+
+        uint8_t pps_num = 0; 
+        bit_buffer.GetBytes(1, pps_num);
+        cout << "pps_num:" << (int)pps_num << endl;
+
+        for (uint8_t i = 0; i < pps_num; ++i)
+        {
+            uint16_t pps_len = 0; 
+            bit_buffer.GetBytes(2, pps_len);
+
+            cout << "pps_len:" << (int)pps_len << endl;
+
+            bit_buffer.GetString(pps_len, pps_);
+
+            cout << "PPS" << endl;
+            cout << Util::Bin2Hex(pps_) << endl;
+        }
     }
 
     return kSuccess;

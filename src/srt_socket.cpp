@@ -107,6 +107,14 @@ int SrtSocket::OnRead()
 
 int SrtSocket::OnWrite()
 {
+    if (IsConnecting())
+    {
+        cout << LMSG << "fd=" << fd_ << ",srt socket=" << this << ", connect established" << endl;
+        SetConnected();
+        DisableWrite();
+        EnableRead();
+    }
+
     return kSuccess;
 }
 
@@ -114,22 +122,13 @@ int SrtSocket::ConnectIp(const std::string& ip, const uint16_t& port)
 {
     int ret = srt_socket_util::Connect(fd_, ip, port);
     
-    if (ret < 0 && errno != EINPROGRESS)
+    if (ret < 0)
     {
         return ret;
     }
 
-    if (errno == EINPROGRESS)
-    {
-        SetConnecting();
-        EnableWrite();
-    }
-    else
-    {
-        cout << LMSG << "connected immediately" << endl;
-        SetConnected();
-        EnableRead();
-    }
+    SetConnecting();
+    EnableWrite();
 
     return kSuccess;
 }

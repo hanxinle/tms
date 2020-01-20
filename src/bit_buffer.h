@@ -112,6 +112,18 @@ public:
         return (bit_len_ - cur_pos_) / 8;
     }
 
+    void SkipBits(const size_t& bits)
+    {
+        size_t bit_left = BitsLeft();
+        cur_pos_ += (bit_left <= bits ? bit_left : bits);
+    }
+
+    void SkipBytes(const size_t& bytes)
+    {
+        size_t byte_left = BytesLeft();
+        cur_pos_ += (byte_left <= bytes ? byte_left : bytes) * 8;
+    }
+
 private:
     const uint8_t* data_;
     size_t bit_len_;

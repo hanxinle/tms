@@ -66,10 +66,11 @@ void AvLogCallback(void* ptr, int level, const char* fmt, va_list vl)
 
 int TetTsReader()
 {
-    int fd = open("./1578877621_455922.ts", O_RDONLY, 0664);
+    string ts_file = "recv.srt";
+    int fd = open(ts_file.c_str(), O_RDONLY, 0664);
     if (fd < 0)
     {
-        cout << "open ./1578877621_455922.ts failed" << endl;
+        cout << "open " << ts_file << " failed" << endl;
         return -1;
     }
 
@@ -576,6 +577,7 @@ int main(int argc, char* argv[])
     srt_socket_util::SetRecvBufSize(server_srt_fd, 10*1024*1024);
     srt_socket_util::SetUdpSendBufSize(server_srt_fd, 10*1024*1024);
     srt_socket_util::SetUdpRecvBufSize(server_srt_fd, 10*1024*1024);
+    srt_socket_util::SetPeerIdleTimeout(server_srt_fd, 20*60*1000);
     srt_socket_util::SetLatency(server_srt_fd, 1000);
     srt_socket_util::Bind(server_srt_fd, "0.0.0.0", 9000);
     srt_socket_util::Listen(server_srt_fd);

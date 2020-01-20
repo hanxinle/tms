@@ -139,6 +139,15 @@ void SrtEpoller::WaitIO(const int& timeout_in_millsecond)
                   timeout_in_millsecond, 
                   NULL, NULL, NULL, NULL);
 
+    cout << LMSG << "ret=" << ret << ",can_read_srt_sockets_num=" << can_write_srt_sockets_num 
+         << ",can_write_srt_sockets_num=" << can_write_srt_sockets_num << endl;
+
+    if (ret < 0)
+    {
+        cout << LMSG << "srt epoll error, " << srt_getlasterror_str() << endl;
+        return;
+    }
+
     for (int i = 0; i < can_read_srt_sockets_num; ++i)
     {   
         int srt_socket = can_read_srt_sockets[i];
@@ -165,7 +174,7 @@ void SrtEpoller::WaitIO(const int& timeout_in_millsecond)
         int ret = fd->OnRead();
 		if (ret == kClose || ret == kError)
 		{   
-			cout << LMSG << "closed, ret:" << ret << endl;
+			cout << LMSG << "read error, ret:" << ret << endl;
 			delete fd; 
 			return;
 		}
@@ -194,14 +203,12 @@ void SrtEpoller::WaitIO(const int& timeout_in_millsecond)
             continue;
         }
 
-        //SRT_SOCKSTATUS srt_status = srt_getsockstate(srt_socket);
-        //cout << LMSG << "srt socket:" << srt_socket << ", srt_status:" << (int)srt_status << endl;
-        //if (srt_status == SRTS_CLOSED)
-        //{
-        //}
-        //else
-        //{
-        //    fd->OnWrite();
-        //}
+        int ret = fd->OnWrite();
+		if (ret == kClose || ret == kError)
+		{   
+			cout << LMSG << "write error, ret:" << ret << endl;
+			delete fd; 
+			return;
+		}
     }
 }

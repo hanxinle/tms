@@ -14,7 +14,96 @@ using namespace std;
 const int kTsSegmentFixedSize = 188;
 const uint8_t kTsHeaderSyncByte = 0x47;
 
+/* stream_id
+    10111100 //1 program_stream_map
+    10111101 //2 private_stream_1
+    10111110 //padding_stream
+    10111111 //3 private_stream_2
+    110xxxxx //ISO/IEC 13818-3 or ISO/IEC 11172-3 or ISO/IEC 13818-7 or ISO/IEC 14496-3 audio stream number x xxxx
+    1110xxxx //ITU-T Rec. H.262 | ISO/IEC 13818-2 or ISO/IEC 11172-2 or ISO/IEC 14496-2 video stream number xxxx
+    11110000 //3 ECM_stream
+    11110001 //3 EMM_stream
+    11110010 //5 ITU-T Rec. H.222.0 | ISO/IEC 13818-1 Annex A or ISO/IEC 13818- 6_DSMCC_stream
+    11110011 //2 ISO/IEC_13522_stream
+    11110100 //6 ITU-T Rec. H.222.1 type A
+    11110101 //6 ITU-T Rec. H.222.1 type B
+    11110110 //6 ITU-T Rec. H.222.1 type C
+    11110111 //6 ITU-T Rec. H.222.1 type D
+    11111000 //6 ITU-T Rec. H.222.1 type E
+    11111001 //7 ancillary_stream
+    11111010 //ISO/IEC14496-1_SL-packetized_stream
+    11111011 //ISO/IEC14496-1_FlexMux_stream
+    11111100 //… 1111 1110 reserved data stream
+    11111111 //4 program_stream_directory
+*/
+
+const uint8_t kProgramStreamMap                = 188;
+const uint8_t kPrivateStream1                  = 189;
+const uint8_t kPaddingStream                   = 190;
+const uint8_t kPrivateStream2                  = 191;
+const uint8_t kAudioStreamBegin                = 192;
+const uint8_t kAudioStreamEnd                  = 223;
+const uint8_t kVideoStreamBegin                = 224;
+const uint8_t kVideoStreamEnd                  = 239;
+const uint8_t kECMStream                       = 240;
+const uint8_t kEMMStream                       = 241;
+const uint8_t kDSMCCStream                     = 242;
+const uint8_t kIEC_13522_stream                = 243;
+const uint8_t kH_222_1_A                       = 244;
+const uint8_t kH_222_1_B                       = 245;
+const uint8_t kH_222_1_C                       = 246;
+const uint8_t kH_222_1_D                       = 247;
+const uint8_t kH_222_1_E                       = 248;
+const uint8_t kAncillaryStream                 = 249;
+const uint8_t kIEC14496_1_SL_packetized_stream = 250;
+const uint8_t kIEC14496_1_FlexMux_stream       = 251;
+const uint8_t kProgramStreamDirector           = 255;
+
+bool IsStreamIdVideo(const uint8_t& stream_id)
+{
+    return stream_id >= kVideoStreamBegin && stream_id <= kVideoStreamEnd;
+}
+
+bool IsStreamIdAudio(const uint8_t& stream_id)
+{
+    return stream_id >= kAudioStreamBegin && stream_id <= kAudioStreamEnd;
+}
+
 const uint8_t kStartCode[] = {0x00, 0x00, 0x00, 0x01};
+
+static map<int, int> kSampingFrequency =
+{
+    {0, 96000}, {1, 88200}, {2, 64000}, {3,  48000}, {4, 44100}, {5,  32000}, {6, 24000},
+    {7, 22050}, {8, 16000}, {9, 12000}, {10, 11025}, {11, 8000}, {12, 7350}
+};
+
+static map<int, int> kChannelConfigurations = 
+{
+    {0, 0}, {1, 1}, {2, 2}, {3, 3}, {4, 4}, {5, 5}, {6, 6}, {7, 8}
+};
+
+int GetSampleRate(const int& sampling_frequency_index)
+{
+    auto iter = kSampingFrequency.find(sampling_frequency_index);
+
+    if (iter == kSampingFrequency.end())
+    {
+        return -1;
+    }
+
+    return iter->second;
+}
+
+int GetChannles(const int& channel_configuration)
+{
+    auto iter = kChannelConfigurations.find(channel_configuration);
+    if (iter == kChannelConfigurations.end())
+    {
+        return -1;
+    }
+
+    return iter->second;
+}
 
 static bool IsVideoStreamType(const uint8_t& stream_type)
 {
@@ -70,8 +159,8 @@ int TsReader::ParseTsSegment(const uint8_t* data, const int& len)
         return -1;
     }
 
+    ostringstream os;
     BitBuffer bit_buffer(data, len);
-    //cout << "ts segment=\n" << Util::Bin2Hex(bit_buffer.CurData(), bit_buffer.BytesLeft()) << endl;
 
     uint8_t sync_byte = 0;
     bit_buffer.GetBits(8, sync_byte);
@@ -82,7 +171,7 @@ int TsReader::ParseTsSegment(const uint8_t* data, const int& len)
     uint8_t payload_unit_start_indicator = 0;
     bit_buffer.GetBits(1, payload_unit_start_indicator);
 
-    cout << LMSG << "payload_unit_start_indicator=" << (int)payload_unit_start_indicator << endl;
+    os << "payload_unit_start_indicator=" << (int)payload_unit_start_indicator;
 
     uint8_t transport_priority = 0;
     bit_buffer.GetBits(1, transport_priority);
@@ -90,7 +179,7 @@ int TsReader::ParseTsSegment(const uint8_t* data, const int& len)
     uint16_t pid = 0xFFFF;
     bit_buffer.GetBits(13, pid);
 
-    cout << LMSG << "pid=" << pid << endl;
+    os << ",pid=" << pid;
 
     uint8_t transport_scambling_control = 0;
     bit_buffer.GetBits(2, transport_scambling_control);
@@ -103,18 +192,20 @@ int TsReader::ParseTsSegment(const uint8_t* data, const int& len)
 
     if (payload_unit_start_indicator == 0x01 && (pid == 0 || pid == pmt_pid_))
     {
-        cout << LMSG << "skip one bytes" << endl;
+        os << ",skip one bytes";
         uint8_t skip;
         bit_buffer.GetBits(8, skip);
     }
 
-    cout << LMSG << "adaptation_field_control=" << (int)adaptation_field_control << endl;
-    cout << LMSG << "continuity_counter=" << (int)continuity_counter << endl;
+    os << ",adaptation_field_control=" << (int)adaptation_field_control;
+    os << ",continuity_counter=" << (int)continuity_counter;
 
     if (adaptation_field_control == 2 || adaptation_field_control == 3)
     {
         ParseAdaptation(bit_buffer);
     }
+
+    cout << LMSG << os.str() << endl;
 
     if (pid == 0x0000)
     {
@@ -146,13 +237,12 @@ int TsReader::ParseTsSegment(const uint8_t* data, const int& len)
 
 int TsReader::ParseAdaptation(BitBuffer& bit_buffer)
 {
-    //cout << LMSG << "adt=\n" << Util::Bin2Hex(bit_buffer.CurData(), bit_buffer.BytesLeft()) << endl;
-    cout << LMSG << "bit_buffer left bits=" << bit_buffer.BitsLeft() << ", bytes left=" << bit_buffer.BytesLeft() << endl;
+    ostringstream os;
 
     uint8_t adaptation_field_length = 0;
     bit_buffer.GetBits(8, adaptation_field_length);
 
-    cout << LMSG << "adaptation_field_length=" << (int)adaptation_field_length << endl;
+    os << "adaptation_field_length=" << (int)adaptation_field_length;
 
     if (adaptation_field_length == 0)
     {
@@ -187,7 +277,6 @@ int TsReader::ParseAdaptation(BitBuffer& bit_buffer)
 
     if (PCR_flag == 0x01)
     {
-        cout << LMSG << "PRC" << endl;
 		uint64_t program_clock_reference_base = 0;
         bit_buffer.GetBits(33, program_clock_reference_base);
         uint8_t reserved;
@@ -195,11 +284,10 @@ int TsReader::ParseAdaptation(BitBuffer& bit_buffer)
         uint16_t program_clock_reference_extension;
         bit_buffer.GetBits(9, program_clock_reference_extension);
 
-        cout << "pcr=" << program_clock_reference_base * 300 + program_clock_reference_extension << endl;
+        os << ",pcr=" << program_clock_reference_base * 300 + program_clock_reference_extension;
     }
     if (OPCR_flag == 0x01)
     {
-        cout << LMSG << "OPRC" << endl;
 		uint64_t original_program_clock_reference_base = 0;
         bit_buffer.GetBits(33, original_program_clock_reference_base);
 		uint8_t reserved;
@@ -214,10 +302,9 @@ int TsReader::ParseAdaptation(BitBuffer& bit_buffer)
     }
     if (transport_private_data_flag == 0x01)
     {
-        //cout << "before transport_private_data_length=\n" << Util::Bin2Hex(bit_buffer.CurData(), bit_buffer.BytesLeft()) << endl;
 		uint8_t transport_private_data_length = 0;
         bit_buffer.GetBits(8, transport_private_data_length);
-        cout << "transport_private_data_length=" << (int)transport_private_data_length << endl;
+        os << ",transport_private_data_length=" << (int)transport_private_data_length;
 		for (int i = 0; i < transport_private_data_length; i++) 
         {
 			uint8_t private_data_byte;
@@ -285,7 +372,7 @@ int TsReader::ParseAdaptation(BitBuffer& bit_buffer)
         int end = bit_buffer.BytesLeft();
         adaptation_field_extension_length -= (begin - end);
 
-        cout << LMSG << "adaptation_field_extension_length=" << (int)adaptation_field_extension_length << endl;
+        os << ",adaptation_field_extension_length=" << (int)adaptation_field_extension_length;
 		for (int i = 0; i < adaptation_field_extension_length; i++) 
         {
             bit_buffer.GetBits(8, reserved);
@@ -294,28 +381,29 @@ int TsReader::ParseAdaptation(BitBuffer& bit_buffer)
 
     int end = bit_buffer.BytesLeft();
     adaptation_field_length -= (begin - end);
-    cout << LMSG << "adaptation_field_length=" << (int)adaptation_field_length << endl;
+    os << ",adaptation_field_length=" << (int)adaptation_field_length;
 
+    // FIXME: skip stuffing_byte
     for (int i = 0; i < adaptation_field_length; i++) 
     {
         uint8_t stuffing_byte = 0;
         bit_buffer.GetBits(8, stuffing_byte);
-        cout << LMSG << "stuffing_byte=" << std::hex << (int)stuffing_byte << std::dec << endl;
-        //assert(stuffing_byte == 0xFF);
+        assert(stuffing_byte == 0xFF);
     }
+
+    cout << LMSG << os.str() << endl;
 
     return 0;
 }
 
 int TsReader::ParsePAT(BitBuffer& bit_buffer)
 {
-    //cout << LMSG << "pat=\n" << Util::Bin2Hex(bit_buffer.CurData(), bit_buffer.BytesLeft()) << endl;
-    cout << LMSG << "bit_buffer left bits=" << bit_buffer.BitsLeft() << ", bytes left=" << bit_buffer.BytesLeft() << endl;
+    ostringstream os;
 
     uint8_t table_id;
     bit_buffer.GetBits(8, table_id);
 
-    cout << LMSG << "table_id=" << (int)table_id << endl;
+    os << "table_id=" << (int)table_id;
 
     uint8_t section_syntax_indicator;
     bit_buffer.GetBits(1, section_syntax_indicator);
@@ -329,7 +417,7 @@ int TsReader::ParsePAT(BitBuffer& bit_buffer)
     uint16_t section_length;
     bit_buffer.GetBits(12, section_length);
 
-    cout << LMSG << "section_length=" << section_length << endl;
+    os << ",section_length=" << section_length;
 
     uint16_t transport_stream_id;
     bit_buffer.GetBits(16, transport_stream_id);
@@ -353,7 +441,7 @@ int TsReader::ParsePAT(BitBuffer& bit_buffer)
         uint16_t program_number = 0;
         bit_buffer.GetBits(16, program_number);
 
-        cout << LMSG << "program_number=" << program_number << endl;
+        os << ",program_number=" << program_number;
 
         uint8_t reserved;
         bit_buffer.GetBits(3, reserved);
@@ -368,24 +456,25 @@ int TsReader::ParsePAT(BitBuffer& bit_buffer)
             uint16_t program_map_PID;
             bit_buffer.GetBits(13, program_map_PID);
             pmt_pid_ = program_map_PID;
-            cout << LMSG << "pmt_pid_=" << pmt_pid_ << endl;
+            os << ",pmt_pid_=" << pmt_pid_;
         }
     }
     uint32_t CRC_32;
     bit_buffer.GetBits(32, CRC_32);
+
+    cout << LMSG << os.str() << endl;
 
     return 0;
 }
 
 int TsReader::ParsePMT(BitBuffer& bit_buffer)
 {
-    //cout << LMSG << "pmt=\n" << Util::Bin2Hex(bit_buffer.CurData(), bit_buffer.BytesLeft()) << endl;
-    cout << LMSG << "bit_buffer left bits=" << bit_buffer.BitsLeft() << ", bytes left=" << bit_buffer.BytesLeft() << endl;
+    ostringstream os;
 
 	uint8_t table_id = 0;
     bit_buffer.GetBits(8, table_id);
 
-    cout << LMSG << "table_id=" << (int)table_id << endl;
+    os << "table_id=" << (int)table_id;
 
 	uint8_t section_syntax_indicator = 0;
     bit_buffer.GetBits(1, section_syntax_indicator);
@@ -399,7 +488,7 @@ int TsReader::ParsePMT(BitBuffer& bit_buffer)
 	uint16_t section_length = 0;
     bit_buffer.GetBits(12, section_length);
 
-    cout << LMSG << "section_length=" << section_length << endl;
+    os << ",section_length=" << section_length;
 
 	uint16_t program_number = 0;
     bit_buffer.GetBits(16, program_number);
@@ -422,13 +511,13 @@ int TsReader::ParsePMT(BitBuffer& bit_buffer)
 
 	uint16_t PCR_PID = 0;
     bit_buffer.GetBits(13, PCR_PID);
-    cout << LMSG << "PCR_PID=" << PCR_PID << endl;
+    os << ",PCR_PID=" << PCR_PID;
 
     bit_buffer.GetBits(4, reserved);
 
 	uint16_t program_info_length = 0;
     bit_buffer.GetBits(12, program_info_length);
-    cout << LMSG << "program_info_length=" << program_info_length << endl;
+    os << ",program_info_length=" << program_info_length;
 
     section_length -= 9;
     int es_info_bytes = section_length - 4;
@@ -438,7 +527,7 @@ int TsReader::ParsePMT(BitBuffer& bit_buffer)
 	    //descriptor();
 	}
 
-    cout << LMSG << "es_info_bytes=" << es_info_bytes << endl;
+    os << ",es_info_bytes=" << es_info_bytes;
 
     while (bit_buffer.BytesLeft() > 4 && es_info_bytes > 0)
     {
@@ -455,12 +544,12 @@ int TsReader::ParsePMT(BitBuffer& bit_buffer)
         if (IsVideoStreamType(stream_type))
         {
             video_pid_ = elementary_PID;
-            cout << LMSG << "video_pid_=" << video_pid_ << endl;
+            os << ",video_pid_=" << video_pid_;
         }
         else if (IsAudioStreamType(stream_type))
         {
             audio_pid_ = elementary_PID;
-            cout << LMSG << "audio_pid_=" << audio_pid_ << endl;
+            os << ",audio_pid_=" << audio_pid_;
         }
 
         bit_buffer.GetBits(4, reserved);
@@ -468,7 +557,7 @@ int TsReader::ParsePMT(BitBuffer& bit_buffer)
 	    uint16_t ES_info_length = 0;
         bit_buffer.GetBits(12, ES_info_length);
 
-        cout << LMSG << "stream_type=" << (int)stream_type << ", elementary_PID=" << elementary_PID << ", ES_info_length=" << ES_info_length << endl;
+        os << ",stream_type=" << (int)stream_type << ", elementary_PID=" << elementary_PID << ", ES_info_length=" << ES_info_length;
 
 	    for (int i = 0; i < ES_info_length; i++) 
         {
@@ -477,12 +566,15 @@ int TsReader::ParsePMT(BitBuffer& bit_buffer)
 
         int end = bit_buffer.BytesLeft();
         es_info_bytes -= (begin - end);
-        cout << LMSG << "es_info_bytes=" << es_info_bytes << endl;
+        os << ",es_info_bytes=" << es_info_bytes;
 	}
 
 	uint32_t CRC_32 = 0;
     bit_buffer.GetBits(32, CRC_32);
-    cout << LMSG << "CRC_32=" << CRC_32 << endl;
+
+    os << ",CRC_32=" << CRC_32;
+
+    cout << LMSG << os.str() << endl;
 
     return 0;
 }
@@ -494,10 +586,9 @@ int TsReader::ParsePES(std::string& pes)
         return 0;
     }
 
-    BitBuffer bit_buffer((const uint8_t*)pes.data(), pes.size());
+    ostringstream os;
 
-    cout << LMSG << "bit_buffer left bits=" << bit_buffer.BitsLeft() << ", bytes left=" << bit_buffer.BytesLeft() << endl;
-    //cout << LMSG << "pes=\n" << Util::Bin2Hex(bit_buffer.CurData(), bit_buffer.BytesLeft()) << endl;
+    BitBuffer bit_buffer((const uint8_t*)pes.data(), pes.size());
 
 	uint32_t packet_start_code_prefix;
     bit_buffer.GetBits(24, packet_start_code_prefix);
@@ -505,21 +596,21 @@ int TsReader::ParsePES(std::string& pes)
 	uint8_t stream_id;
     bit_buffer.GetBits(8, stream_id);
 
-    cout << LMSG << "stream_id=" << (int)stream_id << endl;
+    os << "stream_id=" << (int)stream_id;
 
 	uint16_t PES_packet_length;
     bit_buffer.GetBits(16, PES_packet_length);
 
-    cout << LMSG << "PES_packet_length=" << (int)PES_packet_length << endl;
+    os << ",PES_packet_length=" << (int)PES_packet_length;
 
-	//if (stream_id != program_stream_map && 
-	//	stream_id != padding_stream && 
-	//	stream_id != private_stream_2 && 
-	//	stream_id != ECM && stream_id != EMM && 
-	//	stream_id != program_stream_directory && 
-	//	stream_id != DSMCC_stream && 
-	//	stream_id != ITU-T Rec. H.222.1 type E stream) 
-    if (true)
+	if (stream_id != kProgramStreamMap && 
+		stream_id != kPaddingStream && 
+		stream_id != kPrivateStream2 && 
+		stream_id != kECMStream && 
+        stream_id != kEMMStream && 
+		stream_id != kProgramStreamDirector && 
+		stream_id != kDSMCCStream && 
+		stream_id != kH_222_1_E) 
 	{
 	    uint8_t zero = 0;
         bit_buffer.GetBits(2, zero);
@@ -542,7 +633,7 @@ int TsReader::ParsePES(std::string& pes)
 	    uint8_t PTS_DTS_flags = 0;
         bit_buffer.GetBits(2, PTS_DTS_flags);
 
-        cout << LMSG << "PTS_DTS_flags=" << (int)PTS_DTS_flags << endl;
+        os << ",PTS_DTS_flags=" << (int)PTS_DTS_flags;
 
 	    uint8_t ESCR_flag = 0;
         bit_buffer.GetBits(1, ESCR_flag);
@@ -565,7 +656,7 @@ int TsReader::ParsePES(std::string& pes)
 	    uint8_t PES_header_data_length = 0;
         bit_buffer.GetBits(8, PES_header_data_length);
 
-        cout << LMSG << "PES_header_data_length=" << (int)PES_header_data_length << endl;
+        os << ",PES_header_data_length=" << (int)PES_header_data_length;
 
         uint32_t pts = 0;
         uint32_t dts = 0;
@@ -591,7 +682,7 @@ int TsReader::ParsePES(std::string& pes)
 
             pts = (PTS_32_30 << 29) | (PTS_29_15 << 15) | PTS_14_0;
             dts = pts;
-            cout << LMSG << "dts=pts=" << pts << endl;
+            os << ",dts=pts=" << pts;
 
             bit_buffer.GetBits(1, marker_bit);
 	    }
@@ -615,7 +706,7 @@ int TsReader::ParsePES(std::string& pes)
             bit_buffer.GetBits(15, PTS_14_0);
 
             pts = (PTS_32_30 << 29) | (PTS_29_15 << 15) | PTS_14_0;
-            cout << LMSG << "pts=" << pts << endl;
+            os << ",pts=" << pts;
 
             bit_buffer.GetBits(1, marker_bit);
 
@@ -635,7 +726,7 @@ int TsReader::ParsePES(std::string& pes)
             bit_buffer.GetBits(15, DTS_14_0);
 
             dts = (DTS_32_30 << 29) | (DTS_29_15 << 15) | DTS_14_0;
-            cout << LMSG << "dts=" << dts << endl;
+            os << ",dts=" << dts;
 
             bit_buffer.GetBits(1, marker_bit);
 	    }
@@ -761,9 +852,7 @@ int TsReader::ParsePES(std::string& pes)
 
 	        if (PES_private_data_flag == 1) 
             {
-                string tmp;
-                bit_buffer.GetString(16, tmp);
-	            //PES_private_data 128 bslbf;
+                bit_buffer.SkipBytes(16);
 	        }
 	        if (pack_header_field_flag == 1) 
             {
@@ -813,105 +902,43 @@ int TsReader::ParsePES(std::string& pes)
 	        }
 	    }
 
-        //cout << LMSG << "pes before stuffing_byte=\n" << Util::Bin2Hex(bit_buffer.CurData(), bit_buffer.BytesLeft() > 128 ? 128 : bit_buffer.BytesLeft()) << endl;
-
-        if (bit_buffer.BytesLeft() > 6 && bit_buffer.CurData()[0] == 0x00 && bit_buffer.CurData()[1] == 0x00 && bit_buffer.CurData()[2] == 0x00 && bit_buffer.CurData()[3] == 0x01)
+        if (IsStreamIdVideo(stream_id))
         {
-            cout << LMSG << "is video" << endl;
-            if (video_dump_fd_ < 0)
-            {
-                video_dump_fd_ = open("video.264", O_CREAT|O_TRUNC|O_RDWR, 0664);
-            }
-
-            if (video_dump_fd_ > 0)
-            {
-                write(video_dump_fd_, bit_buffer.CurData(), bit_buffer.BytesLeft());
-            }
+            OpenVideoDumpFile();
+            DumpVideo(bit_buffer.CurData(), bit_buffer.BytesLeft());
 
 			OnVideo(bit_buffer, pts, dts);
         }
+        else if (IsStreamIdAudio(stream_id))
+        {
+            OpenAudioDumpFile();
+            DumpAudio(bit_buffer.CurData(), bit_buffer.BytesLeft());
+
+            OnAudio(bit_buffer, pts);
+        }
         else
         {
-            cout << LMSG << "is audio" << endl;
-            if (audio_dump_fd_ < 0)
-            {
-                audio_dump_fd_ = open("audio.aac", O_CREAT|O_TRUNC|O_RDWR, 0664);
-            }
-
-            if (audio_dump_fd_ > 0)
-            {
-                write(audio_dump_fd_, bit_buffer.CurData(), bit_buffer.BytesLeft());
-            }
-
-            if (frame_callback_)
-            {
-                if (bit_buffer.BytesLeft() >= 7)
-                {
-                    // adts to audio special config
-                    if (header_callback_)
-                    {
-                        const uint8_t* p = bit_buffer.CurData();
-                        uint8_t* audio_header_ref = (uint8_t*)malloc(2);
-    					audio_header_ref[0] = 0x00;
-    					audio_header_ref[1] = 0x00;
-
-    					uint8_t audioObjectType = (((uint8_t)p[2]) >> 6) + 1; 
-    					uint8_t samplingFrequencyIndex = (((uint8_t)p[2] & 0x3C) >> 2); 
-    					uint8_t channelConfiguration  = (((uint8_t)p[2] & 0x01) << 2) | (((uint8_t)p[3] & 0xC0) >> 6); 
-
-    					audio_header_ref[0] = (audioObjectType << 3) | (samplingFrequencyIndex >> 1); 
-    					audio_header_ref[1] = ((samplingFrequencyIndex & 0x01) << 7) | (channelConfiguration << 3); 
-
-                        Payload header_frame(audio_header_ref, 2);
-                        header_frame.SetAudio();
-                        header_callback_(header_frame);
-                    }
-
-                    int len = bit_buffer.BytesLeft() - 7;
-                    uint8_t* audio_ref = (uint8_t*)malloc(len);
-                    memcpy(audio_ref, bit_buffer.CurData() + 7, len);
-                    cout << "audio len=" << len << endl;
-                    Payload audio_frame(audio_ref, len);
-                    audio_frame.SetAudio();
-                    audio_frame.SetDts(dts / 90);
-                    audio_frame.SetIFrame();
-
-                    frame_callback_(audio_frame);
-                }
-            }
+            os << ",no av streamid=" << (int)stream_id;
         }
-	    //for (int i = 0; i < N1; i++) 
-        //{
-	    //    uint8_t stuffing_byte = 0;
-        //    bit_buffer.GetBits(8, stuffing_byte);
-	    //}
-
-	    //for (int i = 0; i < N2; i++) 
-        //{
-	    //    uint8_t PES_packet_data_byte = 0;
-        //    bit_buffer.GetBits(8, PES_packet_data_byte);
-	    //}
 	}
-	//else if (stream_id == program_stream_map || 
-    //        stream_id == private_stream_2 || 
-    //        stream_id == ECM || 
-    //        stream_id == EMM || 
-    //        stream_id == program_stream_directory || 
-    //        stream_id == DSMCC_stream |
-    //        stream_id == ITU-T Rec. H.222.1 type E stream ) 
-    else if (false)
+	else if (stream_id == kProgramStreamMap || 
+             stream_id == kPrivateStream2 || 
+             stream_id == kECMStream || 
+             stream_id == kEMMStream || 
+             stream_id == kProgramStreamDirector || 
+             stream_id == kDSMCCStream ||
+             stream_id == kH_222_1_E) 
     {
-        cout << LMSG << "pes before stuffing_byte=\n" << Util::Bin2Hex(bit_buffer.CurData(), bit_buffer.BytesLeft() > 10 ? 10 : bit_buffer.BytesLeft()) << endl;
+        //os << ",pes before stuffing_byte=\n" << Util::Bin2Hex(bit_buffer.CurData(), bit_buffer.BytesLeft() > 10 ? 10 : bit_buffer.BytesLeft());
 	    //for (int i = 0; i < PES_packet_length; i++) 
         //{
 	    //    uint8_t PES_packet_data_byte = 0;
         //    bit_buffer.GetBits(8, PES_packet_data_byte);
 	    //}
 	}
-	//else if ( stream_id == padding_stream) 
-    else if (false)
+	else if (stream_id == kPaddingStream) 
     {
-        cout << LMSG << "pes before stuffing_byte=\n" << Util::Bin2Hex(bit_buffer.CurData(), bit_buffer.BytesLeft() > 10 ? 10 : bit_buffer.BytesLeft()) << endl;
+        //os << ",pes before stuffing_byte=\n" << Util::Bin2Hex(bit_buffer.CurData(), bit_buffer.BytesLeft() > 10 ? 10 : bit_buffer.BytesLeft());
 	    //for (int i = 0; i < PES_packet_length; i++) 
         //{
 	    //    uint8_t padding_byte = 0;
@@ -920,6 +947,8 @@ int TsReader::ParsePES(std::string& pes)
 	}
 
     pes.clear();
+
+    cout << LMSG << os.str() << endl;
 
     return 0;
 }
@@ -965,7 +994,7 @@ int TsReader::PackHead(BitBuffer& bit_buffer)
 	uint8_t reserved;
     bit_buffer.GetBits(5, reserved);
 
-	uint8_t pack_stuffing_length;
+	uint8_t pack_stuffing_length = 0;
     bit_buffer.GetBits(3, pack_stuffing_length);
 
 	for (int i = 0; i < pack_stuffing_length; i++) 
@@ -1055,21 +1084,13 @@ int TsReader::SystemHeader(BitBuffer& bit_buffer)
 
 int TsReader::CollectAudioPES(BitBuffer& bit_buffer)
 {
-    cout << LMSG << endl;
-
     audio_pes_.append((const char*)bit_buffer.CurData(), bit_buffer.CurLen());
-
     return 0;
 }
 
 int TsReader::CollectVideoPES(BitBuffer& bit_buffer)
 {
-    cout << LMSG << endl;
-
     video_pes_.append((const char*)bit_buffer.CurData(), bit_buffer.CurLen());
-
-    //cout << "video pes=\n" << Util::Bin2Hex(bit_buffer.CurData(), bit_buffer.BytesLeft() > 128 ? 128 : bit_buffer.BytesLeft()) << endl;
-
     return 0;
 }
 
@@ -1079,7 +1100,10 @@ void TsReader::OnVideo(BitBuffer& bit_buffer, const uint32_t& pts, const uint32_
     uint32_t len = bit_buffer.BytesLeft();
     size_t i = 0;
 
-    //cout << "nal=\n" << Util::Bin2Hex(bit_buffer.CurData(), bit_buffer.BytesLeft()) << endl;
+    cout << "video size=" << bit_buffer.BytesLeft() << ",video frame=\n" 
+         << Util::Bin2Hex(bit_buffer.CurData(), bit_buffer.BytesLeft() > 256 ? 256 : bit_buffer.BytesLeft()) 
+         << endl;
+
     vector<pair<const uint8_t*, int>> nals;
 
 	if (p[i] == 0x00 && p[i+1] == 0x00 && p[i+2] == 0x00 && p[i+3] == 0x01)
@@ -1095,7 +1119,7 @@ void TsReader::OnVideo(BitBuffer& bit_buffer, const uint32_t& pts, const uint32_
 
             if (nal != NULL)
             {   
-                nals.push_back(make_pair(nal, p + i - nal));
+                nals.push_back(make_pair(nal, p + i - nal - 1));
             }   
 
             i += 3;
@@ -1104,7 +1128,7 @@ void TsReader::OnVideo(BitBuffer& bit_buffer, const uint32_t& pts, const uint32_
 
         if (nal != NULL)
         {   
-            nals.push_back(make_pair(nal, p + i - nal));
+            nals.push_back(make_pair(nal, p + len - nal));
         }   
 
         string header = "";
@@ -1114,77 +1138,225 @@ void TsReader::OnVideo(BitBuffer& bit_buffer, const uint32_t& pts, const uint32_
             int len = kv.second;
             if (nal != NULL)
             {   
-                cout << "nal=\n" << Util::Bin2Hex(nal, len > 128 ? 128 : len) << endl;
+                cout << "len=" << len << ", nal=\n" << Util::Bin2Hex(nal, len > 128 ? 128 : len) << endl;
                 uint8_t nal_ref_idc = nal[0] >> 5;
                 uint8_t nal_type = nal[0] & 0x1F;
 
                 cout << LMSG << "nal_ref_idc:" << (int)nal_ref_idc << ", nal_type:" << (int) nal_type << endl;
-
                 bool dispatch = true;
-                if (frame_callback_)
+
+                uint8_t* nal_ref = (uint8_t*)malloc(len + 4);
+                nal_ref[0] = 0x00;
+                nal_ref[1] = 0x00;
+                nal_ref[2] = 0x00;
+                nal_ref[3] = 0x01;
+                memcpy(nal_ref + 4, nal, len);
+                Payload video_frame(nal_ref, len + 4);
+                video_frame.SetVideo();
+                video_frame.SetPts(pts / 90);
+                video_frame.SetDts(dts / 90);
+                if (nal_type == H264NalType_IDR_SLICE)
                 {
-                    uint8_t* nal_ref = (uint8_t*)malloc(len + 4);
-                    nal_ref[0] = 0x00;
-                    nal_ref[1] = 0x00;
-                    nal_ref[2] = 0x00;
-                    nal_ref[3] = 0x01;
-                    memcpy(nal_ref + 4, nal, len);
-                    Payload video_frame(nal_ref, len);
-                    video_frame.SetVideo();
-                    video_frame.SetPts(pts / 90);
-                    video_frame.SetDts(dts / 90);
-                    if (nal_type == H264NalType_IDR_SLICE)
+                    video_frame.SetIFrame();
+                }
+                else if (nal_type == H264NalType_SLICE)
+                {
+                    if (pts == dts)
                     {
-                        video_frame.SetIFrame();
-                    }
-                    else if (nal_type == H264NalType_SLICE)
-                    {
-                        if (pts == dts)
-                        {
-                            video_frame.SetPFrame();
-                        }
-                        else
-                        {
-                            video_frame.SetBFrame();
-                        }
-                    }
-                    else if (nal_type == H264NalType_SPS)
-                    {
-                        dispatch = false;
-                        header.append((const char*)kStartCode, 4);
-                        header.append((const char*)nal, len);
-                    }
-                    else if (nal_type == H264NalType_PPS)
-                    {
-                        dispatch = false;
-
-                        bool header_complete = ! header.empty();
-                        header.append((const char*)kStartCode, 4);
-                        header.append((const char*)nal, len);
-
-                        if (header_complete)
-                        {
-                            if (header_callback_)
-                            {
-                                uint8_t* nal_ref = (uint8_t*)malloc(header.size());
-                                memcpy(nal_ref, header.data(), header.size());
-                                Payload header_frame(nal_ref, header.size());
-                                header_frame.SetVideo();
-                                header_callback_(header_frame);
-                            }
-                        }
+                        video_frame.SetPFrame();
                     }
                     else
                     {
-                        dispatch = false;
+                        video_frame.SetBFrame();
                     }
+                }
+                else if (nal_type == H264NalType_SPS)
+                {
+                    dispatch = false;
+                    header.append((const char*)kStartCode, 4);
+                    header.append((const char*)nal, len);
+                }
+                else if (nal_type == H264NalType_PPS)
+                {
+                    dispatch = false;
 
-                    if (dispatch)
+                    bool header_complete = ! header.empty();
+                    header.append((const char*)kStartCode, 4);
+                    header.append((const char*)nal, len);
+
+                    if (header_complete && header_callback_)
                     {
-                        frame_callback_(video_frame);
+                        uint8_t* nal_ref = (uint8_t*)malloc(header.size());
+                        memcpy(nal_ref, header.data(), header.size());
+                        Payload header_frame(nal_ref, header.size());
+                        header_frame.SetVideo();
+                        header_callback_(header_frame);
                     }
+                }
+                else
+                {
+                    dispatch = false;
+                }
+
+                if (dispatch && frame_callback_)
+                {
+                    frame_callback_(video_frame);
+                }
+                else
+                {
+                    cout << LMSG << "no dispatch nal_ref_idc:" << (int)nal_ref_idc << ", nal_type:" << (int) nal_type << endl;
                 }
             }   
         }
+    }
+}
+
+void TsReader::OnAudio(BitBuffer& bit_buffer, const uint32_t& pts)
+{
+    int i = 0;
+    double cal_pts = pts;
+
+    while (bit_buffer.BytesLeft() >= 7)
+    {
+        ostringstream os;
+
+        // adts to audio special config
+        const uint8_t* p = bit_buffer.CurData();
+        uint8_t* audio_header_ref = (uint8_t*)malloc(2);
+    	audio_header_ref[0] = 0x00;
+    	audio_header_ref[1] = 0x00;
+         
+        uint32_t syncword = 0;
+        bit_buffer.GetBits(12, syncword);
+        os << std::hex << "syncword=" << syncword << std::dec;
+
+        uint8_t id = 0;
+        bit_buffer.GetBits(1, id);
+
+        uint8_t layer = 0;
+        bit_buffer.GetBits(2, layer);
+
+        uint8_t protection_absent = 0;
+        bit_buffer.GetBits(1, protection_absent);
+
+        uint8_t profile = 0;
+        bit_buffer.GetBits(2, profile);
+        profile += 1;
+
+        uint8_t sampling_frequency_index = 0;
+        bit_buffer.GetBits(4, sampling_frequency_index);
+
+        int sample_rate = GetSampleRate(sampling_frequency_index);
+
+        uint8_t private_bit = 0;
+        bit_buffer.GetBits(1, private_bit);
+
+        uint8_t channel_configuration = 0;
+        bit_buffer.GetBits(3, channel_configuration);
+
+        int channles = GetChannles(channel_configuration);
+
+        os << ",sample_rate=" << sample_rate << ",channles=" << channles;
+
+        uint8_t original_copy = 0;
+        bit_buffer.GetBits(1, original_copy);
+
+        uint8_t home = 0;
+        bit_buffer.GetBits(1, home);
+
+        uint8_t copyright_identification_bit = 0;
+        bit_buffer.GetBits(1, copyright_identification_bit);
+
+        uint8_t copyright_identification_start = 0;
+        bit_buffer.GetBits(1, copyright_identification_start);
+
+        uint16_t aac_frame_length = 0;
+        bit_buffer.GetBits(13, aac_frame_length);
+
+        uint16_t adts_buffer_fullness = 0;
+        bit_buffer.GetBits(11, adts_buffer_fullness);
+
+        uint16_t number_of_raw_data_blocks_in_frames = 0;
+        bit_buffer.GetBits(2, number_of_raw_data_blocks_in_frames);
+
+        if (! protection_absent)
+        {
+            uint16_t crc = 0;
+            bit_buffer.GetBits(16, crc);
+            os << ",crc=" << crc;
+        }
+
+        cout << LMSG << os.str() << endl;
+
+    	audio_header_ref[0] = (profile << 3) | (sampling_frequency_index >> 1); 
+    	audio_header_ref[1] = ((sampling_frequency_index & 0x01) << 7) | (channel_configuration << 3); 
+
+        Payload header_frame(audio_header_ref, 2);
+        header_frame.SetAudio();
+        if (header_callback_)
+        {
+            header_callback_(header_frame);
+        }
+
+        int len = aac_frame_length - ((protection_absent == 1) ? 7 : 9);
+
+        cout << LMSG << "aac_frame_length=" << aac_frame_length << ", len=" << len << endl;
+        if (len > (int)bit_buffer.BytesLeft())
+        {
+            cout << LMSG << "no more than " << len << " bytes left, left " << bit_buffer.BytesLeft() << endl;
+            break;
+        }
+        uint8_t* audio_ref = (uint8_t*)malloc(len + 2);
+        audio_ref[0] = 0xAF;
+        audio_ref[1] = 0x01;
+        memcpy(audio_ref + 2, bit_buffer.CurData(), len);
+        bit_buffer.SkipBytes(len);
+
+        Payload audio_frame(audio_ref, len + 2);
+        audio_frame.SetAudio();
+        //audio_frame.SetDts(pts / 90 + i * (sample_rate / 1024.0 / channles));
+        audio_frame.SetDts((cal_pts + i * (90000.0/(44100.0/1024.0/2))) / 90.0);
+        audio_frame.SetPts(audio_frame.GetDts());
+        audio_frame.SetIFrame();
+        if (frame_callback_)
+        {
+            frame_callback_(audio_frame);
+        }
+
+        ++i;
+    }
+}
+
+void TsReader::OpenVideoDumpFile()
+{
+    if (video_dump_fd_ < 0)
+    {
+        video_dump_fd_ = open("video.264", O_CREAT|O_TRUNC|O_RDWR, 0664);
+    }
+}
+
+void TsReader::DumpVideo(const uint8_t* data, const size_t& len)
+{
+    if (video_dump_fd_ > 0)
+    {
+        int nbytes = write(video_dump_fd_, data, len);
+        UNUSED(nbytes);
+    }
+}
+
+void TsReader::OpenAudioDumpFile()
+{
+    if (audio_dump_fd_ < 0)
+    {
+        audio_dump_fd_ = open("audio.aac", O_CREAT|O_TRUNC|O_RDWR, 0664);
+    }
+}
+
+void TsReader::DumpAudio(const uint8_t* data, const size_t& len)
+{
+    if (audio_dump_fd_ > 0)
+    {
+        int nbytes = write(audio_dump_fd_, data, len);
+        UNUSED(nbytes);
     }
 }

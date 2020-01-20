@@ -31,7 +31,14 @@ private:
     int SystemHeader(BitBuffer& bit_buffer);
 
 private:
+
+    void OpenVideoDumpFile();
+    void DumpVideo(const uint8_t* data, const size_t& len);
+    void OpenAudioDumpFile();
+    void DumpAudio(const uint8_t* data, const size_t& len);
+
     void OnVideo(BitBuffer& bit_buffer, const uint32_t& pts, const uint32_t& dts);
+    void OnAudio(BitBuffer& bit_buffer, const uint32_t& pts);
 
 private:
     uint16_t pmt_pid_;

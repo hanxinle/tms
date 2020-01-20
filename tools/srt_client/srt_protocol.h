@@ -16,8 +16,6 @@ class IoBuffer;
 class SrtSocket;
 
 class SrtProtocol
-    : public MediaPublisher
-    , public MediaSubscriber
 {
 public:
     SrtProtocol(IoLoop* io_loop, Fd* socket);
@@ -25,7 +23,7 @@ public:
 
 	int Parse(IoBuffer& io_buffer);
     int OnStop();
-    int OnConnected() { return 0; }
+    int OnConnected();
 
     int EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
     int EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count) { return 0; }
@@ -34,13 +32,6 @@ public:
     {
         return (SrtSocket*)socket_;
     }
-
-	void SetMediaPublisher(MediaPublisher* media_publisher)
-    {   
-        media_publisher_ = media_publisher;
-    }
-
-    int SendData(const std::string& data);
 
     void OnFrame(const Payload& video_frame);
     void OnHeader(const Payload& header_frame);
@@ -52,9 +43,7 @@ private:
 private:
 	IoLoop* io_loop_;
     Fd* socket_;
-    MediaPublisher* media_publisher_;
     TsReader ts_reader_;
-    bool    register_publisher_stream_;
 
     int dump_fd_;
 };

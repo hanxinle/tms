@@ -23,3 +23,6 @@ log
 tms*
 *.264
 *.aac
+*.ts
+git.sh
+*.srt

@@ -21,8 +21,6 @@ class ServerMgr;
 class RtmpMgr;
 class TcpSocket;
 
-using std::string;
-
 class HttpFlvProtocol 
     : public MediaSubscriber
     , public SocketHandler
@@ -43,9 +41,9 @@ public:
     int SendFlvHeader();
 
     virtual int SendMediaData(const Payload& payload);
-    virtual int SendAudioHeader(const string& audio_header);
-    virtual int SendVideoHeader(const string& video_header);
-    virtual int SendMetaData(const string& metadata);
+    virtual int SendAudioHeader(const std::string& audio_header);
+    virtual int SendVideoHeader(const std::string& video_header);
+    virtual int SendMetaData(const std::string& metadata);
 
     int SendVideo(const Payload& payload);
     int SendAudio(const Payload& payload);
@@ -56,8 +54,8 @@ public:
 
     int EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count) { return 0; }
 
-    string GetApp() { return app_; }
-    string GetStream() { return stream_; }
+    std::string GetApp() { return app_; }
+    std::string GetStream() { return stream_; }
 
 private:
     TcpSocket* GetTcpSocket()
@@ -70,8 +68,8 @@ private:
     Fd* socket_;
     MediaPublisher* media_publisher_;
 
-    string app_;
-    string stream_;
+    std::string app_;
+    std::string stream_;
 
     uint32_t pre_tag_size_;
 

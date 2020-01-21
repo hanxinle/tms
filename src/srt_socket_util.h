@@ -10,8 +10,6 @@
 #include "socket_util.h"
 #include "srt_socket_util.h"
 
-using namespace std;
-
 namespace srt_socket_util
 {
     inline int CreateSrtSocket()
@@ -20,13 +18,13 @@ namespace srt_socket_util
     
         if (ret == SRT_ERROR)
         {
-            cout << LMSG << "srt_socket failed, err=" << srt_getlasterror_str() << endl;
+            std::cout << LMSG << "srt_socket failed, err=" << srt_getlasterror_str() << std::endl;
         }
     
         return ret;
     }
     
-    inline int Bind(const int& fd, const string& ip, const uint16_t& port)
+    inline int Bind(const int& fd, const std::string& ip, const uint16_t& port)
     {
         sockaddr_in sa;
         socket_util::IpPortToSocketAddr(ip, port, sa);
@@ -34,7 +32,7 @@ namespace srt_socket_util
     
         if (ret == SRT_ERROR)
         {
-            cout << LMSG << "srt_bind failed, err=" << srt_getlasterror_str() << endl;
+            std::cout << LMSG << "srt_bind failed, err=" << srt_getlasterror_str() << std::endl;
         }
     
         return ret;
@@ -48,7 +46,7 @@ namespace srt_socket_util
     
         if (ret == SRT_ERROR)
         {
-            cout << LMSG << "srt_connect failed, err=" << srt_getlasterror_str() << endl;
+            std::cout << LMSG << "srt_connect failed, err=" << srt_getlasterror_str() << std::endl;
         }
     
         return ret;
@@ -60,7 +58,7 @@ namespace srt_socket_util
         
         if (ret == SRT_ERROR)
         {
-            cout << LMSG << "srt_listen failed, err=" << srt_getlasterror_str() << endl;
+            std::cout << LMSG << "srt_listen failed, err=" << srt_getlasterror_str() << std::endl;
         }
     
         return ret;
@@ -72,7 +70,7 @@ namespace srt_socket_util
     	SRT_TRANSTYPE tt = SRTT_LIVE;
     	if (SRT_ERROR == srt_setsockopt(fd, 0, SRTO_TRANSTYPE, &tt, sizeof tt))
     	{
-            cout << LMSG << "srt_setsockopt SRTO_TRANSTYPE failed, err=" << srt_getlasterror_str() << endl;
+            std::cout << LMSG << "srt_setsockopt SRTO_TRANSTYPE failed, err=" << srt_getlasterror_str() << std::endl;
             return -1;
     	}
     
@@ -85,7 +83,7 @@ namespace srt_socket_util
         int ret = srt_setsockopt(fd, 0, SRTO_REUSEADDR, &reuse, sizeof(reuse));
         if (ret == SRT_ERROR)
         {   
-            cout << LMSG << "srt_setsockopt SRTO_REUSEADDR failed, err=" << srt_getlasterror_str() << endl;
+            std::cout << LMSG << "srt_setsockopt SRTO_REUSEADDR failed, err=" << srt_getlasterror_str() << std::endl;
         }
     
         return ret;
@@ -96,13 +94,13 @@ namespace srt_socket_util
         int ret = srt_setsockopt(fd, 0, SRTO_RCVSYN, &block, sizeof(block));
         if (ret == SRT_ERROR)
         {   
-            cout << LMSG << "srt_setsockopt SRTO_RCVSYN failed, err=" << srt_getlasterror_str() << endl;
+            std::cout << LMSG << "srt_setsockopt SRTO_RCVSYN failed, err=" << srt_getlasterror_str() << std::endl;
         }
     
         ret = srt_setsockopt(fd, 0, SRTO_SNDSYN, &block, sizeof(block));
         if (ret == SRT_ERROR)
         {   
-            cout << LMSG << "srt_setsockopt SRTO_SNDSYN failed, err=" << srt_getlasterror_str() << endl;
+            std::cout << LMSG << "srt_setsockopt SRTO_SNDSYN failed, err=" << srt_getlasterror_str() << std::endl;
         }
     
         return ret;
@@ -113,7 +111,7 @@ namespace srt_socket_util
         int ret = srt_setsockopt(fd, SOL_SOCKET, SRTO_SNDBUF, &sndbuf, sizeof(sndbuf));
         if (ret == SRT_ERROR)
         {
-            cout << LMSG << "srt_setsockopt SRTO_SNDBUF failed, err=" << srt_getlasterror_str() << endl;
+            std::cout << LMSG << "srt_setsockopt SRTO_SNDBUF failed, err=" << srt_getlasterror_str() << std::endl;
             return -1;
         }
     
@@ -125,7 +123,7 @@ namespace srt_socket_util
         int ret = srt_setsockopt(fd, SOL_SOCKET, SRTO_RCVBUF, &rcvbuf, sizeof(rcvbuf));
         if (ret == SRT_ERROR)
         {
-            cout << LMSG << "srt_setsockopt SRTO_RCVBUF failed, err=" << srt_getlasterror_str() << endl;
+            std::cout << LMSG << "srt_setsockopt SRTO_RCVBUF failed, err=" << srt_getlasterror_str() << std::endl;
             return -1;
         }
     
@@ -137,7 +135,7 @@ namespace srt_socket_util
         int ret = srt_setsockopt(fd, SOL_SOCKET, SRTO_UDP_SNDBUF, &sndbuf, sizeof(sndbuf));
         if (ret == SRT_ERROR)
         {
-            cout << LMSG << "srt_setsockopt SRTO_UDP_SNDBUF failed, err=" << srt_getlasterror_str() << endl;
+            std::cout << LMSG << "srt_setsockopt SRTO_UDP_SNDBUF failed, err=" << srt_getlasterror_str() << std::endl;
             return -1;
         }
     
@@ -149,7 +147,7 @@ namespace srt_socket_util
         int ret = srt_setsockopt(fd, SOL_SOCKET, SRTO_UDP_RCVBUF, &rcvbuf, sizeof(rcvbuf));
         if (ret == SRT_ERROR)
         {
-            cout << LMSG << "srt_setsockopt SRTO_UDP_RCVBUF failed, err=" << srt_getlasterror_str() << endl;
+            std::cout << LMSG << "srt_setsockopt SRTO_UDP_RCVBUF failed, err=" << srt_getlasterror_str() << std::endl;
             return -1;
         }
     
@@ -161,7 +159,7 @@ namespace srt_socket_util
         int ret = srt_setsockopt(fd, SOL_SOCKET, SRTO_LATENCY, &latency, sizeof(latency));
         if (ret == SRT_ERROR)
         {
-            cout << LMSG << "srt_setsockopt SRTO_LATENCY failed, err=" << srt_getlasterror_str() << endl;
+            std::cout << LMSG << "srt_setsockopt SRTO_LATENCY failed, err=" << srt_getlasterror_str() << std::endl;
             return -1;
         }
     
@@ -173,7 +171,7 @@ namespace srt_socket_util
         int ret = srt_setsockopt(fd, SOL_SOCKET, SRTO_PEERIDLETIMEO, &peer_idle_timeout_ms, sizeof(peer_idle_timeout_ms));
         if (ret == SRT_ERROR)
         {
-            cout << LMSG << "srt_setsockopt SRTO_PEERIDLETIMEO failed, err=" << srt_getlasterror_str() << endl;
+            std::cout << LMSG << "srt_setsockopt SRTO_PEERIDLETIMEO failed, err=" << srt_getlasterror_str() << std::endl;
             return -1;
         }
     

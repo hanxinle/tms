@@ -35,19 +35,19 @@ bool MediaPublisher::RemoveSubscriber(MediaSubscriber* subscriber)
 
 int MediaPublisher::OnNewSubscriber(MediaSubscriber* subscriber)
 {
-    cout << LMSG << endl;
+    std::cout << LMSG << std::endl;
 
     if (media_muxer_.HasMetaData())
     {    
         subscriber->SendMetaData(media_muxer_.GetMetaData());
     }    
 
-    cout << LMSG << "audio header:" << media_muxer_.HasAudioHeader() << ",video_header:" << media_muxer_.HasVideoHeader() << endl;
+    std::cout << LMSG << "audio header:" << media_muxer_.HasAudioHeader() << ",video_header:" << media_muxer_.HasVideoHeader() << std::endl;
 
     // 还未收齐音视频头,暂时挂起,收齐后再分发流
     if (! media_muxer_.HasAudioHeader() || ! media_muxer_.HasVideoHeader())
     {
-        cout << LMSG << "will pending" << endl;
+        std::cout << LMSG << "will pending" << std::endl;
         return kPending;
     }
 

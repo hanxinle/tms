@@ -5,32 +5,28 @@
 #include <utility>
 #include <vector>
 
-using std::pair;
-using std::string;
-using std::vector;
-
 class HttpSender
 {
 public:
     HttpSender();
     ~HttpSender();
 
-    int SetHeader(const string& key, const string& val);
-    string Encode();
-    int SetStatus(const string& status);
+    int SetHeader(const std::string& key, const std::string& val);
+    std::string Encode();
+    int SetStatus(const std::string& status);
     void SetKeepAlive();
     void SetClose();
-    void SetContent(const string& content)
+    void SetContent(const std::string& content)
     {
         content_ = content;
     }
 
-    void SetContentType(const string& type);
+    void SetContentType(const std::string& type);
     
 private:
-    string status_;
-    vector<pair<string, string> > header_kv_;
-    string content_;
+    std::string status_;
+    std::vector<std::pair<std::string, std::string> > header_kv_;
+    std::string content_;
 };
 
 #endif // __HTTP_SENDER_H__

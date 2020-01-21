@@ -18,10 +18,9 @@ public:
     template<typename T>
     int WriteBits(const size_t& bits, const T& val)
     {
-#if 1
         if (cur_pos_ + bits > bit_len_)
         {
-            cout << LMSG << "write " << bits << " bits will be overflow" << endl;
+            std::cout << LMSG << "write " << bits << " bits will be overflow" << std::endl;
             return -1;
         }
 
@@ -37,28 +36,6 @@ public:
             mask >>= 1;
             ++cur_pos_;
         }
-#else
-        T mask = 1UL<<(sizeof(T)*8-1);
-        T tmp = val << (sizeof(T)*8-bits);
-
-        for (size_t b = 0; b != bits; ++b)
-        {
-            uint32_t index = cur_pos_/8;
-            if (index*8 > bit_len_)
-            {
-                cout << LMSG << "write bits overflow" << endl;
-                return -1;
-            }
-
-            if (tmp & mask)
-            {
-                buf_[cur_pos_/8] |= (1 << (7-(cur_pos_%8)));
-            }
-            tmp <<= 1;
-            ++cur_pos_;
-        }
-#endif
-
         return 0;
     }
 
@@ -67,7 +44,7 @@ public:
     {
         if (pos > (int)cur_pos_/8)
         {
-            cout << LMSG << "replace in " << pos << " overflow, cur_pos:" << (cur_pos_/8) << endl;
+            std::cout << LMSG << "replace in " << pos << " overflow, cur_pos:" << (cur_pos_/8) << std::endl;
             return -1;
         }
 

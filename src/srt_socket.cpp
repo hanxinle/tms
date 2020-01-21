@@ -11,8 +11,6 @@
 
 #include "srt/srt.h"
 
-using namespace std;
-
 SrtSocket::SrtSocket(IoLoop* io_loop, const int& fd, HandlerFactoryT handler_factory)
     : Fd(io_loop, fd)
     , connect_status_(kDisconnected)
@@ -20,13 +18,13 @@ SrtSocket::SrtSocket(IoLoop* io_loop, const int& fd, HandlerFactoryT handler_fac
     , server_socket_(false)
     , stream_id_("")
 {
-    cout << LMSG << "fd=" << fd_ << ",srt socket=" << this << endl;
+    std::cout << LMSG << "fd=" << fd_ << ",srt socket=" << this << std::endl;
     socket_handler_ = handler_factory_(io_loop_, this);
 }
 
 SrtSocket::~SrtSocket()
 {
-    cout << LMSG << "fd=" << fd_ << ",srt socket=" << this << endl;
+    std::cout << LMSG << "fd=" << fd_ << ",srt socket=" << this << std::endl;
     delete socket_handler_;
 }
 
@@ -52,7 +50,7 @@ int SrtSocket::OnRead()
             socket_util::SocketAddrToIpPort(sa, client_ip, client_port);
             srt_socket_util::SetBlock(client_srt_socket, false);
 
-            cout << LMSG << "accept client:" << client_ip << ":" << client_port << ", fd:" << client_srt_socket 
+            std::cout << LMSG << "accept client:" << client_ip << ":" << client_port << ", fd:" << client_srt_socket 
                     << ", streamid:" << UDT::getstreamid(client_srt_socket) << std::endl;
         }   
 
@@ -63,7 +61,7 @@ int SrtSocket::OnRead()
         SRT_SOCKSTATUS srt_status = srt_getsockstate(fd());
         if (srt_status == SRTS_CLOSED || srt_status == SRTS_BROKEN)
         {   
-            cout << LMSG << "srt socket=" << fd() << ", srt_status=" << (int)srt_status << endl;
+            std::cout << LMSG << "srt socket=" << fd() << ", srt_status=" << (int)srt_status << std::endl;
             socket_handler_->HandleClose(read_buffer_, *this);
 
             return kClose;
@@ -77,13 +75,13 @@ int SrtSocket::OnRead()
 
             if (ret == SRT_ERROR && srt_getlasterror(NULL) == (MJ_AGAIN * 1000 + MN_RDAVAIL))
             {
-                cout << LMSG << "msg_count=" << msg_count << ", no more data to read" << endl;
+                std::cout << LMSG << "msg_count=" << msg_count << ", no more data to read" << std::endl;
                 break;
             }
 
             if (ret == SRT_ERROR)
             {
-                cout << LMSG << "srt error " << endl;
+                std::cout << LMSG << "srt error " << std::endl;
                 socket_handler_->HandleError(read_buffer_, *this);
 
                 return kError;
@@ -91,14 +89,14 @@ int SrtSocket::OnRead()
 
             ++msg_count;
 
-            //cout << LMSG << "srt recv:" << ret << " bytes, " << Util::Bin2Hex(buf, ret) << endl;
+            //std::cout << LMSG << "srt recv:" << ret << " bytes, " << Util::Bin2Hex(buf, ret) << std::endl;
 
             read_buffer_.Write(buf, ret);
             ret = socket_handler_->HandleRead(read_buffer_, *this);
 
 		    if (ret == kClose || ret == kError)
             {   
-                cout << LMSG << "read error:" << ret << endl;
+                std::cout << LMSG << "read error:" << ret << std::endl;
                 socket_handler_->HandleClose(read_buffer_, *this);
                 return kClose;
             } 
@@ -112,7 +110,7 @@ int SrtSocket::OnWrite()
 {
     if (IsConnecting())
     {
-        cout << LMSG << "fd=" << fd_ << ",srt socket=" << this << ", connect established" << endl;
+        std::cout << LMSG << "fd=" << fd_ << ",srt socket=" << this << ", connect established" << std::endl;
         SetConnected();
         DisableWrite();
         EnableRead();
@@ -138,7 +136,7 @@ int SrtSocket::ConnectIp(const std::string& ip, const uint16_t& port)
 
 int SrtSocket::ConnectHost(const std::string& host, const uint16_t& port)
 {
-    string ip = socket_util::GetIpByHost(host);
+    std::string ip = socket_util::GetIpByHost(host);
 
     if (ip.empty())
     {

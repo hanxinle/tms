@@ -8,8 +8,6 @@
 
 #include "srt/srt.h"
 
-using namespace std;
-
 static int EpollEventToSrtEvent(const uint32_t& epoll_event)
 {
     int srt_event = 0;
@@ -35,8 +33,7 @@ static void InitSrtSocketArray(SRTSOCKET* s, const int size, const int init_val)
 }
 
 SrtEpoller::SrtEpoller()
-    :
-    IoLoop()
+    : IoLoop()
 {
 }
 
@@ -56,11 +53,11 @@ int SrtEpoller::Create()
 
         if (poll_fd_ == SRT_ERROR)
         {
-            cout << LMSG << "srt_epoll_create failed, ret=" << poll_fd_ << endl;
+            std::cout << LMSG << "srt_epoll_create failed, ret=" << poll_fd_ << std::endl;
             return -1;
         }
 
-        cout << LMSG << "srt_epoll_create success. poll_fd_=" << poll_fd_ << endl;
+        std::cout << LMSG << "srt_epoll_create success. poll_fd_=" << poll_fd_ << std::endl;
     }
 
     return 0;
@@ -76,13 +73,13 @@ void SrtEpoller::RunIOLoop(const int& timeout_in_millsecond)
 
 int SrtEpoller::AddFd(Fd* fd)
 {
-    cout << LMSG << "add srt socket:" << fd->fd() << endl;
+    std::cout << LMSG << "add srt socket:" << fd->fd() << std::endl;
     int events = EpollEventToSrtEvent(fd->events());
     int ret = srt_epoll_add_usock(poll_fd_, fd->fd(), &events);
 
     if (ret == SRT_ERROR)
     {
-        cout << LMSG << "srt_epoll_add_usock failed, ret=" << ret << endl;
+        std::cout << LMSG << "srt_epoll_add_usock failed, ret=" << ret << std::endl;
     }
     else
     {
@@ -94,12 +91,12 @@ int SrtEpoller::AddFd(Fd* fd)
 
 int SrtEpoller::DelFd(Fd* fd)
 {
-    cout << LMSG << "del srt socket:" << fd->fd() << endl;
+    std::cout << LMSG << "del srt socket:" << fd->fd() << std::endl;
     int ret = srt_epoll_remove_usock(poll_fd_, fd->fd());
 
     if (ret == SRT_ERROR)
     {
-        cout << LMSG << "srt_epoll_remove_usock failed, ret=" << ret << endl;
+        std::cout << LMSG << "srt_epoll_remove_usock failed, ret=" << ret << std::endl;
     }
     else
     {
@@ -116,7 +113,7 @@ int SrtEpoller::ModFd(Fd* fd)
 
     if (ret == SRT_ERROR)
     {
-        cout << LMSG << "srt_epoll_update_usock failed, ret=" << ret << endl;
+        std::cout << LMSG << "srt_epoll_update_usock failed, ret=" << ret << std::endl;
     }
 
     return ret;
@@ -141,7 +138,7 @@ void SrtEpoller::WaitIO(const int& timeout_in_millsecond)
 
     if (ret < 0)
     {
-        //cout << LMSG << "srt epoll error, " << srt_getlasterror_str() << endl;
+        //std::cout << LMSG << "srt epoll error, " << srt_getlasterror_str() << std::endl;
         return;
     }
 
@@ -158,7 +155,7 @@ void SrtEpoller::WaitIO(const int& timeout_in_millsecond)
 
         if (iter == srt_socket_map_.end())
         {   
-            cout << LMSG << "srt socket:" << srt_socket << " have not added into epoller" << endl;
+            std::cout << LMSG << "srt socket:" << srt_socket << " have not added into epoller" << std::endl;
             continue;
         }   
 
@@ -171,7 +168,7 @@ void SrtEpoller::WaitIO(const int& timeout_in_millsecond)
         int ret = fd->OnRead();
 		if (ret == kClose || ret == kError)
 		{   
-			cout << LMSG << "read error, ret:" << ret << endl;
+			std::cout << LMSG << "read error, ret:" << ret << std::endl;
 			delete fd; 
 			return;
 		}
@@ -190,7 +187,7 @@ void SrtEpoller::WaitIO(const int& timeout_in_millsecond)
 
         if (iter == srt_socket_map_.end())
         {   
-            cout << LMSG << "srt socket:" << srt_socket << " have not added into epoller" << endl;
+            std::cout << LMSG << "srt socket:" << srt_socket << " have not added into epoller" << std::endl;
             continue;
         }   
 
@@ -203,7 +200,7 @@ void SrtEpoller::WaitIO(const int& timeout_in_millsecond)
         int ret = fd->OnWrite();
 		if (ret == kClose || ret == kError)
 		{   
-			cout << LMSG << "write error, ret:" << ret << endl;
+			std::cout << LMSG << "write error, ret:" << ret << std::endl;
 			delete fd; 
 			return;
 		}

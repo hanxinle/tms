@@ -5,9 +5,6 @@
 
 #include "common_define.h"
 
-using std::cout;
-using std::endl;
-
 enum CRC32Type
 {
     CRC32_HLS = 0,

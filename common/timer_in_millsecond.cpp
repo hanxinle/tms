@@ -7,17 +7,14 @@
 #include "timer_handle.h"
 #include "util.h"
 
-using namespace std;
-
 TimerInMillSecond::TimerInMillSecond(IoLoop* io_loop)
-    :
-    Fd(io_loop, timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC)),
-    now_in_ms_(Util::GetNowMs()),
-    count_(1)
+    : Fd(io_loop, timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC))
+    , now_in_ms_(Util::GetNowMs())
+    , count_(1)
 {
     if (fd_ == -1)
     {
-        cout << LMSG << "timerfd_create err:" << strerror(errno) << endl;
+        std::cout << LMSG << "timerfd_create err:" << strerror(errno) << std::endl;
     }
 
     itimerspec second_value;
@@ -30,7 +27,7 @@ TimerInMillSecond::TimerInMillSecond(IoLoop* io_loop)
 
     if (timerfd_settime(fd_, 0, &second_value, NULL) == -1)
     {
-        cout << LMSG << "timerfd_create err:" << strerror(errno) << endl;
+        std::cout << LMSG << "timerfd_create err:" << strerror(errno) << std::endl;
     }
     else
     {
@@ -50,7 +47,7 @@ int TimerInMillSecond::OnRead()
 
     int bytes = read(fd_, &num_expired, sizeof(uint64_t));
     UNUSED(bytes);
-    //cout << LMSG << "read " << bytes << " bytes, num_expired:" << num_expired << endl;
+    //std::cout << LMSG << "read " << bytes << " bytes, num_expired:" << num_expired << std::endl;
 
     return kSuccess;
 }
@@ -60,7 +57,7 @@ int TimerInMillSecond::RunEveryNMillSecond()
     uint64_t now_ms = Util::GetNowMs();
     uint64_t time_elapse = now_ms - now_in_ms_;
 
-    //cout << LMSG << "now_ms:" << now_ms << ",time elapse:" << time_elapse <<",count:" << count_ << endl;
+    //std::cout << LMSG << "now_ms:" << now_ms << ",time elapse:" << time_elapse <<",count:" << count_ << std::endl;
 
     for (auto& handle : millsecond_handle_)
     {

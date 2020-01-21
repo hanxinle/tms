@@ -7,9 +7,6 @@
 #include "socket_handler.h"
 #include "tcp_socket.h"
 
-using namespace std;
-using namespace socket_util;
-
 TcpSocket::TcpSocket(IoLoop* io_loop, const int& fd, HandlerFactoryT handler_factory)
     : Fd(io_loop, fd)
     , server_socket_(false)
@@ -27,19 +24,19 @@ int TcpSocket::OnRead()
 {
     if (server_socket_)
     {
-        string client_ip;
+        std::string client_ip;
         uint16_t client_port;
 
-        int client_fd = Accept(fd_, client_ip, client_port);
+        int client_fd = socket_util::Accept(fd_, client_ip, client_port);
 
         if (client_fd > 0)
         {
-            cout << LMSG << "accept " << client_ip << ":" << client_port << endl;
+            std::cout << LMSG << "accept " << client_ip << ":" << client_port << std::endl;
 
-            NoCloseWait(client_fd);
+            socket_util::NoCloseWait(client_fd);
 
             TcpSocket* tcp_socket = new TcpSocket(io_loop_, client_fd, handler_factory_);
-            SetNonBlock(client_fd);
+            socket_util::SetNonBlock(client_fd);
             tcp_socket->SetConnected();
 
             socket_handler_->HandleAccept(*tcp_socket);
@@ -63,14 +60,14 @@ int TcpSocket::OnRead()
 
                     if (ret == kClose || ret == kError)
                     {
-                        cout << LMSG << "read error:" << ret << endl;
+                        std::cout << LMSG << "read error:" << ret << std::endl;
                         socket_handler_->HandleClose(read_buffer_, *this);
                         return kClose;
                     }
                 }
                 else if (bytes == 0)
                 {
-                    cout << LMSG << "close by peer" << endl;
+                    std::cout << LMSG << "close by peer" << std::endl;
 
                     socket_handler_->HandleClose(read_buffer_, *this);
 
@@ -83,7 +80,7 @@ int TcpSocket::OnRead()
                         break;
                     }
 
-                    cout << LMSG << "read err:" << strerror(errno) << endl;
+                    std::cout << LMSG << "read err:" << strerror(errno) << std::endl;
 
                     socket_handler_->HandleError(read_buffer_, *this);
 
@@ -117,14 +114,14 @@ int TcpSocket::OnWrite()
     else if (connect_status_ == kConnecting)
     {
         int err = -1;
-        if (GetSocketError(fd_, err) != 0 || err != 0)
+        if (socket_util::GetSocketError(fd_, err) != 0 || err != 0)
         {
-            cout << LMSG << "when socket connected err:" << strerror(err) << endl;
+            std::cout << LMSG << "when socket connected err:" << strerror(err) << std::endl;
             socket_handler_->HandleError(read_buffer_, *this);
         }
         else
         {
-            cout << LMSG << "connected" << endl;
+            std::cout << LMSG << "connected" << std::endl;
             SetConnected();
             socket_handler_->HandleConnected(*this);
         }

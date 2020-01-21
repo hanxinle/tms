@@ -5,8 +5,6 @@
 #include "srt_protocol.h"
 #include "srt_socket.h"
 
-using namespace socket_util;
-
 extern LocalStreamCenter g_local_stream_center;
 
 SrtProtocol::SrtProtocol(IoLoop* io_loop, Fd* socket)
@@ -17,8 +15,8 @@ SrtProtocol::SrtProtocol(IoLoop* io_loop, Fd* socket)
     , register_publisher_stream_(false)
     , dump_fd_(-1)
 {
-    cout << LMSG << "new srt protocol, fd=" << socket->fd() << ", socket=" << (void*)socket_ 
-         << ", stream=" << GetSrtSocket()->GetStreamId() << endl;
+    std::cout << LMSG << "new srt protocol, fd=" << socket->fd() << ", socket=" << (void*)socket_ 
+         << ", stream=" << GetSrtSocket()->GetStreamId() << std::endl;
 
 	MediaPublisher* media_publisher = g_local_stream_center.GetMediaPublisherByAppStream("srt", GetSrtSocket()->GetStreamId());
 
@@ -26,18 +24,18 @@ SrtProtocol::SrtProtocol(IoLoop* io_loop, Fd* socket)
     {    
         SetMediaPublisher(media_publisher);
         media_publisher->AddSubscriber(this);
-        cout << LMSG << "publisher " << media_publisher << " add subscriber for stream " << GetSrtSocket()->GetStreamId() << endl;
+        std::cout << LMSG << "publisher " << media_publisher << " add subscriber for stream " << GetSrtSocket()->GetStreamId() << std::endl;
     }    
     else
     {
-        cout << LMSG << "can't find stream " << GetSrtSocket()->GetStreamId() << ", choose random one to debug"<< endl;
-        string app, stream;
+        std::cout << LMSG << "can't find stream " << GetSrtSocket()->GetStreamId() << ", choose random one to debug"<< std::endl;
+        std::string app, stream;
         MediaPublisher* media_publisher = g_local_stream_center._DebugGetRandomMediaPublisher(app, stream);
         if (media_publisher)
         {    
             SetMediaPublisher(media_publisher);
             media_publisher->AddSubscriber(this);
-            cout << LMSG << "random publisher " << media_publisher << " add subscriber for app " << app << ", stream " << stream << endl;
+            std::cout << LMSG << "random publisher " << media_publisher << " add subscriber for app " << app << ", stream " << stream << std::endl;
         }
     }
 
@@ -73,22 +71,22 @@ int SrtProtocol::Parse(IoBuffer& io_buffer)
         if (! register_publisher_stream_)
         {
             g_local_stream_center.RegisterStream("srt", GetSrtSocket()->GetStreamId(), this);
-            cout << LMSG << "register publisher " << this << ", streamid=" << GetSrtSocket()->GetStreamId() << endl;
+            std::cout << LMSG << "register publisher " << this << ", streamid=" << GetSrtSocket()->GetStreamId() << std::endl;
             register_publisher_stream_ = true;
         }
 
         ts_reader_.ParseTs(data, len);
 
-        string media_payload((const char*)data, len);
+        std::string media_payload((const char*)data, len);
 		for (auto& sub : subscriber_)
         {
-            cout << LMSG << "srt route to subscriber " << &sub << endl;
+            std::cout << LMSG << "srt route to subscriber " << &sub << std::endl;
             sub->SendData(media_payload);
         }
 
         //for (auto& pending_sub : wait_header_subscriber_)
         //{
-        //    cout << LMSG << "srt route to pending subscriber " << &pending_sub << endl;
+        //    std::cout << LMSG << "srt route to pending subscriber " << &pending_sub << std::endl;
         //    pending_sub->SendData(media_payload);
         //}
 
@@ -103,8 +101,8 @@ int SrtProtocol::HandleClose(IoBuffer& io_buffer, Fd& socket)
     UNUSED(io_buffer);
     UNUSED(socket);
 
-    cout << LMSG << "srt protocol stop, fd=" << socket_->fd() << ", socket=" << (void*)socket_ 
-         << ", stream=" << GetSrtSocket()->GetStreamId() << endl;
+    std::cout << LMSG << "srt protocol stop, fd=" << socket_->fd() << ", socket=" << (void*)socket_ 
+         << ", stream=" << GetSrtSocket()->GetStreamId() << std::endl;
 
     if (media_publisher_)
     {
@@ -132,7 +130,7 @@ void SrtProtocol::OpenDumpFile()
 {
     if (dump_fd_ == -1)
     {
-        ostringstream os;
+        std::ostringstream os;
         os << GetSrtSocket()->GetStreamId() << ".ts";
         dump_fd_ = open(os.str().c_str(), O_CREAT|O_TRUNC|O_RDWR, 0664);
     }
@@ -151,13 +149,13 @@ void SrtProtocol::OnFrame(const Payload& frame)
 {
     if (frame.IsVideo())
     {
-        cout << LMSG << (frame.IsIFrame() ? "I" : (frame.IsPFrame() ? "P" : (frame.IsBFrame() ? "B" : "Unknown"))) 
-             << ",pts=" << frame.GetPts() << ",dts=" << frame.GetDts() << endl;
+        std::cout << LMSG << (frame.IsIFrame() ? "I" : (frame.IsPFrame() ? "P" : (frame.IsBFrame() ? "B" : "Unknown"))) 
+             << ",pts=" << frame.GetPts() << ",dts=" << frame.GetDts() << std::endl;
         media_muxer_.OnVideo(frame);
     }
     else if (frame.IsAudio())
     {
-        cout << LMSG << "audio, dts=" << frame.GetDts() << endl;
+        std::cout << LMSG << "audio, dts=" << frame.GetDts() << std::endl;
         media_muxer_.OnAudio(frame);
     }
 
@@ -169,16 +167,16 @@ void SrtProtocol::OnFrame(const Payload& frame)
 
 void SrtProtocol::OnHeader(const Payload& header_frame)
 {
-    cout << LMSG << "header=" << Util::Bin2Hex(header_frame.GetAllData(), header_frame.GetAllLen()) << endl;
+    std::cout << LMSG << "header=" << Util::Bin2Hex(header_frame.GetAllData(), header_frame.GetAllLen()) << std::endl;
 
     if (header_frame.IsVideo())
     {
-        string video_header((const char*)header_frame.GetAllData(), header_frame.GetAllLen());
+        std::string video_header((const char*)header_frame.GetAllData(), header_frame.GetAllLen());
         media_muxer_.OnVideoHeader(video_header);
     }
     else if (header_frame.IsAudio())
     {
-        string audio_header((const char*)header_frame.GetAllData(), header_frame.GetAllLen());
+        std::string audio_header((const char*)header_frame.GetAllData(), header_frame.GetAllLen());
         media_muxer_.OnAudioHeader(audio_header);
     }
 }

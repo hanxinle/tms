@@ -29,8 +29,7 @@ uint32_t CRC32::crc32_sctp_table_[256] =
 };
 
 CRC32::CRC32(const int& type)
-    :
-    type_(type)
+    : type_(type)
 {
     uint64_t polynomial = 0;
     if (type_ == CRC32_HLS)

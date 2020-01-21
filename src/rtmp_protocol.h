@@ -15,11 +15,6 @@
 #include "socket_handler.h"
 #include "socket_util.h"
 
-using std::map;
-using std::string;
-using std::ostringstream;
-using std::set;
-
 class AmfCommand;
 class IoLoop;
 class Fd;
@@ -64,26 +59,25 @@ enum class RtmpRole
 
 struct RtmpUrl
 {
-    string ip;
+    std::string ip;
     uint16_t port;
-    string app;
-    string stream;
-    map<string, string> args;
+    std::string app;
+    std::string stream;
+    std::map<std::string, std::string> args;
 };
 
 struct RtmpMessage
 {
     RtmpMessage()
-        :
-        cs_id(0),
-        timestamp(0),
-        timestamp_delta(0),
-        timestamp_calc(0),
-        message_length(0),
-        message_type_id(0),
-        message_stream_id(0),
-        msg(NULL),
-        len(0)
+        : cs_id(0)
+        , timestamp(0)
+        , timestamp_delta(0)
+        , timestamp_calc(0)
+        , message_length(0)
+        , message_type_id(0)
+        , message_stream_id(0)
+        , msg(NULL)
+        , len(0)
     {
     }
 
@@ -101,9 +95,9 @@ struct RtmpMessage
         len = 0;
     }
 
-    string ToString() const
+    std::string ToString() const
     {
-        ostringstream os;
+        std::ostringstream os;
 
         os << "cs_id:" << cs_id
            << ",timestamp:" << timestamp
@@ -204,7 +198,7 @@ public:
     int SetWindowAcknowledgementSize(const uint32_t& ack_window_size);
     int SetPeerBandwidth(const uint32_t& ack_window_size, const uint8_t& limit_type);
     int SendUserControlMessage(const uint16_t& event, const uint32_t& data);
-    int SendConnect(const string& url);
+    int SendConnect(const std::string& url);
     int SendCreateStream();
     int SendReleaseStream();
     int SendFCPublish();
@@ -214,31 +208,29 @@ public:
     int SendAudio(const RtmpMessage& audio);
     int SendVideo(const RtmpMessage& video);
 
-    void SetApp(const string& app)
+    void SetApp(const std::string& app)
     {
         app_ = app;
         media_muxer_.SetApp(app_);
     }
 
-    void SetStreamName(const string& stream)
+    void SetStreamName(const std::string& stream)
     {
         stream_ = stream;
         media_muxer_.SetStreamName(stream_);
     }
 
-    void SetDomain(const string& domain)
+    void SetDomain(const std::string& domain)
     {
         domain_ = domain;
     }
 
-    void SetArgs(const map<string, string>& args)
+    void SetArgs(const std::map<std::string, std::string>& args)
     {
         args_ = args;
     }
 
-    int ConnectForwardRtmpServer(const string& ip, const uint16_t& port);
-
-    static int ParseRtmpUrl(const string& url, RtmpUrl& rtmp_url);
+    static int ParseRtmpUrl(const std::string& url, RtmpUrl& rtmp_url);
 
     TcpSocket* GetTcpSocket()
     {
@@ -253,9 +245,9 @@ public:
     int SendRtmpMessage(const uint32_t cs_id, const uint32_t& message_stream_id, const uint8_t& message_type_id, const uint8_t* data, const size_t& len);
     int SendMediaData(const Payload& media);
 
-	virtual int SendVideoHeader(const string& header);
-    virtual int SendAudioHeader(const string& header);
-    virtual int SendMetaData(const string& metadata);
+	virtual int SendVideoHeader(const std::string& header);
+    virtual int SendAudioHeader(const std::string& header);
+    virtual int SendMetaData(const std::string& metadata);
 
 private:
     double GetTransactionId()
@@ -265,9 +257,9 @@ private:
         return transaction_id_;
     }
 
-    string DumpIdCommand()
+    std::string DumpIdCommand()
     {
-        ostringstream os;
+        std::ostringstream os;
         for (const auto& kv : id_command_)
         {
             os << kv.first << "=>" << kv.second << ",";
@@ -322,24 +314,24 @@ private:
     uint32_t in_chunk_size_;
     uint32_t out_chunk_size_;
 
-    map<uint32_t, RtmpMessage> csid_head_;
-    map<uint32_t, RtmpMessage> csid_pre_info_;
+    std::map<uint32_t, RtmpMessage> csid_head_;
+    std::map<uint32_t, RtmpMessage> csid_pre_info_;
 
     RtmpMessage pending_rtmp_msg_;
 
-    string app_;
-    string tc_url_;
-    string stream_;
-    string domain_;
-    map<string, string> args_;
+    std::string app_;
+    std::string tc_url_;
+    std::string stream_;
+    std::string domain_;
+    std::map<std::string, std::string> args_;
 
     double transaction_id_;
 
     MediaPublisher* media_publisher_;
 
-    string last_send_command_;
+    std::string last_send_command_;
 
-    map<double, string> id_command_;
+    std::map<double, std::string> id_command_;
 
     bool can_publish_;
 

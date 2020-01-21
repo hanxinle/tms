@@ -10,13 +10,10 @@
 #include "io_buffer.h"
 #include "tcp_socket.h"
 
-using namespace std;
-
 HttpFileProtocol::HttpFileProtocol(IoLoop* io_loop, Fd* socket)
-    :
-    io_loop_(io_loop),
-    socket_(socket),
-    upgrade_(false)
+    : io_loop_(io_loop)
+    , socket_(socket)
+    , upgrade_(false)
 {
 }
 
@@ -44,7 +41,7 @@ int HttpFileProtocol::Parse(IoBuffer& io_buffer)
     {
         if (http_parse_.GetFileType() == "html")
         {
-            string html = Util::ReadFile(http_parse_.GetFileName() + ".html");
+            std::string html = Util::ReadFile(http_parse_.GetFileName() + ".html");
             if (html.empty())
             {
 				HttpSender http_rsp;
@@ -53,7 +50,7 @@ int HttpFileProtocol::Parse(IoBuffer& io_buffer)
                 http_rsp.SetClose();
                 http_rsp.SetContent("no found");
 
-                string http_response = http_rsp.Encode();
+                std::string http_response = http_rsp.Encode();
 
                 GetTcpSocket()->Send((const uint8_t*)http_response.data(), http_response.size());
             }
@@ -65,7 +62,7 @@ int HttpFileProtocol::Parse(IoBuffer& io_buffer)
                 http_rsp.SetClose();
                 http_rsp.SetContent(html);
 
-                string http_response = http_rsp.Encode();
+                std::string http_response = http_rsp.Encode();
 
                 GetTcpSocket()->Send((const uint8_t*)http_response.data(), http_response.size());
             }
@@ -78,7 +75,7 @@ int HttpFileProtocol::Parse(IoBuffer& io_buffer)
             http_rsp.SetClose();
             http_rsp.SetContent("no found");
 
-            string http_response = http_rsp.Encode();
+            std::string http_response = http_rsp.Encode();
 
             GetTcpSocket()->Send((const uint8_t*)http_response.data(), http_response.size());
         }

@@ -9,10 +9,6 @@
 
 #include "openssl/ssl.h"
 
-using std::string;
-using std::cout;
-using std::endl;
-
 class SslIoBuffer : public IoBuffer
 {
 public:

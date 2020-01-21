@@ -7,9 +7,6 @@
 #include "socket_handler.h"
 #include "udp_socket.h"
 
-using namespace std;
-using namespace socket_util;
-
 UdpSocket::UdpSocket(IoLoop* io_loop, const int& fd, HandlerFactoryT handler_factory)
     : Fd(io_loop, fd)
     , handler_factory_(handler_factory)
@@ -47,7 +44,7 @@ int UdpSocket::OnRead()
         {
 			if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
             {   
-                //cout << LMSG << "block" << endl;
+                //std::cout << LMSG << "block" << std::endl;
             }
 
             break;

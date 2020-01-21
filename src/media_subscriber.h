@@ -8,17 +8,14 @@
 
 class Payload;
 
-using std::string;
-
 // 所有可能是接收者的Protocol都需要继承这个类
 class MediaSubscriber
 {
 public:
     MediaSubscriber(const uint16_t& type)
-        :
-        type_(type),
-        expired_time_ms_(0),
-        publisher_(NULL)
+        : type_(type)
+        , expired_time_ms_(0)
+        , publisher_(NULL)
     {
     }
 
@@ -39,19 +36,19 @@ public:
     bool IsHttpHls() { return type_ == kHttpHls; }
     bool IsSrt() { return type_ == kSrt; }
 
-    virtual int SendVideoHeader(const string& header)
+    virtual int SendVideoHeader(const std::string& header)
     {
         UNUSED(header);
         return 0;
     }
 
-    virtual int SendAudioHeader(const string& header)
+    virtual int SendAudioHeader(const std::string& header)
     {
         UNUSED(header);
         return 0;
     }
 
-    virtual int SendMetaData(const string& metadata)
+    virtual int SendMetaData(const std::string& metadata)
     {
         UNUSED(metadata);
         return 0;
@@ -63,7 +60,7 @@ public:
         return 0;
     }
 
-    virtual int SendData(const string& data)
+    virtual int SendData(const std::string& data)
     {
         UNUSED(data);
         return 0;

@@ -9,10 +9,6 @@
 
 class IoBuffer;
 
-using std::map;
-using std::string;
-using std::vector;
-
 class HttpParse
 {
 public:
@@ -23,20 +19,20 @@ public:
 
     int Decode(IoBuffer& io_buffer);
 
-    bool IsFlvRequest(string& app, string& stream);
-    bool IsHlsRequest(string& app, string& stream);
+    bool IsFlvRequest(std::string& app, std::string& stream);
+    bool IsHlsRequest(std::string& app, std::string& stream);
 
-    string GetFileName()
+    std::string GetFileName()
     {
         return file_name_;
     }
 
-    string GetFileType()
+    std::string GetFileType()
     {
         return file_type_;
     }
 
-    bool GetHeaderKeyValue(const string& key, string& value)
+    bool GetHeaderKeyValue(const std::string& key, std::string& value)
     {
         auto iter = header_kv_.find(key);
 
@@ -51,10 +47,10 @@ public:
     }
 
 private:
-    map<string, string> header_kv_;
-    string host_;
-    string url_;
-    map<string, string> args_;
+    std::map<std::string, std::string> header_kv_;
+    std::string host_;
+    std::string url_;
+    std::map<std::string, std::string> args_;
 
     int r_pos_;
     int n_pos_;
@@ -63,12 +59,12 @@ private:
     int next_pos_;
     bool key_value_;
 
-    string key_;
-    string value_;
-    string file_name_;
-    string file_type_;
+    std::string key_;
+    std::string value_;
+    std::string file_name_;
+    std::string file_type_;
 
-    vector<string> path_;
+    std::vector<std::string> path_;
 };
 
 #endif // __HTTP_PARSE_H__

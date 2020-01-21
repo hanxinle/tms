@@ -27,7 +27,7 @@ bool Any::GetDouble(double& val)
     return true;
 }
 
-bool Any::GetString(string& val)
+bool Any::GetString(std::string& val)
 {
     if (! IsString())
     {
@@ -39,7 +39,7 @@ bool Any::GetString(string& val)
     return true;
 }
 
-bool Any::GetVector(vector<Any*>& val)
+bool Any::GetVector(std::vector<Any*>& val)
 {
     if (! IsVector())
     {
@@ -51,7 +51,7 @@ bool Any::GetVector(vector<Any*>& val)
     return true;
 }
 
-bool Any::GetMap(map<string, Any*>& val)
+bool Any::GetMap(std::map<std::string, Any*>& val)
 {
     if (! IsMap())
     {
@@ -118,7 +118,7 @@ Any* Any::operator[](const size_t& index)
     return ToVector()[index];
 }
 
-Any* Any::operator[](const string& key)
+Any* Any::operator[](const std::string& key)
 {
     return ToMap()[key];
 }

@@ -19,18 +19,12 @@
 #include "webrtc/modules/rtp_rtcp/source/rtp_format.h"
 #include "webrtc/p2p/base/stun.h"
 
-using namespace cricket;
-using namespace rtc;
-using namespace socket_util;
-using namespace std;
-using namespace webrtc;
-
 const int kWebRtcRecvTimeoutInMs = 10000;
 
 const int SRTP_MASTER_KEY_KEY_LEN = 16;
 const int SRTP_MASTER_KEY_SALT_LEN = 14;
 
-static int HmacEncode(const string& algo, const uint8_t* key, const int& key_length,  
+static int HmacEncode(const std::string& algo, const uint8_t* key, const int& key_length,  
                 	  const uint8_t* input, const int& input_length,  
                 	  uint8_t* output, unsigned int& output_length) 
 {  
@@ -66,7 +60,7 @@ static int HmacEncode(const string& algo, const uint8_t* key, const int& key_len
     }  
     else 
     {  
-        cout << LMSG << "Algorithm " << algo << " is not supported by this program!" << endl;  
+        std::cout << LMSG << "Algorithm " << algo << " is not supported by this program!" << std::endl;  
         return -1;  
     }  
   
@@ -158,7 +152,7 @@ int WebrtcProtocol::Parse(IoBuffer& io_buffer)
    		}
         else
         {
-            cout << LMSG << (long)this <<", unknown" <<endl;
+            std::cout << LMSG << (long)this <<", unknown" <<std::endl;
         }
 
         return kSuccess;
@@ -171,22 +165,22 @@ void WebrtcProtocol::SendVideoData(const uint8_t* data, const int& size, const u
 {
     static int picture_id_ = 0;
 
-	RTPVideoTypeHeader rtp_video_head;
+    webrtc::RTPVideoTypeHeader rtp_video_head;
 
-    RTPVideoHeaderVP8& rtp_header_vp8 = rtp_video_head.VP8;
+    webrtc::RTPVideoHeaderVP8& rtp_header_vp8 = rtp_video_head.VP8;
     rtp_header_vp8.InitRTPVideoHeaderVP8();
     rtp_header_vp8.pictureId = ++picture_id_;
     rtp_header_vp8.nonReference = 0;
 
-    webrtc::FrameType frame_type = kVideoFrameDelta;
+    webrtc::FrameType frame_type = webrtc::kVideoFrameDelta;
     if (flag & 1)
     {
-        frame_type = kVideoFrameKey;
+        frame_type = webrtc::kVideoFrameKey;
         rtp_header_vp8.nonReference = 1;
     }
 
     // 编码后的视频帧打包为RTP
-    RtpPacketizer* rtp_packetizer = RtpPacketizer::Create(kRtpVideoVp8, 1200, &rtp_video_head, frame_type);
+    webrtc::RtpPacketizer* rtp_packetizer = webrtc::RtpPacketizer::Create(webrtc::kRtpVideoVp8, 1200, &rtp_video_head, frame_type);
     rtp_packetizer->SetPayloadData(data, size, NULL);
 
     bool last_packet = false;
@@ -197,7 +191,7 @@ void WebrtcProtocol::SendVideoData(const uint8_t* data, const int& size, const u
         size_t rtp_packet_len = 0;
         if (! rtp_packetizer->NextPacket(rtp_packet, &rtp_packet_len, &last_packet))
         {   
-            cout << LMSG << "packet rtp error" << endl;
+            std::cout << LMSG << "packet rtp error" << std::endl;
         }   
         else
         {   
@@ -221,7 +215,7 @@ void WebrtcProtocol::SendVideoData(const uint8_t* data, const int& size, const u
             }
             else
             {
-                cout << LMSG << "srtp_protect faile:" << ret << endl;
+                std::cout << LMSG << "srtp_protect faile:" << ret << std::endl;
             }
         }   
     }   
@@ -232,7 +226,7 @@ void WebrtcProtocol::SendVideoData(const uint8_t* data, const int& size, const u
 
 void WebrtcProtocol::SendAudioData(const uint8_t* data, const int& size, const uint32_t& timestamp, const int& flag)
 {
-    cout << LMSG << "send opus message" << endl;
+    std::cout << LMSG << "send opus message" << std::endl;
 
 	RtpHeader rtp_header;
 
@@ -261,7 +255,7 @@ void WebrtcProtocol::SendAudioData(const uint8_t* data, const int& size, const u
     }
     else
     {
-        cout << LMSG << "srtp_protect faile:" << ret << endl;
+        std::cout << LMSG << "srtp_protect faile:" << ret << std::endl;
     }
 }
 
@@ -334,10 +328,10 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
         return kError;
     }
 
-    string magic_cookie = "";
+    std::string magic_cookie = "";
     bit_buffer.GetString(4, magic_cookie);
 
-    string transcation_id = "";
+    std::string transcation_id = "";
     bit_buffer.GetString(12, transcation_id);
 
 	//0x0001  :  Binding Request
@@ -346,25 +340,25 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
     //0x0002  :  Shared Secret Request
     //0x0102  :  Shared Secret Response
     //0x0112  :  Shared Secret Error Response
-    cout << LMSG
+    std::cout << LMSG
          << "len:" << len
          <<",stun_message_type:" << stun_message_type
          << ",message_length:" << message_length
          << ",transcation_id:" << Util::Bin2Hex(transcation_id)
-         << endl;
+         << std::endl;
 
 
-    cout << LMSG << TRACE << endl;
+    std::cout << LMSG << TRACE << std::endl;
 
-    string username = "";
-    string local_ufrag = "";
-    string remote_ufrag = "";
+    std::string username = "";
+    std::string local_ufrag = "";
+    std::string remote_ufrag = "";
 
     while (true)
     {
         if (! bit_buffer.MoreThanBytes(4))
         {
-            cout << LMSG << endl;
+            std::cout << LMSG << std::endl;
             break;
         }
 
@@ -375,15 +369,15 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
         bit_buffer.GetBytes(2, length);
 
 
-        cout << LMSG << "type:" << type << ",length:" << length << endl;
+        std::cout << LMSG << "type:" << type << ",length:" << length << std::endl;
 
         if (! bit_buffer.MoreThanBytes(length))
         {
-            cout << LMSG << endl;
+            std::cout << LMSG << std::endl;
             break;
         }
 
-        string value;
+        std::string value;
         bit_buffer.GetString(length, value);
 
 		//0x0001: MAPPED-ADDRESS
@@ -402,138 +396,138 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
         {
             case 0x0001: 
             {
-                cout << LMSG << "MAPPED-ADDRESS" << endl;
+                std::cout << LMSG << "MAPPED-ADDRESS" << std::endl;
             } 
             break;
 
             case 0x0002: 
             {
-                cout << LMSG << "RESPONSE-ADDRESS" << endl;
+                std::cout << LMSG << "RESPONSE-ADDRESS" << std::endl;
             } 
             break;
 
             case 0x0003: 
             {
-                cout << LMSG << "CHANGE-ADDRESS" << endl;
+                std::cout << LMSG << "CHANGE-ADDRESS" << std::endl;
             } 
             break;
 
             case 0x0004: 
             {
-                cout << LMSG << "SOURCE-ADDRESS" << endl;
+                std::cout << LMSG << "SOURCE-ADDRESS" << std::endl;
             } 
             break;
 
             case 0x0005: 
             {
-                cout << LMSG << "CHANGED-ADDRESS" << endl;
+                std::cout << LMSG << "CHANGED-ADDRESS" << std::endl;
             } 
             break;
 
             case 0x0006: 
             {
-                cout << LMSG << "USERNAME" << endl;
-                cout << LMSG << value << endl;
+                std::cout << LMSG << "USERNAME" << std::endl;
+                std::cout << LMSG << value << std::endl;
                 username = value;
 
                 auto pos = username.find(":");
-                if (pos != string::npos)
+                if (pos != std::string::npos)
                 {
                     local_ufrag = username.substr(0, pos);
                     remote_ufrag = username.substr(pos + 1);
 
-                    cout << LMSG << "local_ufrag:" << local_ufrag << ",remote_ufrag:" << remote_ufrag << endl;
+                    std::cout << LMSG << "local_ufrag:" << local_ufrag << ",remote_ufrag:" << remote_ufrag << std::endl;
                 }
             } 
             break;
 
             case 0x0007: 
             {
-                cout << LMSG << "PASSWORD" << endl;
+                std::cout << LMSG << "PASSWORD" << std::endl;
             } 
             break;
 
             case 0x0008: 
             {
-                cout << LMSG << "MESSAGE-INTEGRITY" << endl;
+                std::cout << LMSG << "MESSAGE-INTEGRITY" << std::endl;
             } 
             break;
 
             case 0x0009: 
             {
-                cout << LMSG << "ERROR-CODE" << endl;
+                std::cout << LMSG << "ERROR-CODE" << std::endl;
             }
             break;
 
             case 0x000a: 
             {
-                cout << LMSG << "UNKNOWN-ATTRIBUTES" << endl;
+                std::cout << LMSG << "UNKNOWN-ATTRIBUTES" << std::endl;
             } 
             break;
 
             case 0x000b: 
             {
-                cout << LMSG << "REFLECTED-FROM" << endl;
+                std::cout << LMSG << "REFLECTED-FROM" << std::endl;
             }
             break;
 
             case 0x0014:
             {
-                cout << LMSG << "REALM" << endl;
+                std::cout << LMSG << "REALM" << std::endl;
             }
             break;
 
             case 0x0015:
             {
-                cout << LMSG << "NONCE" << endl;
+                std::cout << LMSG << "NONCE" << std::endl;
             }
             break;
 
             case 0x0020:
             {
-                cout << LMSG << "XOR-MAPPED-ADDRESS" << endl;
+                std::cout << LMSG << "XOR-MAPPED-ADDRESS" << std::endl;
             };
             break;
 
             case 0x0025:
             {
-                cout << LMSG << "PRIORITY" << endl;
+                std::cout << LMSG << "PRIORITY" << std::endl;
             };
             break;
 
             case 0x8022:
             {
-                cout << LMSG << "SOFTWARE" << endl;
+                std::cout << LMSG << "SOFTWARE" << std::endl;
             };
             break;
 
             case 0x8023:
             {
-                cout << LMSG << "ALTERNATE-SERVER" << endl;
+                std::cout << LMSG << "ALTERNATE-SERVER" << std::endl;
             };
             break;
 
             case 0x8028:
             {
-                cout << LMSG << "FINGERPRINT" << endl;
+                std::cout << LMSG << "FINGERPRINT" << std::endl;
             };
             break;
 
             case 0x8029:
             {
-                cout << LMSG << "ICE_CONTROLLED" << endl;
+                std::cout << LMSG << "ICE_CONTROLLED" << std::endl;
             };
             break;
 
             case 0x802A:
             {
-                cout << LMSG << "ICE_CONTROLLING" << endl;
+                std::cout << LMSG << "ICE_CONTROLLING" << std::endl;
             };
             break;
 
             default : 
             {
-                cout << LMSG << "Undefine" << endl;
+                std::cout << LMSG << "Undefine" << std::endl;
             } 
             break;
         }
@@ -544,7 +538,7 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
         case 0x0001:
         {
 #if 1
-            cout << LMSG << "Binding Request" << endl;
+            std::cout << LMSG << "Binding Request" << std::endl;
 
             uint32_t magic_cookie = 0x2112A442;
 
@@ -557,7 +551,7 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
             binding_response.WriteBytes(2, (GetUdpSocket()->GetClientPort() ^ (magic_cookie >> 16)));
 
             uint32_t ip_num;
-            IpStr2Num(GetUdpSocket()->GetClientIp(), ip_num);
+            socket_util::IpStr2Num(GetUdpSocket()->GetClientIp(), ip_num);
             binding_response.WriteBytes(4, htobe32(htobe32(magic_cookie) ^ ip_num));
 
             binding_response.WriteBytes(2, 0x0006); // USERNAME
@@ -575,8 +569,8 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
                 unsigned int out_len = 0;
                 HmacEncode("sha1", (const uint8_t*)local_pwd_.data(), local_pwd_.size(), hmac_input.GetData(), hmac_input.SizeInBytes(), hmac, out_len);
 
-                cout << LMSG << "local_pwd_:" << local_pwd_ << endl;
-                cout << LMSG << "hamc out_len:" << out_len << endl;
+                std::cout << LMSG << "local_pwd_:" << local_pwd_ << std::endl;
+                std::cout << LMSG << "hamc out_len:" << out_len << std::endl;
             }
 
             binding_response.WriteBytes(2, 0x0008);
@@ -592,11 +586,11 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
                 crc32_input.WriteData(transcation_id.size(), (const uint8_t*)transcation_id.data());
                 crc32_input.WriteData(binding_response.SizeInBytes(), binding_response.GetData());
                 CRC32 crc32(CRC32_STUN);
-                cout << LMSG << "my crc32 input:" << Util::Bin2Hex(crc32_input.GetData(), crc32_input.SizeInBytes()) << endl;
+                std::cout << LMSG << "my crc32 input:" << Util::Bin2Hex(crc32_input.GetData(), crc32_input.SizeInBytes()) << std::endl;
                 crc_32 = crc32.GetCrc32(crc32_input.GetData(), crc32_input.SizeInBytes());
-                cout << LMSG << "crc32:" << crc_32 << endl;
+                std::cout << LMSG << "crc32:" << crc_32 << std::endl;
                 crc_32 = crc_32 ^ 0x5354554E;
-                cout << LMSG << "crc32:" << crc_32 << endl;
+                std::cout << LMSG << "crc32:" << crc_32 << std::endl;
             }
 
             binding_response.WriteBytes(2, 0x8028);
@@ -610,8 +604,8 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
             binding_response_header.WriteData(transcation_id.size(), (const uint8_t*)transcation_id.data());
             binding_response_header.WriteData(binding_response.SizeInBytes(), binding_response.GetData());
 
-            cout << LMSG << "myself binding_response\n" 
-                 << Util::Bin2Hex(binding_response_header.GetData(), binding_response_header.SizeInBytes()) << endl;
+            std::cout << LMSG << "myself binding_response\n" 
+                 << Util::Bin2Hex(binding_response_header.GetData(), binding_response_header.SizeInBytes()) << std::endl;
 
             GetUdpSocket()->Send(binding_response_header.GetData(), binding_response_header.SizeInBytes());
 
@@ -622,7 +616,7 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
 
     		if (! stun_req.Read(&byte_buffer_read))
     		{   
-    		    cout << LMSG << "invalid stun message" << endl;
+    		    std::cout << LMSG << "invalid stun message" << std::endl;
     		}   
 
     		if (stun_req.type() == STUN_BINDING_REQUEST)
@@ -646,7 +640,7 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
             	ByteBufferWriter byte_buffer_write;
             	stun_rsp.Write(&byte_buffer_write);
 
-                cout << LMSG << "webrtc binding_response\n" << Util::Bin2Hex((const uint8_t*)byte_buffer_write.Data(), byte_buffer_write.Length()) << endl;
+                std::cout << LMSG << "webrtc binding_response\n" << Util::Bin2Hex((const uint8_t*)byte_buffer_write.Data(), byte_buffer_write.Length()) << std::endl;
 
             	GetUdpSocket()->Send((const uint8_t*)byte_buffer_write.Data(), byte_buffer_write.Length());
             }
@@ -655,37 +649,37 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
             if (true)
             //if (! g_webrtc_mgr->IsRemoteUfragExist(remote_ufrag))
             {
-                cout << LMSG << "connect udp socket:" << GetUdpSocket()->GetClientIp() << ":" << GetUdpSocket()->GetClientPort() << endl;
+                std::cout << LMSG << "connect udp socket:" << GetUdpSocket()->GetClientIp() << ":" << GetUdpSocket()->GetClientPort() << std::endl;
                 //g_webrtc_mgr->AddRemoteUfrag(remote_ufrag);
 
-                int fd = CreateNonBlockUdpSocket();
-                ReuseAddr(fd);
-                Bind(fd, "0.0.0.0", 11445);
-                Connect(fd, GetUdpSocket()->GetClientIp(), GetUdpSocket()->GetClientPort());
+                int fd = socket_util::CreateNonBlockUdpSocket();
+                socket_util::ReuseAddr(fd);
+                socket_util::Bind(fd, "0.0.0.0", 11445);
+                socket_util::Connect(fd, GetUdpSocket()->GetClientIp(), GetUdpSocket()->GetClientPort());
 
                 int old_send_buf_size = 0;
                 int old_recv_buf_size = 0;
 
-                int ret = GetSendBufSize(fd, old_send_buf_size);
-                cout << LMSG << "GetSendBufSize fd:" << fd << ",ret:" << ret << ",old_send_buf_size:" << old_send_buf_size << endl;
+                int ret = socket_util::GetSendBufSize(fd, old_send_buf_size);
+                std::cout << LMSG << "GetSendBufSize fd:" << fd << ",ret:" << ret << ",old_send_buf_size:" << old_send_buf_size << std::endl;
 
-                ret = GetRecvBufSize(fd, old_recv_buf_size);
-                cout << LMSG << "GetRecvBufSize fd:" << fd << ",ret:" << ret << ",old_recv_buf_size:" << old_recv_buf_size << endl;
+                ret = socket_util::GetRecvBufSize(fd, old_recv_buf_size);
+                std::cout << LMSG << "GetRecvBufSize fd:" << fd << ",ret:" << ret << ",old_recv_buf_size:" << old_recv_buf_size << std::endl;
 
                 int new_send_buf_size = 1024*1024*10; // 10MB
                 int new_recv_buf_size = 1024*1024*10; // 10MB
 
-                ret = SetSendBufSize(fd, new_send_buf_size, true);
-                cout << LMSG << "SetSendBufSize fd:" << fd << ",ret:" << ret << ",new_send_buf_size:" << new_send_buf_size << endl;
+                ret = socket_util::SetSendBufSize(fd, new_send_buf_size, true);
+                std::cout << LMSG << "SetSendBufSize fd:" << fd << ",ret:" << ret << ",new_send_buf_size:" << new_send_buf_size << std::endl;
 
-                ret = SetRecvBufSize(fd, new_recv_buf_size, true);
-                cout << LMSG << "SetRecvBufSize fd:" << fd << ",ret:" << ret << ",new_recv_buf_size:" << new_recv_buf_size << endl;
+                ret = socket_util::SetRecvBufSize(fd, new_recv_buf_size, true);
+                std::cout << LMSG << "SetRecvBufSize fd:" << fd << ",ret:" << ret << ",new_recv_buf_size:" << new_recv_buf_size << std::endl;
 
-                ret = GetSendBufSize(fd, new_send_buf_size);
-                cout << LMSG << "GetSendBufSize fd:" << fd << ",ret:" << ret << ",new_send_buf_size:" << new_send_buf_size << endl;
+                ret = socket_util::GetSendBufSize(fd, new_send_buf_size);
+                std::cout << LMSG << "GetSendBufSize fd:" << fd << ",ret:" << ret << ",new_send_buf_size:" << new_send_buf_size << std::endl;
 
-                ret = GetRecvBufSize(fd, new_recv_buf_size);
-                cout << LMSG << "GetRecvBufSize fd:" << fd << ",ret:" << ret << ",new_recv_buf_size:" << new_recv_buf_size << endl;
+                ret = socket_util::GetRecvBufSize(fd, new_recv_buf_size);
+                std::cout << LMSG << "GetRecvBufSize fd:" << fd << ",ret:" << ret << ",new_recv_buf_size:" << new_recv_buf_size << std::endl;
 
                 UdpSocket* udp_socket = new UdpSocket(g_epoll, fd, std::bind(&ProtocolFactory::GenWebrtcProtocol, std::placeholders::_1, std::placeholders::_2));
                 udp_socket->SetSrcAddr(GetUdpSocket()->GetSrcAddr());
@@ -718,7 +712,7 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
 
         case 0x0101:
         {
-            cout << LMSG << "Binding Response" << endl;
+            std::cout << LMSG << "Binding Response" << std::endl;
             SendBindingIndication();
         }
         break;
@@ -754,7 +748,7 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
 
 int WebrtcProtocol::OnDtls(const uint8_t* data, const size_t& len)
 {
-    cout << LMSG << "handshake:" << dtls_handshake_done_ << endl;
+    std::cout << LMSG << "handshake:" << dtls_handshake_done_ << std::endl;
 
     if (! dtls_handshake_done_)
     {
@@ -774,7 +768,7 @@ int WebrtcProtocol::OnDtls(const uint8_t* data, const size_t& len)
 
         while (BIO_ctrl_pending(bio_in_) > 0)
         {
-            cout << LMSG << "DTLS Application data" << endl;
+            std::cout << LMSG << "DTLS Application data" << std::endl;
             uint8_t dtls_read_buf[8092];
             int ret = SSL_read(dtls_, dtls_read_buf, sizeof(dtls_read_buf));
 
@@ -800,20 +794,20 @@ int WebrtcProtocol::OnDtls(const uint8_t* data, const size_t& len)
                 uint32_t crc_32_sctp = crc_sctp.GetCrc32(crc_test, ret);
                 uint32_t crc_32_stun = crc_stun.GetCrc32(crc_test, ret);
 
-                cout << "in_sctp:" << unused << ",crc_32_sctp:" << crc_32_sctp << ",crc_32_stun:" << crc_32_stun << endl;
+                std::cout << "in_sctp:" << unused << ",crc_32_sctp:" << crc_32_sctp << ",crc_32_stun:" << crc_32_stun << std::endl;
             }
 
             if (ret > 0) 
             {
-                cout << LMSG << "dtls read " << ret << " bytes" << endl;
-                cout << LMSG << Util::Bin2Hex(dtls_read_buf, ret) << endl;
+                std::cout << LMSG << "dtls read " << ret << " bytes" << std::endl;
+                std::cout << LMSG << Util::Bin2Hex(dtls_read_buf, ret) << std::endl;
 
                 OnSctp(dtls_read_buf, ret);
             }
             else
             {
                 int err = SSL_get_error(dtls_, ret); 
-                cout << LMSG << "dtls read " << ret << ", err:" << err << endl;
+                std::cout << LMSG << "dtls read " << ret << ", err:" << err << std::endl;
             }
         }
     }
@@ -833,14 +827,14 @@ int WebrtcProtocol::OnSctp(const uint8_t* data, const size_t& len)
     bit_buffer.GetBytes(1, sctp_session_.chunk_flag);
     bit_buffer.GetBytes(2, sctp_session_.chunk_length);
 
-    cout << LMSG << "src_port:" << sctp_session_.src_port 
+    std::cout << LMSG << "src_port:" << sctp_session_.src_port 
                  << ",dst_port:" << sctp_session_.dst_port 
                  << ",verification_tag:" << sctp_session_.verification_tag
                  << ",checksum:" << sctp_session_.checksum 
                  << ",chunk_type:" << (int)sctp_session_.chunk_type 
                  << ",chunk_flag:" << (int)sctp_session_.chunk_flag
                  << ",chunk_length:" << sctp_session_.chunk_length 
-                 << endl;
+                 << std::endl;
 
     switch (sctp_session_.chunk_type)
     {
@@ -853,11 +847,11 @@ int WebrtcProtocol::OnSctp(const uint8_t* data, const size_t& len)
             uint32_t payload_protocol_id = 0;
             bit_buffer.GetBytes(4, payload_protocol_id);
 
-            cout << LMSG << "tsn:" << sctp_session_.remote_tsn
+            std::cout << LMSG << "tsn:" << sctp_session_.remote_tsn
                          << ",stream_id_s:" << sctp_session_.stream_id_s
                          << ",stream_seq_num_n:" << sctp_session_.stream_seq_num_n
                          << ",payload_protocol_id:" << payload_protocol_id
-                         << endl;
+                         << std::endl;
 
             // Webrtc DataChannel parse 里层还有一层封装
 
@@ -868,7 +862,7 @@ int WebrtcProtocol::OnSctp(const uint8_t* data, const size_t& len)
                 uint8_t message_type = 0;
                 bit_buffer.GetBytes(1, message_type);
 
-                cout << LMSG << "message_type:" << (int)message_type << endl;
+                std::cout << LMSG << "message_type:" << (int)message_type << std::endl;
 
                 if (message_type == DataChannelMsgType_OPEN)
                 {
@@ -930,7 +924,7 @@ int WebrtcProtocol::OnSctp(const uint8_t* data, const size_t& len)
 
             case DataChannelPPID_STRING:
             {
-                string usr_data = Util::GetNowMsStr();
+                std::string usr_data = Util::GetNowMsStr();
                 SendSctpData((const uint8_t*)usr_data.data(), usr_data.size(), DataChannelPPID_STRING);
             }
             break;
@@ -956,27 +950,27 @@ int WebrtcProtocol::OnSctp(const uint8_t* data, const size_t& len)
             break;
             }
 
-            string user_data = "";
+            std::string user_data = "";
             bit_buffer.GetString(bit_buffer.BytesLeft(), user_data);
-            cout << LMSG << "recv datachannel msg:[\n" << Util::Bin2Hex(user_data) << "\n]" << endl;
+            std::cout << LMSG << "recv datachannel msg:[\n" << Util::Bin2Hex(user_data) << "\n]" << std::endl;
         }
         break;
 
         case SCTP_TYPE_INIT:
         {
-            cout << "SCTP INIT" << endl;
+            std::cout << "SCTP INIT" << std::endl;
             bit_buffer.GetBytes(4, sctp_session_.initiate_tag);
             bit_buffer.GetBytes(4, sctp_session_.a_rwnd);
             bit_buffer.GetBytes(2, sctp_session_.number_of_outbound_streams);
             bit_buffer.GetBytes(2, sctp_session_.number_of_inbound_streams);
             bit_buffer.GetBytes(4, sctp_session_.initial_tsn);
 
-            cout << LMSG << "initiate_tag:" << sctp_session_.initiate_tag
+            std::cout << LMSG << "initiate_tag:" << sctp_session_.initiate_tag
                          << ",a_rwnd:" << sctp_session_.a_rwnd 
                          << ",number_of_outbound_streams:" << sctp_session_.number_of_outbound_streams 
                          << ",number_of_inbound_streams:" << sctp_session_.number_of_inbound_streams 
                          << ",initial_tsn:" << sctp_session_.initial_tsn 
-                         << endl;
+                         << std::endl;
 
             // optional
             while (bit_buffer.BitsLeft() >= 4)
@@ -987,10 +981,10 @@ int WebrtcProtocol::OnSctp(const uint8_t* data, const size_t& len)
                 uint16_t parameter_length = 0;
                 bit_buffer.GetBytes(2, parameter_length);
 
-                string parameter_value;
+                std::string parameter_value;
                 bit_buffer.GetString(parameter_length, parameter_value);
 
-                cout << LMSG << "parameter_type:" << parameter_type << ",parameter_length:" << parameter_length << endl;
+                std::cout << LMSG << "parameter_type:" << parameter_type << ",parameter_length:" << parameter_length << std::endl;
             }
 
             BitStream bs_chunk;
@@ -1088,7 +1082,7 @@ int WebrtcProtocol::OnSctp(const uint8_t* data, const size_t& len)
             uint16_t hb_info_length = 0;
             bit_buffer.GetBytes(2, hb_info_length);
 
-            string hb_info = "";
+            std::string hb_info = "";
             bit_buffer.GetString(bit_buffer.BytesLeft(), hb_info);
 
             BitStream bs_chunk;
@@ -1141,7 +1135,7 @@ int WebrtcProtocol::OnSctp(const uint8_t* data, const size_t& len)
 
         case SCTP_TYPE_COOKIE_ECHO:
         {
-            cout << "SCTP_TYPE_COOKIE_ECHO" << endl;
+            std::cout << "SCTP_TYPE_COOKIE_ECHO" << std::endl;
 
             BitStream bs;
             bs.WriteBytes(2, sctp_session_.dst_port);
@@ -1192,13 +1186,13 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
 {
     if (srtp_recv_ == NULL)
     {
-        cout << LMSG << "srtp_recv_ NULL" << endl;
+        std::cout << LMSG << "srtp_recv_ NULL" << std::endl;
         return kError;
     }
 
     if (! dtls_handshake_done_)
     {
-        cout << LMSG << "dtls_handshake_done_ false" << endl;
+        std::cout << LMSG << "dtls_handshake_done_ false" << std::endl;
         return kError;
     }
 
@@ -1218,11 +1212,11 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
         int ret = srtp_unprotect_rtcp(srtp_recv_, unprotect_buf, &unprotect_buf_len);
         if (ret != 0)
         {
-            cout << LMSG << "srtp_unprotect_rtcp failed, ret:" << ret << endl;
+            std::cout << LMSG << "srtp_unprotect_rtcp failed, ret:" << ret << std::endl;
             return kError;
         }
 
-        cout << LMSG << "Rtcp Peek:\n" << Util::Bin2Hex(unprotect_buf, unprotect_buf_len) << endl;
+        std::cout << LMSG << "Rtcp Peek:\n" << Util::Bin2Hex(unprotect_buf, unprotect_buf_len) << std::endl;
 
         BitBuffer rtcp_bit_buffer(unprotect_buf, unprotect_buf_len);
 
@@ -1246,23 +1240,23 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
             // length也包括头
             length = length * 4;
 
-            cout << LMSG << "[RTCP Header] # version:" << (int)version
+            std::cout << LMSG << "[RTCP Header] # version:" << (int)version
                          << ",padding:" << (int)padding
                          << ",five_bits:" << (int)five_bits
                          << ",payload_type:" << (int)payload_type
                          << ",length:" << length
-                         << endl;
+                         << std::endl;
 
             if (! rtcp_bit_buffer.MoreThanBytes(length))
             {
-                cout << LMSG << "length:" << length << ",rtcp_bit_buffer left:" << rtcp_bit_buffer.BytesLeft() << endl;
+                std::cout << LMSG << "length:" << length << ",rtcp_bit_buffer left:" << rtcp_bit_buffer.BytesLeft() << std::endl;
                 break;
             }
 
-            string one_rtcp_packet = "";
+            std::string one_rtcp_packet = "";
             rtcp_bit_buffer.GetString(length, one_rtcp_packet);
 
-            cout << LMSG << "Rtcp one packet peek\n" << Util::Bin2Hex(one_rtcp_packet) << endl;
+            std::cout << LMSG << "Rtcp one packet peek\n" << Util::Bin2Hex(one_rtcp_packet) << std::endl;
 
             BitBuffer one_rtcp_packet_bit_buffer((const uint8_t*)one_rtcp_packet.data(), one_rtcp_packet.length());
 
@@ -1302,7 +1296,7 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
                     uint32_t delay_since_last_SR = 0;
                     one_rtcp_packet_bit_buffer.GetBytes(4, delay_since_last_SR);
 
-                    cout << LMSG << "[Receiver Report RTCP Packet]"
+                    std::cout << LMSG << "[Receiver Report RTCP Packet]"
                                  << "ssrc:" << ssrc
                                  << ",fraction_lost:" << (int)fraction_lost
                                  << ",cumulative_number_of_packets_lost:" << cumulative_number_of_packets_lost
@@ -1310,7 +1304,7 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
                                  << ",interarrival_jitter:" << interarrival_jitter
                                  << ",last_SR:" << last_SR
                                  << ",delay_since_last_SR:" << delay_since_last_SR
-                                 << endl;
+                                 << std::endl;
                 }
                 break;
 
@@ -1351,8 +1345,8 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
 
                                 uint32_t fix_loss_seq_base = video_seq_ - (video_seq_ % 65536) + packet_id;
 
-                                cout << LMSG << "NACK, packet_id:" << packet_id << ",bitmask_of_following_lost_packets:" << bitmask_of_following_lost_packets
-                                             << ",video_seq_:" << video_seq_ << ", fix_loss_seq_base:" << fix_loss_seq_base << endl;
+                                std::cout << LMSG << "NACK, packet_id:" << packet_id << ",bitmask_of_following_lost_packets:" << bitmask_of_following_lost_packets
+                                             << ",video_seq_:" << video_seq_ << ", fix_loss_seq_base:" << fix_loss_seq_base << std::endl;
 
                                 uint16_t mask = 0x0001;
                                 for (int i = 0; i != sizeof(bitmask_of_following_lost_packets)*8; ++i)
@@ -1377,11 +1371,11 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
 
                                             if (iter == send_map_.end())
                                             {
-                                                cout << LMSG << "NACK can't find loss seq:" << loss_seq << endl;
+                                                std::cout << LMSG << "NACK can't find loss seq:" << loss_seq << std::endl;
                                             }
                                             else
                                             {
-                                                cout << LMSG << "NACK find loss seq:" << loss_seq << " and resend it" << endl;
+                                                std::cout << LMSG << "NACK find loss seq:" << loss_seq << " and resend it" << std::endl;
                                                 GetUdpSocket()->Send((const uint8_t*)iter->second.data(), iter->second.size());
                                             }
                                         }
@@ -1396,11 +1390,11 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
 
                                         if (iter == send_map_.end())
                                         {
-                                            cout << LMSG << "NACK can't find loss seq:" << loss_seq << endl;
+                                            std::cout << LMSG << "NACK can't find loss seq:" << loss_seq << std::endl;
                                         }
                                         else
                                         {
-                                            cout << LMSG << "NACK find loss seq:" << loss_seq << " and resend it" << endl;
+                                            std::cout << LMSG << "NACK find loss seq:" << loss_seq << " and resend it" << std::endl;
                                             GetUdpSocket()->Send((const uint8_t*)iter->second.data(), iter->second.size());
                                         }
                                     }
@@ -1409,7 +1403,7 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
                                 }
                             }
 
-                            cout << LMSG << "NACK left:" << one_rtcp_packet_bit_buffer.BytesLeft() << endl;
+                            std::cout << LMSG << "NACK left:" << one_rtcp_packet_bit_buffer.BytesLeft() << std::endl;
                         }
                         break;
 
@@ -1433,7 +1427,7 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
                     {
                         case 1: /*PLI*/
                         {
-                            cout << LMSG << "PLI" << endl;
+                            std::cout << LMSG << "PLI" << std::endl;
                         }
                         break;
 
@@ -1448,7 +1442,7 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
                             uint8_t picture_id = 0;
                             one_rtcp_packet_bit_buffer.GetBits(6, picture_id);
 
-                            cout << LMSG << "SLI, first:" << first << ", number:" << number << ", picture_id:" << picture_id << endl;
+                            std::cout << LMSG << "SLI, first:" << first << ", number:" << number << ", picture_id:" << picture_id << std::endl;
                         }
                         break;
 
@@ -1472,7 +1466,7 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
         int ret = srtp_unprotect(srtp_recv_, unprotect_buf, &unprotect_buf_len);
         if (ret != 0)
         {
-            cout << LMSG << "srtp_unprotect failed, ret:" << ret << endl;
+            std::cout << LMSG << "srtp_unprotect failed, ret:" << ret << std::endl;
         }
 
         BitBuffer rtp_bit_buffer(unprotect_buf, unprotect_buf_len);
@@ -1510,7 +1504,7 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
             rtp_bit_buffer.GetBytes(4, csrc);
         }
 
-        ostringstream os_extension;
+        std::ostringstream os_extension;
         if (extension)
         {
             uint16_t defined_by_profile = 0;
@@ -1521,7 +1515,7 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
 
             extension_length = extension_length * 4;
 
-            string extension_payload = "";
+            std::string extension_payload = "";
             rtp_bit_buffer.GetString(extension_length, extension_payload);
             
             os_extension << "defined_by_profile:" << defined_by_profile
@@ -1531,7 +1525,7 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
 
         if (sequence_number % 1000 == 0)
         {
-            cout << LMSG << "[RTP Header] # version:" << (int)version
+            std::cout << LMSG << "[RTP Header] # version:" << (int)version
                          << ",padding:" << (int)padding
                          << ",extension:" << (int)extension << " | " << os_extension.str()
                          << ",csrc_count:" << (int)csrc_count
@@ -1540,34 +1534,34 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
                          << ",sequence_number:" << sequence_number
                          << ",timestamp:" << timestamp
                          << ",ssrc:" << ssrc
-                         << endl;
+                         << std::endl;
         }
 
-        //cout << LMSG << "rtp have read bytes:" << rtp_bit_buffer.HaveReadBytes() << endl;
+        //std::cout << LMSG << "rtp have read bytes:" << rtp_bit_buffer.HaveReadBytes() << std::endl;
 
         // 解析
         if (payload_type == (uint8_t)WebRTCPayloadType::VP8)
         {
-            RtpDepacketizer::ParsedPayload parsed_payload;
+            webrtc::RtpDepacketizer::ParsedPayload parsed_payload;
 
             if (! vp8_depacket_.Parse(&parsed_payload, unprotect_buf + rtp_bit_buffer.HaveReadBytes(), unprotect_buf_len - rtp_bit_buffer.HaveReadBytes()))
             {
-                cout << LMSG << "parse vp8 failed" << endl;
+                std::cout << LMSG << "parse vp8 failed" << std::endl;
                 return kError;
             }
 
-            cout << LMSG << "parse vp8 success" << endl;
+            std::cout << LMSG << "parse vp8 success" << std::endl;
         }
         else if (payload_type == (uint8_t)WebRTCPayloadType::VP9)
         {
-            RtpDepacketizer::ParsedPayload parsed_payload;
+            webrtc::RtpDepacketizer::ParsedPayload parsed_payload;
 
             if (! vp9_depacket_.Parse(&parsed_payload, unprotect_buf + rtp_bit_buffer.HaveReadBytes(), unprotect_buf_len - rtp_bit_buffer.HaveReadBytes()))
             {
-                cout << LMSG << "parse vp9 failed" << endl;
+                std::cout << LMSG << "parse vp9 failed" << std::endl;
                 return kError;
             }
-            cout << LMSG                       << "parse vp9 success"
+            std::cout << LMSG                       << "parse vp9 success"
 #if defined(WEBRTC_DEBUG)
                  << ",payload_length:"         << (int64_t)parsed_payload.payload_length
 				 << ",frame_type:"             << (int64_t)parsed_payload.frame_type
@@ -1597,18 +1591,18 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
                  << ",width:"                  << (int64_t)parsed_payload.type.Video.codecHeader.VP9.width[0]
                  << ",height:"                 << (int64_t)parsed_payload.type.Video.codecHeader.VP9.height[0]
 #endif
-                 << endl;
+                 << std::endl;
         }
         else if (payload_type == (uint8_t)WebRTCPayloadType::H264) // H264
         {
-            RtpDepacketizer::ParsedPayload parsed_payload;
+            webrtc::RtpDepacketizer::ParsedPayload parsed_payload;
             if (! h264_depacket_.Parse(&parsed_payload, unprotect_buf + rtp_bit_buffer.HaveReadBytes(), unprotect_buf_len - rtp_bit_buffer.HaveReadBytes()))
             {
-                cout << LMSG << "parse h264 failed" << endl;
+                std::cout << LMSG << "parse h264 failed" << std::endl;
                 return kError;
             }
 
-            cout << LMSG << "parse h264 success.\n"
+            std::cout << LMSG << "parse h264 success.\n"
 #if defined(WEBRTC_DEBUG)
                          << "payload_length:" << parsed_payload.payload_length
                          << ",frame_type:" << parsed_payload.frame_type
@@ -1619,7 +1613,7 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
                          << ",packetization_type:" << parsed_payload.type.Video.codecHeader.H264.packetization_type
                          << ",dump:\n" << Util::Bin2Hex(parsed_payload.payload, parsed_payload.payload_length > 32 ? 32 : parsed_payload.payload_length)
 #endif
-                         << endl;
+                         << std::endl;
         }
         else if (payload_type == (uint8_t)WebRTCPayloadType::OPUS)
         {
@@ -1636,7 +1630,7 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
             if (rtp_header->getExtension())
             {
                 uint32_t extension_length = 4 + rtp_header->getExtLength() * 4;
-                //cout << LMSG << "ext len from rtp header=" << extension_length << endl;
+                //std::cout << LMSG << "ext len from rtp header=" << extension_length << std::endl;
 
                 uint32_t rtp_header_length = rtp_header->getHeaderLength();
                 memcpy(unprotect_buf + extension_length, unprotect_buf, rtp_header_length - extension_length);
@@ -1679,30 +1673,30 @@ int WebrtcProtocol::Handshake()
 
             send_begin_time_ = Util::GetNowMs();
 
-            cout << LMSG << "handshake done" << endl;
+            std::cout << LMSG << "handshake done" << std::endl;
 
 			unsigned char material[SRTP_MASTER_KEY_LEN * 2] = {0};  // client(SRTP_MASTER_KEY_KEY_LEN + SRTP_MASTER_KEY_SALT_LEN) + server
     		char dtls_srtp_lable[] = "EXTRACTOR-dtls_srtp";
     		if (! SSL_export_keying_material(dtls_, material, sizeof(material), dtls_srtp_lable, strlen(dtls_srtp_lable), NULL, 0, 0)) 
     		{   
-    		    cout << LMSG << "SSL_export_keying_material error" << endl;
+    		    std::cout << LMSG << "SSL_export_keying_material error" << std::endl;
     		}   
             else
             {
     		    size_t offset = 0;
 
-    		    string sClientMasterKey(reinterpret_cast<char*>(material), SRTP_MASTER_KEY_KEY_LEN);
+    		    std::string sClientMasterKey(reinterpret_cast<char*>(material), SRTP_MASTER_KEY_KEY_LEN);
     		    offset += SRTP_MASTER_KEY_KEY_LEN;
-    		    string sServerMasterKey(reinterpret_cast<char*>(material + offset), SRTP_MASTER_KEY_KEY_LEN);
+    		    std::string sServerMasterKey(reinterpret_cast<char*>(material + offset), SRTP_MASTER_KEY_KEY_LEN);
     		    offset += SRTP_MASTER_KEY_KEY_LEN;
-    		    string sClientMasterSalt(reinterpret_cast<char*>(material + offset), SRTP_MASTER_KEY_SALT_LEN);
+    		    std::string sClientMasterSalt(reinterpret_cast<char*>(material + offset), SRTP_MASTER_KEY_SALT_LEN);
     		    offset += SRTP_MASTER_KEY_SALT_LEN;
-    		    string sServerMasterSalt(reinterpret_cast<char*>(material + offset), SRTP_MASTER_KEY_SALT_LEN);
+    		    std::string sServerMasterSalt(reinterpret_cast<char*>(material + offset), SRTP_MASTER_KEY_SALT_LEN);
 
     		    client_key_ = sClientMasterKey + sClientMasterSalt;
     		    server_key_ = sServerMasterKey + sServerMasterSalt;
 
-                cout << LMSG << "client_key_:" << client_key_.size() << ",server_key_:" << server_key_.size() << endl;
+                std::cout << LMSG << "client_key_:" << client_key_.size() << ",server_key_:" << server_key_.size() << std::endl;
 
                 srtp_init();
 
@@ -1729,11 +1723,11 @@ int WebrtcProtocol::Handshake()
         			int ret = srtp_create(&srtp_send_, &policy);
         			if (ret != 0)
         			{   
-        			    cout << LMSG << "srtp_create error:" << ret << endl;
+        			    std::cout << LMSG << "srtp_create error:" << ret << std::endl;
         			}   
                     else
                     {
-                        cout << LMSG << "srtp_send init success" << endl;
+                        std::cout << LMSG << "srtp_send init success" << std::endl;
                     }
 
         			delete [] key;
@@ -1761,11 +1755,11 @@ int WebrtcProtocol::Handshake()
         			int ret = srtp_create(&srtp_recv_, &policy);
         			if (ret != 0)
         			{
-        			    cout << LMSG << "srtp_create error:" << ret << endl;
+        			    std::cout << LMSG << "srtp_create error:" << ret << std::endl;
         			}
                     else
                     {
-                        cout << LMSG << "srtp_recv init success" << endl;
+                        std::cout << LMSG << "srtp_recv init success" << std::endl;
                     }
 
         			delete [] key;
@@ -1776,26 +1770,26 @@ int WebrtcProtocol::Handshake()
 
         case SSL_ERROR_WANT_READ:
         {   
-            cout << LMSG << "handshake want read" << endl;
+            std::cout << LMSG << "handshake want read" << std::endl;
         }   
         break;
 
         case SSL_ERROR_WANT_WRITE:
         {   
-            cout << LMSG << "handshake want write" << endl;
+            std::cout << LMSG << "handshake want write" << std::endl;
         }
         break;
 
         default:
         {   
-            cout << LMSG << endl;
+            std::cout << LMSG << std::endl;
         }   
         break;
     }   
 
     if (out_bio_len)
     {   
-        cout << LMSG << "send handshake msg, len:" << out_bio_len << endl;
+        std::cout << LMSG << "send handshake msg, len:" << out_bio_len << std::endl;
         GetUdpSocket()->Send(out_bio_data, out_bio_len);
     }
 
@@ -1806,7 +1800,7 @@ void WebrtcProtocol::SetConnectState()
 {
     if (! dtls_hello_send_)
     {
-        cout << LMSG << "dtls send clienthello" << endl;
+        std::cout << LMSG << "dtls send clienthello" << std::endl;
 
         dtls_hello_send_ = true;
 
@@ -1888,10 +1882,10 @@ int WebrtcProtocol::SendSctpData(const uint8_t* data, const int& len, const int&
 
 int WebrtcProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)
 {
-    cout << LMSG << "datachannel_open_:" << datachannel_open_ << endl;
+    std::cout << LMSG << "datachannel_open_:" << datachannel_open_ << std::endl;
     if (datachannel_open_)
     {
-        string usr_data = "xiaozhihong_" + Util::GetNowMsStr() + ",tsn:" + Util::Num2Str(sctp_session_.local_tsn);
+        std::string usr_data = "xiaozhihong_" + Util::GetNowMsStr() + ",tsn:" + Util::Num2Str(sctp_session_.local_tsn);
         SendSctpData((const uint8_t*)usr_data.data(), usr_data.size(), DataChannelPPID_STRING);
     }
 
@@ -1932,11 +1926,11 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
 
             if (ret == 0)
             {
-                cout << LMSG << "ProtectRtcp success" << endl;
+                std::cout << LMSG << "ProtectRtcp success" << std::endl;
                 GetUdpSocket()->Send(protect_buf, protect_buf_len);
             }
 
-            cout << LMSG << "PLI[" << Util::Bin2Hex(bs_pli.GetData(), bs_pli.SizeInBytes()) << "]" << endl;
+            std::cout << LMSG << "PLI[" << Util::Bin2Hex(bs_pli.GetData(), bs_pli.SizeInBytes()) << "]" << std::endl;
         }
 
         // FIR,当前生效,暂时不发
@@ -1980,7 +1974,7 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
             int ret = ProtectRtcp(buf, len, protect_buf, protect_buf_len);
 
             //GetUdpSocket()->Send(protect_buf, protect_buf_len);
-            //cout << LMSG << "PLI[" << Util::Bin2Hex(buf, len) << "]" << endl;
+            //std::cout << LMSG << "PLI[" << Util::Bin2Hex(buf, len) << "]" << std::endl;
         }
     }
 
@@ -1990,10 +1984,10 @@ int WebrtcProtocol::EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& 
 void WebrtcProtocol::SendBindingRequest()
 {
     uint32_t magic_cookie = 0x2112A442;
-    string transcation_id = Util::GenRandom(12);
+    std::string transcation_id = Util::GenRandom(12);
 
     BitStream binding_request;
-    string username = remote_ufrag_ + ":" + local_ufrag_;
+    std::string username = remote_ufrag_ + ":" + local_ufrag_;
     binding_request.WriteBytes(2, 0x0006); // USERNAME
     binding_request.WriteBytes(2, username.size());
     binding_request.WriteData(username.size(), (const uint8_t*)username.data());
@@ -2019,8 +2013,8 @@ void WebrtcProtocol::SendBindingRequest()
         unsigned int out_len = 0;
         HmacEncode("sha1", (const uint8_t*)remote_pwd_.data(), remote_pwd_.size(), hmac_input.GetData(), hmac_input.SizeInBytes(), hmac, out_len);
 
-        cout << LMSG << "remote_pwd_:" << remote_pwd_ << endl;
-        cout << LMSG << "hamc out_len:" << out_len << endl;
+        std::cout << LMSG << "remote_pwd_:" << remote_pwd_ << std::endl;
+        std::cout << LMSG << "hamc out_len:" << out_len << std::endl;
     }
 
     binding_request.WriteBytes(2, 0x0008);
@@ -2036,11 +2030,11 @@ void WebrtcProtocol::SendBindingRequest()
         crc32_input.WriteData(transcation_id.size(), (const uint8_t*)transcation_id.data());
         crc32_input.WriteData(binding_request.SizeInBytes(), binding_request.GetData());
         CRC32 crc32(CRC32_STUN);
-        cout << LMSG << "my crc32 input:" << Util::Bin2Hex(crc32_input.GetData(), crc32_input.SizeInBytes()) << endl;
+        std::cout << LMSG << "my crc32 input:" << Util::Bin2Hex(crc32_input.GetData(), crc32_input.SizeInBytes()) << std::endl;
         crc_32 = crc32.GetCrc32(crc32_input.GetData(), crc32_input.SizeInBytes());
-        cout << LMSG << "crc32:" << crc_32 << endl;
+        std::cout << LMSG << "crc32:" << crc_32 << std::endl;
         crc_32 = crc_32 ^ 0x5354554E;
-        cout << LMSG << "crc32:" << crc_32 << endl;
+        std::cout << LMSG << "crc32:" << crc_32 << std::endl;
     }
 
     binding_request.WriteBytes(2, 0x8028);
@@ -2054,8 +2048,8 @@ void WebrtcProtocol::SendBindingRequest()
     binding_request_header.WriteData(transcation_id.size(), (const uint8_t*)transcation_id.data());
     binding_request_header.WriteData(binding_request.SizeInBytes(), binding_request.GetData());
 
-    cout << LMSG << "myself send binding_request\n" 
-         << Util::Bin2Hex(binding_request_header.GetData(), binding_request_header.SizeInBytes()) << endl;
+    std::cout << LMSG << "myself send binding_request\n" 
+         << Util::Bin2Hex(binding_request_header.GetData(), binding_request_header.SizeInBytes()) << std::endl;
 
 
     GetUdpSocket()->Send(binding_request_header.GetData(), binding_request_header.SizeInBytes());
@@ -2064,7 +2058,7 @@ void WebrtcProtocol::SendBindingRequest()
 void WebrtcProtocol::SendBindingIndication()
 {
     uint32_t magic_cookie = 0x2112A442;
-    string transcation_id = Util::GenRandom(12);
+    std::string transcation_id = Util::GenRandom(12);
 
     BitStream binding_indication;
 
@@ -2078,8 +2072,8 @@ void WebrtcProtocol::SendBindingIndication()
         unsigned int out_len = 0;
         HmacEncode("sha1", (const uint8_t*)remote_pwd_.data(), remote_pwd_.size(), hmac_input.GetData(), hmac_input.SizeInBytes(), hmac, out_len);
 
-        cout << LMSG << "remote_pwd_:" << remote_pwd_ << endl;
-        cout << LMSG << "hamc out_len:" << out_len << endl;
+        std::cout << LMSG << "remote_pwd_:" << remote_pwd_ << std::endl;
+        std::cout << LMSG << "hamc out_len:" << out_len << std::endl;
     }
 
     binding_indication.WriteBytes(2, 0x0008);
@@ -2095,11 +2089,11 @@ void WebrtcProtocol::SendBindingIndication()
         crc32_input.WriteData(transcation_id.size(), (const uint8_t*)transcation_id.data());
         crc32_input.WriteData(binding_indication.SizeInBytes(), binding_indication.GetData());
         CRC32 crc32(CRC32_STUN);
-        cout << LMSG << "my crc32 input:" << Util::Bin2Hex(crc32_input.GetData(), crc32_input.SizeInBytes()) << endl;
+        std::cout << LMSG << "my crc32 input:" << Util::Bin2Hex(crc32_input.GetData(), crc32_input.SizeInBytes()) << std::endl;
         crc_32 = crc32.GetCrc32(crc32_input.GetData(), crc32_input.SizeInBytes());
-        cout << LMSG << "crc32:" << crc_32 << endl;
+        std::cout << LMSG << "crc32:" << crc_32 << std::endl;
         crc_32 = crc_32 ^ 0x5354554E;
-        cout << LMSG << "crc32:" << crc_32 << endl;
+        std::cout << LMSG << "crc32:" << crc_32 << std::endl;
     }
 
     binding_indication.WriteBytes(2, 0x8028);
@@ -2113,8 +2107,8 @@ void WebrtcProtocol::SendBindingIndication()
     binding_indication_header.WriteData(transcation_id.size(), (const uint8_t*)transcation_id.data());
     binding_indication_header.WriteData(binding_indication.SizeInBytes(), binding_indication.GetData());
 
-    cout << LMSG << "myself send binding_indication\n" 
-         << Util::Bin2Hex(binding_indication_header.GetData(), binding_indication_header.SizeInBytes()) << endl;
+    std::cout << LMSG << "myself send binding_indication\n" 
+         << Util::Bin2Hex(binding_indication_header.GetData(), binding_indication_header.SizeInBytes()) << std::endl;
 
 
     GetUdpSocket()->Send(binding_indication_header.GetData(), binding_indication_header.SizeInBytes());
@@ -2123,9 +2117,9 @@ void WebrtcProtocol::SendBindingIndication()
 // 注意, 要拒绝SEI帧发送,不然chrome只能解码关键帧
 void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_len, const uint32_t& dts)
 {
-	RTPVideoTypeHeader rtp_video_head;
+    webrtc::RTPVideoTypeHeader rtp_video_head;
 
-    RTPVideoHeaderH264& rtp_header_h264 = rtp_video_head.H264;
+    webrtc::RTPVideoHeaderH264& rtp_header_h264 = rtp_video_head.H264;
 
 #if 0
     rtp_header_h264.nalu_type = frame_data[0];
@@ -2143,21 +2137,21 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
     }
 
 #endif
-    webrtc::FrameType frame_type = kVideoFrameDelta;
+    webrtc::FrameType frame_type = webrtc::kVideoFrameDelta;
 
 
     // FIXME:key frame
 
     // 编码后的视频帧打包为RTP
-    RtpPacketizer* rtp_packetizer = RtpPacketizer::Create(kRtpVideoH264, 900, &rtp_video_head, frame_type);
+    webrtc::RtpPacketizer* rtp_packetizer = webrtc::RtpPacketizer::Create(webrtc::kRtpVideoH264, 900, &rtp_video_head, frame_type);
 
-    RTPFragmentationHeader fragment_header;
+    webrtc::RTPFragmentationHeader fragment_header;
     fragment_header.VerifyAndAllocateFragmentationHeader(1);
 
     fragment_header.fragmentationOffset[0] = 0;
     fragment_header.fragmentationLength[0] = frame_len;
 
-    cout << LMSG << "fragment_header.fragmentationVectorSize:" << fragment_header.fragmentationVectorSize << endl;
+    std::cout << LMSG << "fragment_header.fragmentationVectorSize:" << fragment_header.fragmentationVectorSize << std::endl;
     rtp_packetizer->SetPayloadData(frame_data, frame_len, &fragment_header);
 
     bool last_packet = false;
@@ -2168,7 +2162,7 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
         size_t rtp_packet_len = 0;
         if (! rtp_packetizer->NextPacket(rtp_packet, &rtp_packet_len, &last_packet))
         {   
-            cerr << LMSG << "packet rtp error" << endl;
+            std::cout << LMSG << "packet rtp error" << std::endl;
         }   
         else
         {   
@@ -2176,14 +2170,14 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
             {
                 uint8_t debug[1500];
                 memcpy(debug, rtp_packet, rtp_packet_len);
-                RtpDepacketizer::ParsedPayload parsed_payload;
+                webrtc::RtpDepacketizer::ParsedPayload parsed_payload;
                 if (! h264_depacket_.Parse(&parsed_payload, debug, rtp_packet_len))
                 {
-                    cout << LMSG << "parse h264 failed" << endl;
+                    std::cout << LMSG << "parse h264 failed" << std::endl;
                 }
                 else
                 {
-                    cout << LMSG << "payload_length:" << parsed_payload.payload_length
+                    std::cout << LMSG << "payload_length:" << parsed_payload.payload_length
                                  << ",this:" << this
                                  << ",video_seq:" << video_seq_
                                  << ",frame_type:" << parsed_payload.frame_type
@@ -2193,7 +2187,7 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
                                  << ",nalu_type:" << (int)parsed_payload.type.Video.codecHeader.H264.nalu_type
                                  << ",packetization_type:" << parsed_payload.type.Video.codecHeader.H264.packetization_type
                                  << ",dump:\n" << Util::Bin2Hex(parsed_payload.payload, parsed_payload.payload_length > 32 ? 32 : parsed_payload.payload_length)
-                                 << endl;
+                                 << std::endl;
                 }
             }
 
@@ -2214,8 +2208,8 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
 
             if (ret == 0)
             {
-                cout << "ProtectRtp success" << endl;
-                send_map_[video_seq_] = string((const char*)protect_buf, protect_buf_len);
+                std::cout << "ProtectRtp success" << std::endl;
+                send_map_[video_seq_] = std::string((const char*)protect_buf, protect_buf_len);
 
                 if (send_map_.size() >= 5000)
                 {
@@ -2225,7 +2219,7 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
                 //if (video_seq_ % 10000 == 1)
                 if (false)
                 {
-                    cout << LMSG << "NACK TEST, skip " << video_seq_ << endl;
+                    std::cout << LMSG << "NACK TEST, skip " << video_seq_ << std::endl;
                 }
                 else
                 {
@@ -2234,12 +2228,12 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
             }
             else
             {
-                cout << LMSG << "ProtectRtp failed:" << ret << endl;
+                std::cout << LMSG << "ProtectRtp failed:" << ret << std::endl;
             }
 
             ++video_seq_;
 
-            cout << LMSG << "srtp protect_buf_len:" << protect_buf_len << endl;
+            std::cout << LMSG << "srtp protect_buf_len:" << protect_buf_len << std::endl;
         }   
     }   
     while (! last_packet);
@@ -2275,7 +2269,7 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
     }
     else
     {
-        cout << LMSG << "srtp_protect faile:" << ret << endl;
+        std::cout << LMSG << "srtp_protect faile:" << ret << std::endl;
     }
 #endif
 }
@@ -2286,7 +2280,7 @@ bool WebrtcProtocol::CheckCanClose()
 
     if (now_ms - pre_recv_data_time_ms_ >= kWebRtcRecvTimeoutInMs)
     {
-        cout << LMSG << "instance=" << this << ",webrtc timeout" << endl;
+        std::cout << LMSG << "instance=" << this << ",webrtc timeout" << std::endl;
         return true;
     }
 

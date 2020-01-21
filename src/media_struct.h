@@ -3,8 +3,6 @@
 
 #include <string>
 
-using std::string;
-
 struct TsMedia
 {
     TsMedia()
@@ -16,7 +14,7 @@ struct TsMedia
 
     double duration;
     double first_dts;
-    string ts_data;
+    std::string ts_data;
 };
 
 #endif // __MEDIA_STRUCT_H__

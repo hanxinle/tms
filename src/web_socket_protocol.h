@@ -14,8 +14,6 @@ class IoBuffer;
 class Payload;
 class TcpSocket;
 
-using std::string;
-
 class WebSocketProtocol
     : public SocketHandler
 {

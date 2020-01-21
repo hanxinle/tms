@@ -14,10 +14,8 @@
 #include "common_define.h"
 #include "util.h"
 
-const string letter = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const string num = "0123456789";
-
-using namespace std;
+const std::string letter = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const std::string num = "0123456789";
 
 void Util::Daemon()
 {
@@ -31,13 +29,13 @@ void Util::Daemon()
 	// Get maximum number of file descriptors.
 	if (getrlimit(RLIMIT_NOFILE, &rl) < 0)
     {
-        cout << LMSG << "getrlimit error:" << strerror(errno) << endl;
+        std::cout << LMSG << "getrlimit error:" << strerror(errno) << std::endl;
     }
 
 	// Become a session leader to lose controlling TTY.
 	if ((pid = fork()) < 0)
     {
-        cout << LMSG << "fork error:" << strerror(errno) << endl;
+        std::cout << LMSG << "fork error:" << strerror(errno) << std::endl;
         exit(-1);
     }
 	else if (pid != 0) /* parent */
@@ -53,13 +51,13 @@ void Util::Daemon()
 	sa.sa_flags = 0;
 	if (sigaction(SIGHUP, &sa, NULL) < 0)
     {
-        cout << LMSG << "sigaction ignore SIGHUP error:" << strerror(errno) << endl;
+        std::cout << LMSG << "sigaction ignore SIGHUP error:" << strerror(errno) << std::endl;
         exit(-1);
     }
 
 	if ((pid = fork()) < 0)
     {
-        cout << LMSG << "fork error:" << strerror(errno) << endl;
+        std::cout << LMSG << "fork error:" << strerror(errno) << std::endl;
         exit(-1);
     }
 	else if (pid != 0) // parent
@@ -70,7 +68,7 @@ void Util::Daemon()
 	// Change the current working directory to the root so we won’t prevent file systems from being unmounted.
 	if (chdir("/") < 0)
     {
-        cout << LMSG << "chdir error:" << strerror(errno) << endl;
+        std::cout << LMSG << "chdir error:" << strerror(errno) << std::endl;
         exit(-1);
     }
 
@@ -105,15 +103,15 @@ void Util::Daemon()
     */
 }
 
-map<string, string> Util::ParseArgs(int argc, char* argv[])
+std::map<std::string, std::string> Util::ParseArgs(int argc, char* argv[])
 {
-    map<string, string> ret;
+    std::map<std::string, std::string> ret;
     int i = 1;
     while (i < argc && argv[i] != NULL)
     {   
         int index = 0;
-        string opt;
-        string val;
+        std::string opt;
+        std::string val;
         while (argv[i][index] != '\0')
         {   
             if (argv[i][index] == '-')
@@ -161,12 +159,12 @@ map<string, string> Util::ParseArgs(int argc, char* argv[])
     return ret;
 }
 
-string Util::Bin2Hex(const uint8_t* buf, const size_t& len, const size_t& char_per_line, const bool& printf_ascii, const string& prefix)
+std::string Util::Bin2Hex(const uint8_t* buf, const size_t& len, const size_t& char_per_line, const bool& printf_ascii, const std::string& prefix)
 {   
-    string hex; 
-    string ascii = "    ";
+    std::string hex; 
+    std::string ascii = "    ";
         
-    string line = prefix;
+    std::string line = prefix;
     for (size_t index = 0; index < len; ++index)
     {        
         char tmp[64] = {0}; 
@@ -219,7 +217,7 @@ string Util::Bin2Hex(const uint8_t* buf, const size_t& len, const size_t& char_p
     return hex; 
 }   
 
-string Util::Bin2Hex(const string& str, const size_t& char_per_line, const bool& printf_ascii, const string& prefix)
+std::string Util::Bin2Hex(const std::string& str, const size_t& char_per_line, const bool& printf_ascii, const std::string& prefix)
 {   
     return Bin2Hex((const uint8_t*)str.data(), str.length(), char_per_line, printf_ascii, prefix);
 }
@@ -248,7 +246,7 @@ uint64_t Util::GetNowUs()
     return tv.tv_sec * 1000000UL + tv.tv_usec;
 }
 
-string Util::GetNowStr()
+std::string Util::GetNowStr()
 {
     char time_printf[256];
 
@@ -261,13 +259,13 @@ string Util::GetNowStr()
 
     if (ret > 0)
     {
-        return string(time_printf, ret);
+        return std::string(time_printf, ret);
     }
 
     return "";
 }
 
-string Util::GetNowStrHttpFormat()
+std::string Util::GetNowStrHttpFormat()
 {
     char time_printf[256];
 
@@ -280,13 +278,13 @@ string Util::GetNowStrHttpFormat()
 
     if (ret > 0)
     {
-        return string(time_printf, ret);
+        return std::string(time_printf, ret);
     }
 
     return "";
 }
 
-string Util::GetNowMsStr()
+std::string Util::GetNowMsStr()
 {
     char time_printf[256];
 
@@ -305,20 +303,20 @@ string Util::GetNowMsStr()
         time_printf[ret + 3] = '0' + (tv.tv_usec/1000%10);
         time_printf[ret + 4] = '\0';
 
-        return string(time_printf, ret + 4);
+        return std::string(time_printf, ret + 4);
     }
 
     return "";
 }
 
-string Util::ReadFile(const string& file_name)
+std::string Util::ReadFile(const std::string& file_name)
 {
-    string ret = "";
+    std::string ret = "";
 
 	int fd = open(file_name.c_str(), O_RDONLY, 0664);
     if (fd < 0)
     {   
-        cout << LMSG << "open " << file_name << " faild, ret:" << fd << ",error:" << strerror(errno) << endl;
+        std::cout << LMSG << "open " << file_name << " faild, ret:" << fd << ",error:" << strerror(errno) << std::endl;
     }   
     else
     {
@@ -329,7 +327,7 @@ string Util::ReadFile(const string& file_name)
 
             if (bytes < 0)
             {   
-            	cout << LMSG << "open " << file_name << " faild, ret:" << fd << ",error:" << strerror(errno) << endl;
+            	std::cout << LMSG << "open " << file_name << " faild, ret:" << fd << ",error:" << strerror(errno) << std::endl;
                 break;
             }   
             else if (bytes == 0)
@@ -344,22 +342,22 @@ string Util::ReadFile(const string& file_name)
 	return ret;
 }
 
-vector<string> Util::SepStr(const string& input, const string& sep)
+std::vector<std::string> Util::SepStr(const std::string& input, const std::string& sep)
 {
-    vector<string> ret;
+    std::vector<std::string> ret;
 
     size_t pre_pos = 0;
     while (true)
     {
         auto pos = input.find(sep, pre_pos);
 
-        if (pos == string::npos)
+        if (pos == std::string::npos)
         {
             ret.push_back(input.substr(pre_pos));
             break;
         }
 
-        string tmp = input.substr(pre_pos, pos - pre_pos);
+        std::string tmp = input.substr(pre_pos, pos - pre_pos);
 
         if (tmp == sep)
         {
@@ -375,21 +373,21 @@ vector<string> Util::SepStr(const string& input, const string& sep)
     return ret;
 }
 
-void Util::Replace(string& input, const string& from, const string& to) 
+void Util::Replace(std::string& input, const std::string& from, const std::string& to) 
 {
     size_t pos = 0;
     size_t next_pos = 0;
 
-    while ((next_pos = input.find(from, pos)) != string::npos)
+    while ((next_pos = input.find(from, pos)) != std::string::npos)
     {   
         input.replace(next_pos, from.length(), to);
     }   
 }
 
-string Util::GenRandom(const size_t& len)
+std::string Util::GenRandom(const size_t& len)
 {   
-    string ret;
-    random_device random_generate;
+    std::string ret;
+    std::random_device random_generate;
 
     for (size_t index = 0; index != len; ++index)
     {   
@@ -399,10 +397,10 @@ string Util::GenRandom(const size_t& len)
     return ret;
 }
 
-string Util::GenRandomNum(const size_t& len)
+std::string Util::GenRandomNum(const size_t& len)
 {   
-    string ret;
-    random_device random_generate;
+    std::string ret;
+    std::random_device random_generate;
     
     for (size_t index = 0; index != len; ++index)
     {   

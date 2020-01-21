@@ -5,10 +5,6 @@
 #include <string>
 #include <map>
 
-using std::set;
-using std::string;
-using std::map;
-
 class MediaCenterMgr;
 class MediaPublisher;
 class MediaSubscriber;
@@ -19,16 +15,16 @@ public:
     LocalStreamCenter();
     ~LocalStreamCenter();
 
-    MediaPublisher* GetMediaPublisherByAppStream(const string& app, const string& stream);
-    bool IsAppStreamExist(const string& app, const string& stream);
+    MediaPublisher* GetMediaPublisherByAppStream(const std::string& app, const std::string& stream);
+    bool IsAppStreamExist(const std::string& app, const std::string& stream);
 
-    bool RegisterStream(const string& app, const string& stream, MediaPublisher* media_publisher);
-    bool UnRegisterStream(const string& app, const string& stream, MediaPublisher* media_publisher);
+    bool RegisterStream(const std::string& app, const std::string& stream, MediaPublisher* media_publisher);
+    bool UnRegisterStream(const std::string& app, const std::string& stream, MediaPublisher* media_publisher);
 
-    MediaPublisher* _DebugGetRandomMediaPublisher(string& app, string& stream);
+    MediaPublisher* _DebugGetRandomMediaPublisher(std::string& app, std::string& stream);
 
 private:
-	map<string, map<string, MediaPublisher*>> app_stream_publisher_;
+	std::map<std::string, std::map<std::string, MediaPublisher*>> app_stream_publisher_;
 };
 
 #endif // __LOCAL_STREAM_CENTER_H__

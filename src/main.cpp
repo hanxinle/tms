@@ -23,13 +23,9 @@
 
 #include "openssl/ssl.h"
 
-using namespace any;
-using namespace std;
-using namespace socket_util;
-
 static void sighandler(int sig_no)
 {
-    cout << LMSG << "sig:" << sig_no << endl;
+    std::cout << LMSG << "sig:" << sig_no << std::endl;
 	exit(0);
 } 
 
@@ -37,12 +33,12 @@ LocalStreamCenter               g_local_stream_center;
 Epoller*                        g_epoll = NULL;
 SSL_CTX*                        g_tls_ctx = NULL;
 SSL_CTX*                        g_dtls_ctx = NULL;
-string                          g_dtls_fingerprint = "";
-string                          g_local_ice_pwd = "";
-string                          g_local_ice_ufrag = "";
-string                          g_remote_ice_pwd = "";
-string                          g_remote_ice_ufrag = "";
-string                          g_server_ip = "";
+std::string                          g_dtls_fingerprint = "";
+std::string                          g_local_ice_pwd = "";
+std::string                          g_local_ice_ufrag = "";
+std::string                          g_remote_ice_pwd = "";
+std::string                          g_remote_ice_ufrag = "";
+std::string                          g_server_ip = "";
 
 void AvLogCallback(void* ptr, int level, const char* fmt, va_list vl)
 {
@@ -54,12 +50,12 @@ void AvLogCallback(void* ptr, int level, const char* fmt, va_list vl)
 
 int main(int argc, char* argv[])
 {
-	string server_crt = Util::ReadFile("server.crt");
-	string server_key = Util::ReadFile("server.key");
+	std::string server_crt = Util::ReadFile("server.crt");
+	std::string server_key = Util::ReadFile("server.key");
 
     if (server_crt.empty() || server_key.empty())
     {
-        cout << LMSG << "server.crt or server.key incorrect" << endl;
+        std::cout << LMSG << "server.crt or server.key incorrect" << std::endl;
         return -1;
     }
 
@@ -112,27 +108,27 @@ int main(int argc, char* argv[])
 	EVP_PKEY* dtls_private_key = EVP_PKEY_new();
     if (dtls_private_key == NULL)
     {
-        cout << LMSG << "EVP_PKEY_new err" << endl;
+        std::cout << LMSG << "EVP_PKEY_new err" << std::endl;
         return -1;
     }
 
     RSA* rsa = RSA_new();
     if (rsa == NULL)
     {
-        cout << LMSG << "RSA_new err" << endl;
+        std::cout << LMSG << "RSA_new err" << std::endl;
         return -1;
     }
 
     BIGNUM* exponent = BN_new();
     if (exponent == NULL)
     {
-        cout << LMSG << "BN_new err" << endl;
+        std::cout << LMSG << "BN_new err" << std::endl;
         return -1;
     }
 
     BN_set_word(exponent, RSA_F4);
 
-	const string& aor = "www.john.com";
+	const std::string& aor = "www.john.com";
 	int expire_day = 365;
 	int private_key_len = 1024;
 
@@ -141,20 +137,20 @@ int main(int argc, char* argv[])
     ret = EVP_PKEY_set1_RSA(dtls_private_key, rsa);
     if (ret != 1)
     {
-        cout << LMSG << "EVP_PKEY_set1_RSA err:" << ret << endl;
+        std::cout << LMSG << "EVP_PKEY_set1_RSA err:" << ret << std::endl;
     }
 
     X509* dtls_cert = X509_new();
     if (dtls_cert == NULL)
     {
-        cout << LMSG << "X509_new err" << endl;
+        std::cout << LMSG << "X509_new err" << std::endl;
         return -1;
     }
 
     X509_NAME* subject = X509_NAME_new();
     if (subject == NULL)
     {
-        cout << LMSG << "X509_NAME_new err" << endl;
+        std::cout << LMSG << "X509_NAME_new err" << std::endl;
         return -1;
     }
 
@@ -174,13 +170,13 @@ int main(int argc, char* argv[])
     ret = X509_set_pubkey(dtls_cert, dtls_private_key);
     if (ret != 1)
     {
-        cout << LMSG << "X509_set_pubkey err:" << ret << endl;
+        std::cout << LMSG << "X509_set_pubkey err:" << ret << std::endl;
     }
 
     ret = X509_sign(dtls_cert, dtls_private_key, EVP_sha1());
     if (ret == 0)
     {
-        cout << LMSG << "X509_sign err:" << ret << endl;
+        std::cout << LMSG << "X509_sign err:" << ret << std::endl;
     }
 
     // free
@@ -192,25 +188,25 @@ int main(int argc, char* argv[])
 	ret = SSL_CTX_use_certificate(g_dtls_ctx, dtls_cert);
     if (ret != 1)
     {   
-        cout << LMSG << "|SSL_CTX_use_certificate error:" << ret << endl; 
+        std::cout << LMSG << "|SSL_CTX_use_certificate error:" << ret << std::endl; 
     }   
 
     ret = SSL_CTX_use_PrivateKey(g_dtls_ctx, dtls_private_key);
     if (ret != 1)
     {   
-        cout << LMSG << "|SSL_CTX_use_PrivateKey error:" << ret << endl; 
+        std::cout << LMSG << "|SSL_CTX_use_PrivateKey error:" << ret << std::endl; 
     }   
 
     ret = SSL_CTX_set_cipher_list(g_dtls_ctx, "ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH");
     if (ret != 1)
     {   
-        cout << LMSG << "|SSL_CTX_set_cipher_list error:" << ret << endl; 
+        std::cout << LMSG << "|SSL_CTX_set_cipher_list error:" << ret << std::endl; 
     }   
 
     ret = SSL_CTX_set_tlsext_use_srtp(g_dtls_ctx, "SRTP_AES128_CM_SHA1_80");
     if (ret != 0)
     {   
-        cout << LMSG << "|SSL_CTX_set_tlsext_use_srtp error:" << ret << endl; 
+        std::cout << LMSG << "|SSL_CTX_set_tlsext_use_srtp error:" << ret << std::endl; 
     }   
 
     SSL_CTX_set_verify_depth (g_dtls_ctx, 4); 
@@ -244,10 +240,10 @@ int main(int argc, char* argv[])
 
     g_dtls_fingerprint.assign(fp, strlen(fp));
 
-    cout << "DTLS fingerprint[" << g_dtls_fingerprint << "]" << endl;
+    std::cout << "DTLS fingerprint[" << g_dtls_fingerprint << "]" << std::endl;
 
     // parse args
-    map<string, string> args_map = Util::ParseArgs(argc, argv);
+    std::map<std::string, std::string> args_map = Util::ParseArgs(argc, argv);
 
     uint16_t rtmp_port              = 1935;
     uint16_t https_file_port        = 8643;
@@ -269,7 +265,7 @@ int main(int argc, char* argv[])
 
     if (iter_server_ip == args_map.end())
     {
-        cout << "Usage:" << argv[0] << " -server_ip <xxx.xxx.xxx.xxx> -http_flv_port [xxx] -http_hls_port [xxx] -daemon [xxx]" << endl;
+        std::cout << "Usage:" << argv[0] << " -server_ip <xxx.xxx.xxx.xxx> -http_flv_port [xxx] -http_hls_port [xxx] -daemon [xxx]" << std::endl;
         return 0;
     }
 
@@ -316,7 +312,7 @@ int main(int argc, char* argv[])
 
     Log::SetLogLevel(kLevelDebug);
 
-    DEBUG << argv[0] << " starting..." << endl;
+    DEBUG << argv[0] << " starting..." << std::endl;
 
     Epoller epoller;
     epoller.Create();
@@ -327,119 +323,119 @@ int main(int argc, char* argv[])
     TimerInMillSecond timer_in_millsecond(&epoller);
 
     // === Init Server Rtmp Socket ===
-    int server_rtmp_fd = CreateNonBlockTcpSocket();
+    int server_rtmp_fd = socket_util::CreateNonBlockTcpSocket();
 
-    ReuseAddr(server_rtmp_fd);
-    Bind(server_rtmp_fd, "0.0.0.0", rtmp_port);
-    Listen(server_rtmp_fd);
-    SetNonBlock(server_rtmp_fd);
+    socket_util::ReuseAddr(server_rtmp_fd);
+    socket_util::Bind(server_rtmp_fd, "0.0.0.0", rtmp_port);
+    socket_util::Listen(server_rtmp_fd);
+    socket_util::SetNonBlock(server_rtmp_fd);
 
     TcpSocket server_rtmp_socket(&epoller, server_rtmp_fd, std::bind(&ProtocolFactory::GenRtmpProtocol, std::placeholders::_1, std::placeholders::_2));
     server_rtmp_socket.EnableRead();
     server_rtmp_socket.AsServerSocket();
 
     // === Init Server Http Flv Socket ===
-    int server_http_flv_fd = CreateNonBlockTcpSocket();
+    int server_http_flv_fd = socket_util::CreateNonBlockTcpSocket();
 
-    ReuseAddr(server_http_flv_fd);
-    Bind(server_http_flv_fd, "0.0.0.0", http_flv_port);
-    Listen(server_http_flv_fd);
-    SetNonBlock(server_http_flv_fd);
+    socket_util::ReuseAddr(server_http_flv_fd);
+    socket_util::Bind(server_http_flv_fd, "0.0.0.0", http_flv_port);
+    socket_util::Listen(server_http_flv_fd);
+    socket_util::SetNonBlock(server_http_flv_fd);
 
     TcpSocket server_http_flv_socket(&epoller, server_http_flv_fd, std::bind(&ProtocolFactory::GenHttpFlvProtocol, std::placeholders::_1, std::placeholders::_2));
     server_http_flv_socket.EnableRead();
     server_http_flv_socket.AsServerSocket();
 
     // === Init Server Https Flv Socket ===
-    int server_https_flv_fd = CreateNonBlockTcpSocket();
+    int server_https_flv_fd = socket_util::CreateNonBlockTcpSocket();
 
-    ReuseAddr(server_https_flv_fd);
-    Bind(server_https_flv_fd, "0.0.0.0", https_flv_port);
-    Listen(server_https_flv_fd);
-    SetNonBlock(server_https_flv_fd);
+    socket_util::ReuseAddr(server_https_flv_fd);
+    socket_util::Bind(server_https_flv_fd, "0.0.0.0", https_flv_port);
+    socket_util::Listen(server_https_flv_fd);
+    socket_util::SetNonBlock(server_https_flv_fd);
 
     SslSocket server_https_flv_socket(&epoller, server_https_flv_fd, std::bind(&ProtocolFactory::GenHttpFlvProtocol, std::placeholders::_1, std::placeholders::_2));
     server_https_flv_socket.EnableRead();
     server_https_flv_socket.AsServerSocket();
 
     // === Init Server Http Hls Socket ===
-    int server_http_hls_fd = CreateNonBlockTcpSocket();
+    int server_http_hls_fd = socket_util::CreateNonBlockTcpSocket();
 
-    ReuseAddr(server_http_hls_fd);
-    Bind(server_http_hls_fd, "0.0.0.0", http_hls_port);
-    Listen(server_http_hls_fd);
-    SetNonBlock(server_http_hls_fd);
+    socket_util::ReuseAddr(server_http_hls_fd);
+    socket_util::Bind(server_http_hls_fd, "0.0.0.0", http_hls_port);
+    socket_util::Listen(server_http_hls_fd);
+    socket_util::SetNonBlock(server_http_hls_fd);
 
     TcpSocket server_http_hls_socket(&epoller, server_http_hls_fd, std::bind(&ProtocolFactory::GenHttpHlsProtocol, std::placeholders::_1, std::placeholders::_2));
     server_http_hls_socket.EnableRead();
     server_http_hls_socket.AsServerSocket();
 
     // === Init Server Https Hls Socket ===
-    int server_https_hls_fd = CreateNonBlockTcpSocket();
+    int server_https_hls_fd = socket_util::CreateNonBlockTcpSocket();
 
-    ReuseAddr(server_https_hls_fd);
-    Bind(server_https_hls_fd, "0.0.0.0", https_hls_port);
-    Listen(server_https_hls_fd);
-    SetNonBlock(server_https_hls_fd);
+    socket_util::ReuseAddr(server_https_hls_fd);
+    socket_util::Bind(server_https_hls_fd, "0.0.0.0", https_hls_port);
+    socket_util::Listen(server_https_hls_fd);
+    socket_util::SetNonBlock(server_https_hls_fd);
 
     SslSocket server_https_hls_socket(&epoller, server_https_hls_fd, std::bind(&ProtocolFactory::GenHttpHlsProtocol, std::placeholders::_1, std::placeholders::_2));
     server_https_hls_socket.EnableRead();
     server_https_hls_socket.AsServerSocket();
 
     // === Init WebSocket Socket ===
-    int web_socket_fd = CreateNonBlockTcpSocket();
+    int web_socket_fd = socket_util::CreateNonBlockTcpSocket();
 
-    ReuseAddr(web_socket_fd);
-    Bind(web_socket_fd, "0.0.0.0", web_socket_port);
-    Listen(web_socket_fd);
-    SetNonBlock(web_socket_fd);
+    socket_util::ReuseAddr(web_socket_fd);
+    socket_util::Bind(web_socket_fd, "0.0.0.0", web_socket_port);
+    socket_util::Listen(web_socket_fd);
+    socket_util::SetNonBlock(web_socket_fd);
 
     TcpSocket web_socket_socket(&epoller, web_socket_fd, std::bind(&ProtocolFactory::GenWebSocketProtocol, std::placeholders::_1, std::placeholders::_2));
     web_socket_socket.EnableRead();
     web_socket_socket.AsServerSocket();
 
     // === Init SSL WebSocket Socket ===
-    int ssl_web_socket_fd = CreateNonBlockTcpSocket();
+    int ssl_web_socket_fd = socket_util::CreateNonBlockTcpSocket();
 
-    ReuseAddr(ssl_web_socket_fd);
-    Bind(ssl_web_socket_fd, "0.0.0.0", ssl_web_socket_port);
-    Listen(ssl_web_socket_fd);
-    SetNonBlock(ssl_web_socket_fd);
+    socket_util::ReuseAddr(ssl_web_socket_fd);
+    socket_util::Bind(ssl_web_socket_fd, "0.0.0.0", ssl_web_socket_port);
+    socket_util::Listen(ssl_web_socket_fd);
+    socket_util::SetNonBlock(ssl_web_socket_fd);
 
     SslSocket ssl_web_socket_socket(&epoller, ssl_web_socket_fd, std::bind(&ProtocolFactory::GenWebSocketProtocol, std::placeholders::_1, std::placeholders::_2));
     ssl_web_socket_socket.EnableRead();
     ssl_web_socket_socket.AsServerSocket();
 
     // === Init Server Http File Socket ===
-    int server_https_file_fd = CreateNonBlockTcpSocket();
+    int server_https_file_fd = socket_util::CreateNonBlockTcpSocket();
 
-    ReuseAddr(server_https_file_fd);
-    Bind(server_https_file_fd, "0.0.0.0", https_file_port);
-    Listen(server_https_file_fd);
-    SetNonBlock(server_https_file_fd);
+    socket_util::ReuseAddr(server_https_file_fd);
+    socket_util::Bind(server_https_file_fd, "0.0.0.0", https_file_port);
+    socket_util::Listen(server_https_file_fd);
+    socket_util::SetNonBlock(server_https_file_fd);
 
     SslSocket server_https_file_socket(&epoller, server_https_file_fd, std::bind(&ProtocolFactory::GenHttpFileProtocol, std::placeholders::_1, std::placeholders::_2));
     server_https_file_socket.EnableRead();
     server_https_file_socket.AsServerSocket();
 
     // === Init Server Http File Socket ===
-    int server_http_file_fd = CreateNonBlockTcpSocket();
+    int server_http_file_fd = socket_util::CreateNonBlockTcpSocket();
 
-    ReuseAddr(server_http_file_fd);
-    Bind(server_http_file_fd, "0.0.0.0", http_file_port);
-    Listen(server_http_file_fd);
-    SetNonBlock(server_http_file_fd);
+    socket_util::ReuseAddr(server_http_file_fd);
+    socket_util::Bind(server_http_file_fd, "0.0.0.0", http_file_port);
+    socket_util::Listen(server_http_file_fd);
+    socket_util::SetNonBlock(server_http_file_fd);
 
     TcpSocket server_http_file_socket(&epoller, server_http_file_fd, std::bind(&ProtocolFactory::GenHttpFileProtocol, std::placeholders::_1, std::placeholders::_2));
     server_http_file_socket.EnableRead();
     server_http_file_socket.AsServerSocket();
 
     // === Init WebRTC Socket ===
-    int webrtc_fd = CreateNonBlockUdpSocket();
+    int webrtc_fd = socket_util::CreateNonBlockUdpSocket();
 
-    ReuseAddr(webrtc_fd);
-    Bind(webrtc_fd, "0.0.0.0", webrtc_port);
-    SetNonBlock(webrtc_fd);
+    socket_util::ReuseAddr(webrtc_fd);
+    socket_util::Bind(webrtc_fd, "0.0.0.0", webrtc_port);
+    socket_util::SetNonBlock(webrtc_fd);
 
     UdpSocket server_webrtc_socket(&epoller, webrtc_fd, std::bind(&ProtocolFactory::GenWebrtcProtocol, std::placeholders::_1, std::placeholders::_2));
     server_webrtc_socket.EnableRead();

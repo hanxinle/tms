@@ -19,8 +19,6 @@ class ServerMgr;
 class RtmpMgr;
 class TcpSocket;
 
-using std::string;
-
 class HttpHlsProtocol 
     : public MediaSubscriber
     , public SocketHandler
@@ -52,10 +50,10 @@ private:
     Fd* socket_;
     MediaPublisher* media_publisher_;
 
-    string app_;
-    string stream_;
-    string ts_;
-    string type_;
+    std::string app_;
+    std::string stream_;
+    std::string ts_;
+    std::string type_;
 };
 
 #endif // __HTTP_HLS_PROTOCOL_H__

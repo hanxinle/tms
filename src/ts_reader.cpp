@@ -9,8 +9,6 @@
 #include "ts_reader.h"
 #include "util.h"
 
-using namespace std;
-
 const int kTsSegmentFixedSize = 188;
 const uint8_t kTsHeaderSyncByte = 0x47;
 
@@ -71,13 +69,13 @@ bool IsStreamIdAudio(const uint8_t& stream_id)
 
 const uint8_t kStartCode[] = {0x00, 0x00, 0x00, 0x01};
 
-static map<int, int> kSampingFrequency =
+static std::map<int, int> kSampingFrequency =
 {
     {0, 96000}, {1, 88200}, {2, 64000}, {3,  48000}, {4, 44100}, {5,  32000}, {6, 24000},
     {7, 22050}, {8, 16000}, {9, 12000}, {10, 11025}, {11, 8000}, {12, 7350}
 };
 
-static map<int, int> kChannelConfigurations = 
+static std::map<int, int> kChannelConfigurations = 
 {
     {0, 0}, {1, 1}, {2, 2}, {3, 3}, {4, 4}, {5, 5}, {6, 6}, {7, 8}
 };
@@ -132,7 +130,7 @@ int TsReader::ParseTs(const uint8_t* data, const int& len)
 {
     if (len % kTsSegmentFixedSize != 0)
     {
-        cout << LMSG << "ts len=" << len << ", invalid" << endl;
+        std::cout << LMSG << "ts len=" << len << ", invalid" << std::endl;
         return -1;
     }
 
@@ -159,7 +157,7 @@ int TsReader::ParseTsSegment(const uint8_t* data, const int& len)
         return -1;
     }
 
-    ostringstream os;
+    std::ostringstream os;
     BitBuffer bit_buffer(data, len);
 
     uint8_t sync_byte = 0;
@@ -205,7 +203,7 @@ int TsReader::ParseTsSegment(const uint8_t* data, const int& len)
         ParseAdaptation(bit_buffer);
     }
 
-    cout << LMSG << os.str() << endl;
+    std::cout << LMSG << os.str() << std::endl;
 
     if (pid == 0x0000)
     {
@@ -237,7 +235,7 @@ int TsReader::ParseTsSegment(const uint8_t* data, const int& len)
 
 int TsReader::ParseAdaptation(BitBuffer& bit_buffer)
 {
-    ostringstream os;
+    std::ostringstream os;
 
     uint8_t adaptation_field_length = 0;
     bit_buffer.GetBits(8, adaptation_field_length);
@@ -391,14 +389,14 @@ int TsReader::ParseAdaptation(BitBuffer& bit_buffer)
         assert(stuffing_byte == 0xFF);
     }
 
-    cout << LMSG << os.str() << endl;
+    std::cout << LMSG << os.str() << std::endl;
 
     return 0;
 }
 
 int TsReader::ParsePAT(BitBuffer& bit_buffer)
 {
-    ostringstream os;
+    std::ostringstream os;
 
     uint8_t table_id;
     bit_buffer.GetBits(8, table_id);
@@ -462,14 +460,14 @@ int TsReader::ParsePAT(BitBuffer& bit_buffer)
     uint32_t CRC_32;
     bit_buffer.GetBits(32, CRC_32);
 
-    cout << LMSG << os.str() << endl;
+    std::cout << LMSG << os.str() << std::endl;
 
     return 0;
 }
 
 int TsReader::ParsePMT(BitBuffer& bit_buffer)
 {
-    ostringstream os;
+    std::ostringstream os;
 
 	uint8_t table_id = 0;
     bit_buffer.GetBits(8, table_id);
@@ -574,7 +572,7 @@ int TsReader::ParsePMT(BitBuffer& bit_buffer)
 
     os << ",CRC_32=" << CRC_32;
 
-    cout << LMSG << os.str() << endl;
+    std::cout << LMSG << os.str() << std::endl;
 
     return 0;
 }
@@ -586,7 +584,7 @@ int TsReader::ParsePES(std::string& pes)
         return 0;
     }
 
-    ostringstream os;
+    std::ostringstream os;
 
     BitBuffer bit_buffer((const uint8_t*)pes.data(), pes.size());
 
@@ -948,14 +946,14 @@ int TsReader::ParsePES(std::string& pes)
 
     pes.clear();
 
-    cout << LMSG << os.str() << endl;
+    std::cout << LMSG << os.str() << std::endl;
 
     return 0;
 }
 
 int TsReader::PackHead(BitBuffer& bit_buffer)
 {
-    cout << LMSG << endl;
+    std::cout << LMSG << std::endl;
 
 	uint32_t pack_start_code;
     bit_buffer.GetBits(32, pack_start_code);
@@ -1015,7 +1013,7 @@ int TsReader::PackHead(BitBuffer& bit_buffer)
 
 int TsReader::SystemHeader(BitBuffer& bit_buffer) 
 {
-    cout << LMSG << endl;
+    std::cout << LMSG << std::endl;
 
     uint32_t system_header_start_code;
     bit_buffer.GetBits(32, system_header_start_code);
@@ -1100,11 +1098,11 @@ void TsReader::OnVideo(BitBuffer& bit_buffer, const uint32_t& pts, const uint32_
     uint32_t len = bit_buffer.BytesLeft();
     size_t i = 0;
 
-    cout << "video size=" << bit_buffer.BytesLeft() << ",video frame=\n" 
+    std::cout << "video size=" << bit_buffer.BytesLeft() << ",video frame=\n" 
          << Util::Bin2Hex(bit_buffer.CurData(), bit_buffer.BytesLeft() > 256 ? 256 : bit_buffer.BytesLeft()) 
-         << endl;
+         << std::endl;
 
-    vector<pair<const uint8_t*, int>> nals;
+    std::vector<std::pair<const uint8_t*, int>> nals;
 
 	if (p[i] == 0x00 && p[i+1] == 0x00 && p[i+2] == 0x00 && p[i+3] == 0x01)
     {   
@@ -1119,7 +1117,7 @@ void TsReader::OnVideo(BitBuffer& bit_buffer, const uint32_t& pts, const uint32_
 
             if (nal != NULL)
             {   
-                nals.push_back(make_pair(nal, p + i - nal - 1));
+                nals.push_back(std::make_pair(nal, p + i - nal - 1));
             }   
 
             i += 3;
@@ -1128,21 +1126,21 @@ void TsReader::OnVideo(BitBuffer& bit_buffer, const uint32_t& pts, const uint32_
 
         if (nal != NULL)
         {   
-            nals.push_back(make_pair(nal, p + len - nal));
+            nals.push_back(std::make_pair(nal, p + len - nal));
         }   
 
-        string header = "";
+        std::string header = "";
         for (const auto& kv :nals)
         {
             const uint8_t* nal = kv.first;
             int len = kv.second;
             if (nal != NULL)
             {   
-                cout << "len=" << len << ", nal=\n" << Util::Bin2Hex(nal, len > 128 ? 128 : len) << endl;
+                std::cout << "len=" << len << ", nal=\n" << Util::Bin2Hex(nal, len > 128 ? 128 : len) << std::endl;
                 uint8_t nal_ref_idc = nal[0] >> 5;
                 uint8_t nal_type = nal[0] & 0x1F;
 
-                cout << LMSG << "nal_ref_idc:" << (int)nal_ref_idc << ", nal_type:" << (int) nal_type << endl;
+                std::cout << LMSG << "nal_ref_idc:" << (int)nal_ref_idc << ", nal_type:" << (int) nal_type << std::endl;
                 bool dispatch = true;
 
                 uint8_t* nal_ref = (uint8_t*)malloc(len + 4);
@@ -1204,7 +1202,7 @@ void TsReader::OnVideo(BitBuffer& bit_buffer, const uint32_t& pts, const uint32_
                 }
                 else
                 {
-                    cout << LMSG << "no dispatch nal_ref_idc:" << (int)nal_ref_idc << ", nal_type:" << (int) nal_type << endl;
+                    std::cout << LMSG << "no dispatch nal_ref_idc:" << (int)nal_ref_idc << ", nal_type:" << (int) nal_type << std::endl;
                 }
             }   
         }
@@ -1218,7 +1216,7 @@ void TsReader::OnAudio(BitBuffer& bit_buffer, const uint32_t& pts)
 
     while (bit_buffer.BytesLeft() >= 7)
     {
-        ostringstream os;
+        std::ostringstream os;
 
         // adts to audio special config
         const uint8_t* p = bit_buffer.CurData();
@@ -1286,7 +1284,7 @@ void TsReader::OnAudio(BitBuffer& bit_buffer, const uint32_t& pts)
             os << ",crc=" << crc;
         }
 
-        cout << LMSG << os.str() << endl;
+        std::cout << LMSG << os.str() << std::endl;
 
     	audio_header_ref[0] = (profile << 3) | (sampling_frequency_index >> 1); 
     	audio_header_ref[1] = ((sampling_frequency_index & 0x01) << 7) | (channel_configuration << 3); 
@@ -1300,10 +1298,10 @@ void TsReader::OnAudio(BitBuffer& bit_buffer, const uint32_t& pts)
 
         int len = aac_frame_length - ((protection_absent == 1) ? 7 : 9);
 
-        cout << LMSG << "aac_frame_length=" << aac_frame_length << ", len=" << len << endl;
+        std::cout << LMSG << "aac_frame_length=" << aac_frame_length << ", len=" << len << std::endl;
         if (len > (int)bit_buffer.BytesLeft())
         {
-            cout << LMSG << "no more than " << len << " bytes left, left " << bit_buffer.BytesLeft() << endl;
+            std::cout << LMSG << "no more than " << len << " bytes left, left " << bit_buffer.BytesLeft() << std::endl;
             break;
         }
         uint8_t* audio_ref = (uint8_t*)malloc(len + 2);

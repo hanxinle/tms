@@ -5,10 +5,6 @@
 #include <string>
 #include <vector>
 
-using std::map;
-using std::string;
-using std::vector;
-
 namespace any
 {
 
@@ -19,7 +15,7 @@ const uint8_t kVector = 3;
 const uint8_t kMap    = 4;
 const uint8_t kNull   = 5;
 
-static string AnyTypeToStr(const uint8_t& type)
+static std::string AnyTypeToStr(const uint8_t& type)
 {
     switch (type)
     {
@@ -43,8 +39,7 @@ class Any
 {
 public:
     explicit Any(const uint8_t& type)
-        :
-        type_(type)
+        : type_(type)
     {
     }
     
@@ -52,7 +47,7 @@ public:
     {
     }
 
-    string TypeStr()
+    std::string TypeStr()
     {
         return AnyTypeToStr(type_);
     }
@@ -106,12 +101,12 @@ public:
 
     bool GetInt(int64_t& val);
     bool GetDouble(double& val);
-    bool GetString(string& val);
-    bool GetVector(vector<Any*>& val);
-    bool GetMap(map<string, Any*>& val);
+    bool GetString(std::string& val);
+    bool GetVector(std::vector<Any*>& val);
+    bool GetMap(std::map<std::string, Any*>& val);
 
     Any* operator[](const size_t& index);
-    Any* operator[](const string& key);
+    Any* operator[](const std::string& key);
 
 private:
     uint8_t type_;
@@ -122,9 +117,8 @@ class Int : public Any
     friend class Any;
 public:
     Int(const int64_t i)
-        :
-        Any(kInt),
-        val_(i)
+        : Any(kInt)
+        , val_(i)
     {
     }
 
@@ -142,9 +136,8 @@ class Double : public Any
     friend class Any;
 public:
     Double(const double& d)
-        :
-        Any(kDouble),
-        val_(d)
+        : Any(kDouble)
+        , val_(d)
     {
     }
 
@@ -161,31 +154,29 @@ class String : public Any
 {
     friend class Any;
 public:
-    String(const string& str)
-        :
-        Any(kString),
-        val_(str)
+    String(const std::string& str)
+        : Any(kString)
+        , val_(str)
     {
     }
 
-    string GetVal()
+    std::string GetVal()
     {
         return val_;
     }
 
 private:
-    string val_;
+    std::string val_;
 };
 
 class Vector : public Any
 {
     friend class Any;
 public:
-    Vector(const vector<Any*>& v, const bool& delete_when_destruct = false)
-        :
-        Any(kVector),
-        val_(v),
-        delete_when_destruct_(delete_when_destruct)
+    Vector(const std::vector<Any*>& v, const bool& delete_when_destruct = false)
+        : Any(kVector)
+        , val_(v)
+        , delete_when_destruct_(delete_when_destruct)
     {
     }
 
@@ -210,13 +201,13 @@ public:
         return val_[index];
     }
 
-    vector<Any*> GetVal()
+    std::vector<Any*> GetVal()
     {
         return val_;
     }
 
 private:
-    vector<Any*> val_;
+    std::vector<Any*> val_;
     bool delete_when_destruct_;
 };
 
@@ -224,18 +215,16 @@ class Map : public Any
 {
     friend class Any;
 public:
-    Map(const map<string, Any*>& m, const bool& delete_when_destruct = false)
-        :
-        Any(kMap),
-        val_(m),
-        delete_when_destruct_(delete_when_destruct)
+    Map(const std::map<std::string, Any*>& m, const bool& delete_when_destruct = false)
+        : Any(kMap)
+        , val_(m)
+        , delete_when_destruct_(delete_when_destruct)
     {
     }
 
     Map(const bool& delete_when_destruct = false)
-        :
-        Any(kMap),
-        delete_when_destruct_(delete_when_destruct)
+        : Any(kMap)
+        , delete_when_destruct_(delete_when_destruct)
     {
     }
 
@@ -250,7 +239,7 @@ public:
         }
     }
 
-    Any* operator[](const string& key)
+    Any* operator[](const std::string& key)
     {
         if (! val_.count(key))
         {
@@ -260,18 +249,18 @@ public:
         return val_[key];
     }
 
-    bool Insert(const string& key, Any* val)
+    bool Insert(const std::string& key, Any* val)
     {
         return (val_.insert(make_pair(key, val))).second;
     }
 
-    map<string, Any*> GetVal()
+    std::map<std::string, Any*> GetVal()
     {
         return val_;
     }
 
 private:
-    map<string, Any*> val_;
+    std::map<std::string, Any*> val_;
     bool delete_when_destruct_;
 };
 
@@ -280,8 +269,7 @@ class Null : public Any
     friend class Any;
 public:
     Null()
-        :
-        Any(kNull)
+        : Any(kNull)
     {
     }
 };

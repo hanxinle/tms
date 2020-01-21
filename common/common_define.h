@@ -103,8 +103,8 @@ enum WebSocketProtocolDefine
 //#define VERBOSE Log(kLevelVerbose)
 //#define DEBUG Log(kLevelDebug)
 
-#define VERBOSE cout<<LMSG
-#define DEBUG cout<<LMSG
+#define VERBOSE std::cout<<LMSG
+#define DEBUG std::cout<<LMSG
 
 
 #endif // __COMMON_DEFINE_H__

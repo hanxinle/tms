@@ -13,14 +13,11 @@
     "EE386BFB5A899FA5AE9F24117C4B1FE649286651ECE65381" \
     "FFFFFFFFFFFFFFFF"
 
-using namespace std;
-
 DhTool::DhTool()
-    :
-    dh_(NULL),
-    shared_key_(NULL),
-    shared_key_length_(0),
-	peer_public_key_(NULL)
+    : dh_(NULL)
+    , shared_key_(NULL)
+    , shared_key_length_(0)
+    , peer_public_key_(NULL)
 {
 }
 
@@ -62,33 +59,33 @@ int DhTool::Initialize(const uint32_t& bit_count)
 
     if (dh_ == NULL)
     {
-        cout << LMSG << "DH_new failed" << endl;
+        std::cout << LMSG << "DH_new failed" << std::endl;
         return -1;
     }
 
     dh_->p = BN_new();
     if (dh_->p == NULL)
     {
-        cout << LMSG << "BN_new failed" << endl;
+        std::cout << LMSG << "BN_new failed" << std::endl;
         return -1;
     }
 
     dh_->g = BN_new();
     if (dh_->g == NULL)
     {
-        cout << LMSG << "BN_new failed" << endl;
+        std::cout << LMSG << "BN_new failed" << std::endl;
         return -1;
     }
 
     if (BN_hex2bn(&dh_->p, BigNumber_1024) == 0)
     {
-        cout << LMSG << "BN_hex2bn failed" << endl;
+        std::cout << LMSG << "BN_hex2bn failed" << std::endl;
         return -1;
     }
 
     if (BN_set_word(dh_->g, 2) != 1)
     {
-        cout << LMSG << "BN_set_word failed" << endl;
+        std::cout << LMSG << "BN_set_word failed" << std::endl;
         return -1;
     }
 
@@ -96,7 +93,7 @@ int DhTool::Initialize(const uint32_t& bit_count)
 
     if (DH_generate_key(dh_) != 1)
     {
-        cout << LMSG << "DH_generate_key failed" << endl;
+        std::cout << LMSG << "DH_generate_key failed" << std::endl;
         return -1;
     }
 
@@ -114,7 +111,7 @@ int DhTool::CreateSharedKey(uint8_t* peer_public_key, const int32_t& peer_public
 
     if (shared_key_length_ <= 0 || shared_key_length_ > 1024)
     {
-        cout << LMSG << "invalid shared_key_length_:" << shared_key_length_ << endl;
+        std::cout << LMSG << "invalid shared_key_length_:" << shared_key_length_ << std::endl;
         return -1;
     }
 
@@ -124,13 +121,13 @@ int DhTool::CreateSharedKey(uint8_t* peer_public_key, const int32_t& peer_public
     peer_public_key_ = BN_bin2bn(peer_public_key, peer_public_key_length, 0);
     if (peer_public_key_ == NULL)
     {
-        cout << LMSG << "BN_bin2bn failed"<< endl;
+        std::cout << LMSG << "BN_bin2bn failed"<< std::endl;
         return -1;
     }
 
     if (DH_compute_key(shared_key_, peer_public_key_, dh_) == -1)
     {
-        cout << LMSG << "DH_compute_key failed" << endl;
+        std::cout << LMSG << "DH_compute_key failed" << std::endl;
         return -1;
     }
 
@@ -153,7 +150,7 @@ int DhTool::CopyPublicKey(uint8_t* dst, const uint32_t& length)
 
     if (BN_bn2bin(dh_->pub_key, dst) != key_size)
     {
-        cout << LMSG << "BN_bn2bin failed" << endl;
+        std::cout << LMSG << "BN_bn2bin failed" << std::endl;
         return -1;
     }
 

@@ -6,10 +6,6 @@
 
 #include "any.h"
 
-using any::Any;
-using std::string;
-using std::vector;
-
 class BitBuffer;
 class IoBuffer;
 
@@ -35,7 +31,7 @@ enum Amf0Marker
     kTypedObject,
 };
 
-static string Amf0MarkerToStr(const int& marker)
+static std::string Amf0MarkerToStr(const int& marker)
 {
     switch (marker)
     {
@@ -67,12 +63,11 @@ class AmfCommand
 {
 public:
     AmfCommand(const bool& delete_when_destruct = true)
-        :
-        delete_when_destruct_(delete_when_destruct)
+        : delete_when_destruct_(delete_when_destruct)
     {
     }
 
-    void PushBack(Any* any)
+    void PushBack(any::Any* any)
     {
         vec_any_.push_back(any);
     }
@@ -91,7 +86,7 @@ public:
         }
     }
 
-    Any* operator[](const size_t index)
+    any::Any* operator[](const size_t index)
     {
         if (vec_any_.size() < index + 1)
         {
@@ -107,35 +102,35 @@ public:
     }
 
 private:
-    vector<Any*> vec_any_;
+    std::vector<any::Any*> vec_any_;
     bool delete_when_destruct_;
 };
 
 class Amf0
 {
 public:
-    static int Decode(string& data, AmfCommand& result);
-    static int Encode(const vector<Any*>& input, IoBuffer& output);
+    static int Decode(std::string& data, AmfCommand& result);
+    static int Encode(const std::vector<any::Any*>& input, IoBuffer& output);
 
 private:
     static int GetType(BitBuffer& bit_bufferk, int& type);
     static int PeekType(BitBuffer& bit_buffer);
 
     static int Decode(BitBuffer& bit_buffer, AmfCommand& result);
-    static int Decode(const int& type, BitBuffer& bit_buffer, Any*& result);
-    static int DecodeNumber(BitBuffer& bit_buffer, Any*& result);
-    static int DecodeBoolean(BitBuffer& bit_buffer, Any*& result);
-    static int DecodeString(BitBuffer& bit_buffer, Any*& result);
-    static int DecodeObject(BitBuffer& bit_buffer, Any*& result);
-    static int DecodeEcmaArray(BitBuffer& bit_buffer, Any*& result);
-    static int DecodeNull(BitBuffer& bit_buffer, Any*& result);
+    static int Decode(const int& type, BitBuffer& bit_buffer, any::Any*& result);
+    static int DecodeNumber(BitBuffer& bit_buffer, any::Any*& result);
+    static int DecodeBoolean(BitBuffer& bit_buffer, any::Any*& result);
+    static int DecodeString(BitBuffer& bit_buffer, any::Any*& result);
+    static int DecodeObject(BitBuffer& bit_buffer, any::Any*& result);
+    static int DecodeEcmaArray(BitBuffer& bit_buffer, any::Any*& result);
+    static int DecodeNull(BitBuffer& bit_buffer, any::Any*& result);
 
-    static int Encode(const Any* any, IoBuffer& output);
+    static int Encode(const any::Any* any, IoBuffer& output);
     static int EncodeType(const uint8_t& type, IoBuffer& output);
     static int EncodeNumber(const double& val, IoBuffer& output);
     static int EncodeBoolean(const uint8_t& val, IoBuffer& output);
-    static int EncodeString(const string& val, IoBuffer& output);
-    static int EncodeObject(const map<string, Any*>& val, IoBuffer& output);
+    static int EncodeString(const std::string& val, IoBuffer& output);
+    static int EncodeObject(const std::map<std::string, any::Any*>& val, IoBuffer& output);
 };
 
 #endif // __AMF_0_H__

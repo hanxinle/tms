@@ -9,8 +9,6 @@
 
 #include "openssl/err.h"
 
-using namespace std;
-
 SslIoBuffer::SslIoBuffer(const size_t& capacity)
     : IoBuffer(capacity)
 {
@@ -40,7 +38,7 @@ int SslIoBuffer::ReadFromFdAndWrite(const int& fd)
     }
     else if (bytes == 0)
     {
-        cout << LMSG << "close by peer" << endl;
+        std::cout << LMSG << "close by peer" << std::endl;
     }
     else
     {
@@ -76,7 +74,7 @@ int SslIoBuffer::WriteToFd(const int& fd)
     }
     else
     {
-        cout << LMSG << "ssl write failed" << endl;
+        std::cout << LMSG << "ssl write failed" << std::endl;
     }
 
     return ret;

@@ -13,8 +13,7 @@ class MediaPublisher
 {
 public:
     MediaPublisher()
-        :
-        media_muxer_(this)
+        : media_muxer_(this)
     {
     }
 
@@ -27,7 +26,7 @@ public:
         return media_muxer_;
     }
     
-    set<MediaSubscriber*> GetAndClearWaitHeaderSubscriber()
+    std::set<MediaSubscriber*> GetAndClearWaitHeaderSubscriber()
     {
         auto ret = wait_header_subscriber_;
         wait_header_subscriber_.clear();
@@ -35,7 +34,7 @@ public:
         return ret;
     }
 
-    set<MediaSubscriber*> GetSubscriber()
+    std::set<MediaSubscriber*> GetSubscriber()
     {
         return subscriber_;
     }
@@ -47,8 +46,8 @@ protected:
     int OnNewSubscriber(MediaSubscriber* subscriber);
 
 protected:
-	set<MediaSubscriber*> subscriber_;
-    set<MediaSubscriber*> wait_header_subscriber_; // 当前进程app/stream所在的流还未收齐音视频头
+	std::set<MediaSubscriber*> subscriber_;
+    std::set<MediaSubscriber*> wait_header_subscriber_; // 当前进程app/stream所在的流还未收齐音视频头
 
     MediaMuxer media_muxer_;
 };

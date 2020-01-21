@@ -13,8 +13,6 @@ class Fd;
 class IoBuffer;
 class TcpSocket;
 
-using std::string;
-
 class HttpFileProtocol
     : public SocketHandler
 {

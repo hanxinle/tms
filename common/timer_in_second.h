@@ -5,8 +5,6 @@
 
 #include "fd.h"
 
-using std::set;
-
 class TimerSecondHandle;
 
 class TimerInSecond : public Fd
@@ -39,7 +37,7 @@ public:
     }
 
 private:
-    set<TimerSecondHandle*> second_handle_;
+    std::set<TimerSecondHandle*> second_handle_;
 
     uint64_t now_in_ms_;
     uint64_t count_;

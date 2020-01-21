@@ -9,9 +9,8 @@ class IoLoop
 {
 public:
     IoLoop() 
-        :
-        poll_fd_(-1),
-        quit_(false)
+        : poll_fd_(-1)
+        , quit_(false)
     {
     }
 

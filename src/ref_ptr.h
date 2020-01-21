@@ -8,18 +8,12 @@
 
 #include "common_define.h"
 
-using std::atomic;
-using std::cout;
-using std::endl;
-using std::hex;
-
 class RefPtr
 {
 public:
     RefPtr(uint8_t* ptr)
-        :
-        ptr_(ptr),
-        ref_count_(1)
+        : ptr_(ptr)
+        , ref_count_(1)
     {
     }
 
@@ -29,7 +23,7 @@ public:
 
         if(ptr_ != NULL)
         {
-            //cout << LMSG << "free " << (void*)ptr_ << endl;
+            //std::cout << LMSG << "free " << (void*)ptr_ << std::endl;
             free(ptr_);
         }
     }
@@ -55,27 +49,25 @@ public:
 
 private:
     uint8_t* ptr_;
-    atomic<uint32_t> ref_count_;
+    std::atomic<uint32_t> ref_count_;
 };
 
 class Payload
 {
 public:
     Payload()
-        :
-        ref_ptr_(NULL),
-        len_(0),
-        frame_type_(kUnknownFrame),
-        payload_type_(kUnknownPayload)
+        : ref_ptr_(NULL)
+        , len_(0)
+        , frame_type_(kUnknownFrame)
+        , payload_type_(kUnknownPayload)
     {
     }
 
     Payload(uint8_t* ptr, const uint64_t& len)
-        :
-        ref_ptr_(new RefPtr(ptr)),
-        len_(len),
-        frame_type_(kUnknownFrame),
-        payload_type_(kUnknownPayload)
+        : ref_ptr_(new RefPtr(ptr))
+        , len_(len)
+        , frame_type_(kUnknownFrame)
+        , payload_type_(kUnknownPayload)
     {
     }
 
@@ -130,7 +122,7 @@ public:
 
             if (referenct_count == 0)
             {
-                //cout << LMSG << "len:" << len_ << ",ref_ptr_:" << ref_ptr_ << endl;
+                //std::cout << LMSG << "len:" << len_ << ",ref_ptr_:" << ref_ptr_ << std::endl;
                 delete ref_ptr_;
             }
         }

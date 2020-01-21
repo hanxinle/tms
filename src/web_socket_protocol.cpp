@@ -12,13 +12,10 @@
 #include "sdp_parse.h"
 #include "tcp_socket.h"
 
-using namespace std;
-
 WebSocketProtocol::WebSocketProtocol(IoLoop* io_loop, Fd* socket)
-    :
-    io_loop_(io_loop),
-    socket_(socket),
-    upgrade_(false)
+    : io_loop_(io_loop)
+    , socket_(socket)
+    , upgrade_(false)
 {
 }
 
@@ -48,7 +45,7 @@ int WebSocketProtocol::HandleRead(IoBuffer& io_buffer, Fd& socket)
      +-+-+-+-+-------+-+-------------+ - - - - - - - - - - - - - - - +
      |     Extended payload length continued, if payload len == 127  |
      + - - - - - - - - - - - - - - - +-------------------------------+
-     |                               |Masking-key, if MASK set to 1  |
+     |                               |Masking-key, if MASK std::set to 1  |
      +-------------------------------+-------------------------------+
      | Masking-key (continued)       |          Payload Data         |
      +-------------------------------- - - - - - - - - - - - - - - - +
@@ -82,7 +79,7 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
         {
             upgrade_ = true;
 
-            string web_socket_key = "";
+            std::string web_socket_key = "";
 
             if (! http_parse_.GetHeaderKeyValue("Sec-WebSocket-Key", web_socket_key))
             {
@@ -91,17 +88,17 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
 
             web_socket_key += "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
-			string web_socket_rsp = "HTTP/1.1 101 Switching Protocols\r\n"
+			std::string web_socket_rsp = "HTTP/1.1 101 Switching Protocols\r\n"
 									"Server: trs\r\n"
 									"Connection: upgrade\r\n"
 									"Sec-WebSocket-Accept: ";
 
-            string web_socket_key_sha;
+            std::string web_socket_key_sha;
             web_socket_key_sha.resize(20);
 
             SHA1((const unsigned char*)(web_socket_key.data()), web_socket_key.length(), (unsigned char*)web_socket_key_sha.data());
 
-            string web_socket_key_sha_base64;
+            std::string web_socket_key_sha_base64;
             Base64::Encode(web_socket_key_sha, web_socket_key_sha_base64);
             web_socket_rsp += web_socket_key_sha_base64;
             web_socket_rsp += "\r\nUpgrade: websocket\r\n\r\n";
@@ -120,7 +117,7 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
         	size_t len = 0;
         	len = io_buffer.Peek(data, 0, io_buffer.Size());
 
-        	cout << LMSG << Util::Bin2Hex(data, len) << endl;
+        	std::cout << LMSG << Util::Bin2Hex(data, len) << std::endl;
         }
 
         uint32_t header_len = kWebSocketProtocolHeaderSize;
@@ -174,8 +171,8 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
             bit_buffer.GetBytes(peek_len, extended_payload_length);
         }
 
-        cout << LMSG << "fin:" << (int)fin << ",opcode:" << (int)opcode << ",mask:" << (int)mask << ",payload_len:" << (int)payload_len 
-             << ",peek_len:" << (int)peek_len <<",extended_payload_length:" << extended_payload_length << endl;
+        std::cout << LMSG << "fin:" << (int)fin << ",opcode:" << (int)opcode << ",mask:" << (int)mask << ",payload_len:" << (int)payload_len 
+             << ",peek_len:" << (int)peek_len <<",extended_payload_length:" << extended_payload_length << std::endl;
 
         if (io_buffer.Size() < header_len + extended_payload_length + mask_len)
         {
@@ -220,36 +217,36 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
         {
         }
 
-        cout << LMSG << "websocket payload:\n" << Util::Bin2Hex(data, extended_payload_length) << endl;
+        std::cout << LMSG << "websocket payload:\n" << Util::Bin2Hex(data, extended_payload_length) << std::endl;
 
 
         // FIXME: sdp 
         if (extended_payload_length >= 2 && data[0] == 'v' && data[1] == '=')
         {
-            string remote_sdp((const char*)data, extended_payload_length);
+            std::string remote_sdp((const char*)data, extended_payload_length);
 
             SdpParse sdp_parse;
             sdp_parse.Parse(remote_sdp);
 
-            vector<string> sdp_line = Util::SepStr(remote_sdp, "\r\n");
+            std::vector<std::string> sdp_line = Util::SepStr(remote_sdp, "\r\n");
 
-            cout << LMSG << "==================== remote sdp ====================" << endl;
+            std::cout << LMSG << "==================== remote sdp ====================" << std::endl;
             for (const auto& line : sdp_line)
             {
-                cout << LMSG << line << endl;
+                std::cout << LMSG << line << std::endl;
 
-                if (line.find("a=ice-ufrag") != string::npos)
+                if (line.find("a=ice-ufrag") != std::string::npos)
                 {
-                    vector<string> tmp = Util::SepStr(line, ":");
+                    std::vector<std::string> tmp = Util::SepStr(line, ":");
 
                     if (tmp.size() == 2)
                     {
                         g_remote_ice_ufrag = tmp[1];
                     }
                 }
-                else if (line.find("a=ice-pwd") != string::npos)
+                else if (line.find("a=ice-pwd") != std::string::npos)
                 {
-                    vector<string> tmp = Util::SepStr(line, ":");
+                    std::vector<std::string> tmp = Util::SepStr(line, ":");
 
                     if (tmp.size() == 2)
                     {
@@ -258,14 +255,14 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
                 }
             }
 
-            cout << LMSG << "g_remote_ice_ufrag:" << Util::Bin2Hex(g_remote_ice_ufrag) << endl;
-            cout << LMSG << "g_remote_ice_pwd:" << Util::Bin2Hex(g_remote_ice_pwd) << endl;
+            std::cout << LMSG << "g_remote_ice_ufrag:" << Util::Bin2Hex(g_remote_ice_ufrag) << std::endl;
+            std::cout << LMSG << "g_remote_ice_pwd:" << Util::Bin2Hex(g_remote_ice_pwd) << std::endl;
 
-            string sdp_file = http_parse_.GetFileName() + "." +http_parse_.GetFileType();
+            std::string sdp_file = http_parse_.GetFileName() + "." +http_parse_.GetFileType();
 
-            cout << LMSG << "sdp:" << sdp_file << endl;
+            std::cout << LMSG << "sdp:" << sdp_file << std::endl;
 
-            string webrtc_test_sdp = Util::ReadFile(sdp_file);
+            std::string webrtc_test_sdp = Util::ReadFile(sdp_file);
 
             if (webrtc_test_sdp.empty())
             {
@@ -277,8 +274,8 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
 			g_local_ice_ufrag = Util::GenRandom(15);
             g_local_ice_pwd = Util::GenRandom(24);
 
-            cout << LMSG << "g_local_ice_ufrag:" << Util::Bin2Hex(g_local_ice_ufrag) << endl;
-            cout << LMSG << "g_local_ice_pwd:" << Util::Bin2Hex(g_local_ice_pwd) << endl;
+            std::cout << LMSG << "g_local_ice_ufrag:" << Util::Bin2Hex(g_local_ice_ufrag) << std::endl;
+            std::cout << LMSG << "g_local_ice_pwd:" << Util::Bin2Hex(g_local_ice_pwd) << std::endl;
 
             Util::Replace(webrtc_test_sdp, "a=ice-ufrag:xxx\r\n", "a=ice-ufrag:" + g_local_ice_ufrag + "\r\n");
             Util::Replace(webrtc_test_sdp, "a=ice-pwd:xxx\r\n", "a=ice-pwd:" + g_local_ice_pwd + "\r\n");
@@ -305,30 +302,30 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
             sdp_generate.SetVideoSsrc(3233846889);
 
             //webrtc_test_sdp = sdp_generate.Generate();
-            //cout << LMSG << "@gen sdp=\n" << webrtc_test_sdp << endl;
+            //std::cout << LMSG << "@gen sdp=\n" << webrtc_test_sdp << std::endl;
 
             // a=sendrecv sdp中这个影响chrome推流
 #if 1 // 标准流程都是这么做的, sdpMid需要跟sdp中的mid:对齐, datachannel一定要走到这里来
-            string candidate = R"(candidate":"candidate:1 1 udp 2115783679 xxx.xxx.xxx.xxx:what typ host generation 0 ufrag )" + g_local_ice_ufrag + R"( netwrok-cost 50", "sdpMid":"0","sdpMLineIndex":0)";
+            std::string candidate = R"(candidate":"candidate:1 1 udp 2115783679 xxx.xxx.xxx.xxx:what typ host generation 0 ufrag )" + g_local_ice_ufrag + R"( netwrok-cost 50", "sdpMid":"0","sdpMLineIndex":0)";
             Util::Replace(candidate, "xxx.xxx.xxx.xxx:what", g_server_ip + " 11445");
-            string sdp_answer = "{\"sdpAnswer\":\"" + webrtc_test_sdp + "\", \"candidate\":{" + "\"" + candidate + "}}";
+            std::string sdp_answer = "{\"sdpAnswer\":\"" + webrtc_test_sdp + "\", \"candidate\":{" + "\"" + candidate + "}}";
 #else
-            string sdp_answer = "{\"sdpAnswer\":\"" + webrtc_test_sdp + "\"}";
+            std::string sdp_answer = "{\"sdpAnswer\":\"" + webrtc_test_sdp + "\"}";
 #endif
 
-            cout << LMSG << "==================== local sdp ====================" << endl;
+            std::cout << LMSG << "==================== local sdp ====================" << std::endl;
             sdp_line = Util::SepStr(webrtc_test_sdp, "\r\n");
             for (const auto& line : sdp_line)
             {
-                cout << LMSG << line << endl;
+                std::cout << LMSG << line << std::endl;
             }
 
 
-            cout << "sdp_answer size:" << sdp_answer.size() << endl;
+            std::cout << "sdp_answer size:" << sdp_answer.size() << std::endl;
             Util::Replace(sdp_answer, "\r\n", "\\r\\n");
-            cout << "sdp_answer size:" << sdp_answer.size() << endl;
+            std::cout << "sdp_answer size:" << sdp_answer.size() << std::endl;
 
-            cout << LMSG << sdp_answer << endl;
+            std::cout << LMSG << sdp_answer << std::endl;
 
             Send((const uint8_t*)sdp_answer.data(), sdp_answer.size());
         }

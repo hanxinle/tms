@@ -14,12 +14,6 @@
 #include "ref_ptr.h"
 #include "socket_util.h"
 
-using std::map;
-using std::ostringstream;
-using std::string;
-using std::set;
-using std::vector;
-
 class MediaPublisher;
 
 class MediaMuxer
@@ -30,22 +24,22 @@ public:
 
     int EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
 
-    void SetApp(const string& app)
+    void SetApp(const std::string& app)
     {
         app_ = app;
     }
 
-    void SetStreamName(const string& name)
+    void SetStreamName(const std::string& name)
     {
         stream_ = name;
     }
 
-    string GetM3U8()
+    std::string GetM3U8()
     {
         return m3u8_;
     }
 
-    const string& GetTs(const uint64_t& ts) const
+    const std::string& GetTs(const uint64_t& ts) const
     {
         auto iter = ts_queue_.find(ts);
 
@@ -57,7 +51,7 @@ public:
         return iter->second.ts_data;
     }
 
-    const string& GetVideoHeader()
+    const std::string& GetVideoHeader()
     {
         return video_header_;
     }
@@ -67,7 +61,7 @@ public:
         return ! video_header_.empty();
     }
 
-    const string& GetAudioHeader()
+    const std::string& GetAudioHeader()
     {
         return audio_header_;
     }
@@ -77,7 +71,7 @@ public:
         return ! audio_header_.empty();
     }
 
-    const string& GetMetaData()
+    const std::string& GetMetaData()
     {
         return metadata_;
     }
@@ -89,8 +83,8 @@ public:
 
     void UpdateM3U8();
     void PacketTs(const Payload& payload);
-    string& PacketTsPmt();
-    string& PacketTsPat();
+    std::string& PacketTsPmt();
+    std::string& PacketTsPat();
 
     uint16_t GetAudioContinuityCounter()
     {
@@ -150,18 +144,18 @@ public:
 
     int OnAudio(const Payload& payload);
     int OnVideo(const Payload& payload);
-    int OnMetaData(const string& metadata);
-    int OnVideoHeader(const string& video_header);
-    int OnAudioHeader(const string& audio_header);
+    int OnMetaData(const std::string& metadata);
+    int OnVideoHeader(const std::string& video_header);
+    int OnAudioHeader(const std::string& audio_header);
 
-    vector<Payload> GetFastOut();
+    std::vector<Payload> GetFastOut();
 
 private:
-    string app_;
-    string stream_;
+    std::string app_;
+    std::string stream_;
 
-    map<uint64_t, Payload> video_queue_;
-    map<uint64_t, Payload> audio_queue_;
+    std::map<uint64_t, Payload> video_queue_;
+    std::map<uint64_t, Payload> audio_queue_;
 
     uint64_t video_frame_id_;
     uint64_t audio_frame_id_;
@@ -179,24 +173,24 @@ private:
 
     uint64_t pre_calc_fps_ms_;
 
-    string metadata_;
-    string audio_header_;
-    string video_header_;
+    std::string metadata_;
+    std::string audio_header_;
+    std::string video_header_;
 
     uint8_t adts_header_[7];
 
-    string vps_;
-    string sps_;
-    string pps_;
+    std::string vps_;
+    std::string sps_;
+    std::string pps_;
 
     // ======== ts ========
-    string invalid_ts_;
+    std::string invalid_ts_;
 
-    map<uint64_t, TsMedia> ts_queue_;
+    std::map<uint64_t, TsMedia> ts_queue_;
 
-    string m3u8_;
-    string ts_pat_;
-    string ts_pmt_;
+    std::string m3u8_;
+    std::string ts_pat_;
+    std::string ts_pmt_;
 
     uint64_t ts_seq_;
     uint8_t  ts_couter_;

@@ -17,7 +17,7 @@ public:
     virtual int Send(const uint8_t* data, const size_t& len);
 
     uint16_t GetClientPort() { return client_port_; }
-    string GetClientIp() { return client_ip_; }
+    std::string GetClientIp() { return client_ip_; }
     sockaddr GetSrcAddr() { return src_addr_; }
     socklen_t GetSrcAddrLen() { return src_addr_len_; }
     void SetSrcAddr(sockaddr src_addr) { src_addr_ = src_addr; }
@@ -28,7 +28,7 @@ private:
     sockaddr src_addr_;
     socklen_t src_addr_len_;
 
-    string client_ip_;
+    std::string client_ip_;
     uint16_t client_port_;
 };
 

@@ -10,11 +10,8 @@
 
 #include <iostream>
 
-using namespace std;
-
 Epoller::Epoller()
-    :
-    IoLoop()
+    : IoLoop()
 {
 }
 
@@ -34,11 +31,11 @@ int Epoller::Create()
 
         if (poll_fd_ < 0)
         {
-            cout << LMSG << "epoll_create failed, ret=" << poll_fd_ << endl;
+            std::cout << LMSG << "epoll_create failed, ret=" << poll_fd_ << std::endl;
             return -1;
         }
 
-        cout << LMSG << "epoll_create success. poll_fd_=" << poll_fd_ << endl;
+        std::cout << LMSG << "epoll_create success. poll_fd_=" << poll_fd_ << std::endl;
     }
 
     return 0;
@@ -62,7 +59,7 @@ int Epoller::AddFd(Fd* fd)
 
     if (ret < 0)
     {
-        cout << LMSG << "epoll_ctl faield ret=" << ret << endl;
+        std::cout << LMSG << "epoll_ctl faield ret=" << ret << std::endl;
     }
 
     return ret;
@@ -78,7 +75,7 @@ int Epoller::DelFd(Fd* fd)
 
     if (ret < 0)
     {
-        cout << LMSG << "epoll_ctl failed, ret=" << ret << endl;
+        std::cout << LMSG << "epoll_ctl failed, ret=" << ret << std::endl;
     }
 
     return ret;
@@ -94,7 +91,7 @@ int Epoller::ModFd(Fd* fd)
 
     if (ret < 0)
     {
-        cout << LMSG << "epoll_ctl failed, ret=" << ret << endl;
+        std::cout << LMSG << "epoll_ctl failed, ret=" << ret << std::endl;
     }
 
     return ret;
@@ -122,7 +119,7 @@ void Epoller::WaitIO(const int& timeout_in_millsecond)
                 int ret = fd->OnRead();
                 if (ret == kClose || ret == kError)
                 {
-                    cout << LMSG << "closed, ret:" << ret << endl;
+                    std::cout << LMSG << "closed, ret:" << ret << std::endl;
                     delete fd;
                     return;
                 }
@@ -140,7 +137,7 @@ void Epoller::WaitIO(const int& timeout_in_millsecond)
     }
     else if (num_event < 0)
     {
-        cout << LMSG << "epoll_wait failed, ret=" <<num_event << endl;
+        std::cout << LMSG << "epoll_wait failed, ret=" <<num_event << std::endl;
     }
     else
     {

@@ -39,18 +39,17 @@ public:
     uint32_t extensions;
 
     inline RtpHeader()
-        :
-        cc(0),
-        hasextension(0),
-        padding(0),
-        version(2),
-        payloadtype(0),
-        marker(0),
-        seqnum(0),
-        timestamp(0),
-        ssrc(0),
-        extensionpayload(0),
-        extensionlength(0)
+        : cc(0)
+        , hasextension(0)
+        , padding(0)
+        , version(2)
+        , payloadtype(0)
+        , marker(0)
+        , seqnum(0)
+        , timestamp(0)
+        , ssrc(0)
+        , extensionpayload(0)
+        , extensionlength(0)
     {
     }
 

@@ -6,14 +6,10 @@
 
 #include "common_define.h"
 
-using std::string;
-using std::cout;
-using std::endl;
-
 class BitBuffer
 {
 public:
-    BitBuffer(const string& data);
+    BitBuffer(const std::string& data);
     BitBuffer(const uint8_t* data, const size_t& len);
 
     inline bool MoreThanBytes(const size_t& bytes)
@@ -68,7 +64,7 @@ public:
     {
         if (! MoreThanBits(bits))
         {
-            cout << LMSG << "no more than " << bits << " bits, left bits:" << BitsLeft() << endl;
+            std::cout << LMSG << "no more than " << bits << " bits, left bits:" << BitsLeft() << std::endl;
             return -1;
         }
 
@@ -81,7 +77,7 @@ public:
             // XXX: static mask
             uint8_t mask = (0x01 << (7 - cur_pos_%8));
 
-            //cout << "cur_pos_:" << cur_pos_ << ",mask:" << (uint16_t)mask << endl;
+            //std::cout << "cur_pos_:" << cur_pos_ << ",mask:" << (uint16_t)mask << std::endl;
 
             if (data_[cur_pos_/8] & mask)
             {
@@ -93,7 +89,7 @@ public:
 
         return 0;
     }
-    int GetString(const size_t& len, string& result);
+    int GetString(const size_t& len, std::string& result);
 
     int PeekBits(const size_t& bits, uint64_t& result);
 

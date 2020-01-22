@@ -13,6 +13,7 @@
 #include "media_subscriber.h"
 #include "ref_ptr.h"
 #include "socket_handler.h"
+#include "webrtc_session_mgr.h"
 
 #include "webrtc/modules/rtp_rtcp/source/rtp_format_vp8.h"
 #include "webrtc/modules/rtp_rtcp/source/rtp_format_vp9.h"
@@ -192,6 +193,11 @@ public:
     void SendBindingRequest();
     void SendBindingIndication();
 
+    void SetSessionInfo(const SessionInfo& session_info)
+    {
+        session_info_ = session_info;
+    }
+
     void SetLocalUfrag(const std::string& ufrag)
     {
         local_ufrag_ = ufrag;
@@ -211,6 +217,8 @@ public:
     {
         remote_pwd_ = pwd;
     }
+
+    void SubscribeStream();
 
     void SendVideoData(const uint8_t* data, const int& size, const uint32_t& timestamp, const int& flag);
     void SendAudioData(const uint8_t* data, const int& size, const uint32_t& timestamp, const int& flag);
@@ -234,7 +242,10 @@ public:
     int DtlsSend(const uint8_t* data, const int& size);
     int SendSctpData(const uint8_t* data, const int& len, const int& type);
 
-    void SendH264Data(const uint8_t* frame_data, const int& frame_len, const uint32_t& dts);
+    virtual int SendMediaData(const Payload& payload);
+    virtual int SendVideoHeader(const std::string& header);
+
+    virtual int SendData(const std::string& data);
 
     bool CheckCanClose();
 
@@ -267,6 +278,8 @@ private:
 
     uint64_t create_time_ms_;
 
+    bool register_publisher_stream_;
+
     // key:
     std::map<int, uint64_t> recv_time_ms_;
     std::map<int, uint64_t> all_packet_recv_map_;
@@ -283,6 +296,8 @@ private:
 
     srtp_t srtp_send_;
     srtp_t srtp_recv_;
+
+    SessionInfo session_info_;
 
     std::string local_ufrag_;
     std::string local_pwd_;

@@ -41,11 +41,6 @@ public:
         return (SrtSocket*)socket_;
     }
 
-	void SetMediaPublisher(MediaPublisher* media_publisher)
-    {   
-        media_publisher_ = media_publisher;
-    }
-
     int SendData(const std::string& data);
 
     void OnFrame(const Payload& video_frame);
@@ -58,7 +53,6 @@ private:
 private:
 	IoLoop* io_loop_;
     Fd* socket_;
-    MediaPublisher* media_publisher_;
     TsReader ts_reader_;
     bool    register_publisher_stream_;
 

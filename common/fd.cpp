@@ -5,11 +5,15 @@
 #include <sys/epoll.h>
 #include <unistd.h>
 
+std::atomic<uint64_t> Fd::id_generator_;
+
 Fd::Fd(IoLoop* io_loop, const int& fd)
     : events_(0)
     , fd_(fd)
     , io_loop_(io_loop)
     , socket_handler_(NULL)
+    , id_(GenID())
+    , name_("unknown")
 {
 }
 

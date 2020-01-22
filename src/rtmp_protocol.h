@@ -177,11 +177,6 @@ public:
         role_ = role;
     }
 
-    void SetMediaPublisher(MediaPublisher* media_publisher)
-    {
-        media_publisher_ = media_publisher;
-    }
-
     uint32_t GetDigestOffset(const uint8_t scheme, const uint8_t* buf);
     uint32_t GetKeyOffset(const uint8_t& scheme, const uint8_t* buf);
     bool GuessScheme(const uint8_t& scheme, const uint8_t* buf);
@@ -326,8 +321,6 @@ private:
     std::map<std::string, std::string> args_;
 
     double transaction_id_;
-
-    MediaPublisher* media_publisher_;
 
     std::string last_send_command_;
 

@@ -88,7 +88,7 @@ enum SubscriberType
     kHttpFlv = 1,
     kHttpHls = 2,
     kSrt = 3,
-    kWebRtc = 4,
+    kWebrtc = 4,
 };
 
 enum WebSocketProtocolDefine

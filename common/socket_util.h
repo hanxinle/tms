@@ -455,6 +455,46 @@ namespace socket_util
         return 0;
     }
 
+    inline int GetSocketName(const int& fd, std::string& ip, uint16_t& port)
+    {
+        sockaddr_in addr;
+        memset(&addr, 0, sizeof(addr));
+
+        socklen_t addr_len = sizeof(addr);
+
+        int ret = getsockname(fd, (sockaddr*)&addr, &addr_len);
+
+        if (ret != 0)
+        {
+            std::cout << LMSG << "getsockname err:" << strerror(errno) << std::endl;
+            return -1;
+        }
+
+        SocketAddrInetToIpPort(addr, ip, port);
+
+        return 0;
+    }
+
+    inline int GetPeerName(const int& fd, std::string& ip, uint16_t& port)
+    {
+        sockaddr_in addr;
+        memset(&addr, 0, sizeof(addr));
+
+        socklen_t addr_len = sizeof(addr);
+
+        int ret = getpeername(fd, (sockaddr*)&addr, &addr_len);
+
+        if (ret != 0)
+        {
+            std::cout << LMSG << "getsockname err:" << strerror(errno) << std::endl;
+            return -1;
+        }
+
+        SocketAddrInetToIpPort(addr, ip, port);
+
+        return 0;
+    }
+
 } // namespace socket_util
 
 #endif // __SOCKET_UTIL__

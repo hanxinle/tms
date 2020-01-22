@@ -31,13 +31,14 @@ int TcpSocket::OnRead()
 
         if (client_fd > 0)
         {
-            std::cout << LMSG << "accept " << client_ip << ":" << client_port << std::endl;
-
             socket_util::NoCloseWait(client_fd);
 
             TcpSocket* tcp_socket = new TcpSocket(io_loop_, client_fd, handler_factory_);
             socket_util::SetNonBlock(client_fd);
             tcp_socket->SetConnected();
+            tcp_socket->ModName("tcp " + name() + " <-> " + client_ip + ":" + Util::Num2Str(client_port));
+
+            std::cout << LMSG << tcp_socket->name() << " accept" << std::endl;
 
             socket_handler_->HandleAccept(*tcp_socket);
 
@@ -60,14 +61,14 @@ int TcpSocket::OnRead()
 
                     if (ret == kClose || ret == kError)
                     {
-                        std::cout << LMSG << "read error:" << ret << std::endl;
+                        std::cout << LMSG << name() << " handle error:" << ret << std::endl;
                         socket_handler_->HandleClose(read_buffer_, *this);
                         return kClose;
                     }
                 }
                 else if (bytes == 0)
                 {
-                    std::cout << LMSG << "close by peer" << std::endl;
+                    std::cout << LMSG << name() << " close by peer" << std::endl;
 
                     socket_handler_->HandleClose(read_buffer_, *this);
 
@@ -80,7 +81,7 @@ int TcpSocket::OnRead()
                         break;
                     }
 
-                    std::cout << LMSG << "read err:" << strerror(errno) << std::endl;
+                    std::cout << LMSG << name() << " read err:" << strerror(errno) << std::endl;
 
                     socket_handler_->HandleError(read_buffer_, *this);
 
@@ -106,6 +107,7 @@ int TcpSocket::OnWrite()
 
         if (ret < 0)
         {
+            std::cout << LMSG << name() << " write error:" << ret << std::endl;
             socket_handler_->HandleError(read_buffer_, *this);
         }
 
@@ -116,14 +118,24 @@ int TcpSocket::OnWrite()
         int err = -1;
         if (socket_util::GetSocketError(fd_, err) != 0 || err != 0)
         {
-            std::cout << LMSG << "when socket connected err:" << strerror(err) << std::endl;
+            std::cout << LMSG << name() << " connect error:" << strerror(err) << std::endl;
             socket_handler_->HandleError(read_buffer_, *this);
         }
         else
         {
-            std::cout << LMSG << "connected" << std::endl;
+            std::cout << LMSG << name() << " connected" << std::endl;
             SetConnected();
             socket_handler_->HandleConnected(*this);
+
+            std::string local_ip = "";
+            uint16_t local_port = 0;
+            socket_util::GetSocketName(fd(), local_ip, local_port);
+
+            std::string remote_ip = "";
+            uint16_t remote_port = 0;
+            socket_util::GetPeerName(fd(), remote_ip, remote_port);
+
+            ModName("tcp " + local_ip + Util::Num2Str(local_port) + " <-> " + remote_ip + ":" + Util::Num2Str(remote_port));
         }
     }
 
@@ -148,6 +160,8 @@ int TcpSocket::Send(const uint8_t* data, const size_t& len)
         else
         {
             // FIXME:close socket
+
+            std::cout << LMSG << name() << " write error:" << ret << std::endl;
             socket_handler_->HandleError(read_buffer_, *this);
         }
 

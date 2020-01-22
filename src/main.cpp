@@ -318,6 +318,9 @@ int main(int argc, char* argv[])
     epoller.Create();
     g_epoll = &epoller;
 
+    std::string local_ip = "";
+    uint16_t local_port = 0;
+
     // === Init Timer ===
     TimerInSecond timer_in_second(&epoller);
     TimerInMillSecond timer_in_millsecond(&epoller);
@@ -329,8 +332,10 @@ int main(int argc, char* argv[])
     socket_util::Bind(server_rtmp_fd, "0.0.0.0", rtmp_port);
     socket_util::Listen(server_rtmp_fd);
     socket_util::SetNonBlock(server_rtmp_fd);
+    socket_util::GetSocketName(server_rtmp_fd, local_ip, local_port);
 
     TcpSocket server_rtmp_socket(&epoller, server_rtmp_fd, std::bind(&ProtocolFactory::GenRtmpProtocol, std::placeholders::_1, std::placeholders::_2));
+    server_rtmp_socket.ModName(local_ip + ":" + Util::Num2Str(local_port));
     server_rtmp_socket.EnableRead();
     server_rtmp_socket.AsServerSocket();
 
@@ -341,8 +346,10 @@ int main(int argc, char* argv[])
     socket_util::Bind(server_http_flv_fd, "0.0.0.0", http_flv_port);
     socket_util::Listen(server_http_flv_fd);
     socket_util::SetNonBlock(server_http_flv_fd);
+    socket_util::GetSocketName(server_http_flv_fd, local_ip, local_port);
 
     TcpSocket server_http_flv_socket(&epoller, server_http_flv_fd, std::bind(&ProtocolFactory::GenHttpFlvProtocol, std::placeholders::_1, std::placeholders::_2));
+    server_http_flv_socket.ModName(local_ip + ":" + Util::Num2Str(local_port));
     server_http_flv_socket.EnableRead();
     server_http_flv_socket.AsServerSocket();
 
@@ -353,8 +360,10 @@ int main(int argc, char* argv[])
     socket_util::Bind(server_https_flv_fd, "0.0.0.0", https_flv_port);
     socket_util::Listen(server_https_flv_fd);
     socket_util::SetNonBlock(server_https_flv_fd);
+    socket_util::GetSocketName(server_https_flv_fd, local_ip, local_port);
 
     SslSocket server_https_flv_socket(&epoller, server_https_flv_fd, std::bind(&ProtocolFactory::GenHttpFlvProtocol, std::placeholders::_1, std::placeholders::_2));
+    server_https_flv_socket.ModName(local_ip + ":" + Util::Num2Str(local_port));
     server_https_flv_socket.EnableRead();
     server_https_flv_socket.AsServerSocket();
 
@@ -365,8 +374,10 @@ int main(int argc, char* argv[])
     socket_util::Bind(server_http_hls_fd, "0.0.0.0", http_hls_port);
     socket_util::Listen(server_http_hls_fd);
     socket_util::SetNonBlock(server_http_hls_fd);
+    socket_util::GetSocketName(server_http_hls_fd, local_ip, local_port);
 
     TcpSocket server_http_hls_socket(&epoller, server_http_hls_fd, std::bind(&ProtocolFactory::GenHttpHlsProtocol, std::placeholders::_1, std::placeholders::_2));
+    server_http_hls_socket.ModName(local_ip + ":" + Util::Num2Str(local_port));
     server_http_hls_socket.EnableRead();
     server_http_hls_socket.AsServerSocket();
 
@@ -377,8 +388,10 @@ int main(int argc, char* argv[])
     socket_util::Bind(server_https_hls_fd, "0.0.0.0", https_hls_port);
     socket_util::Listen(server_https_hls_fd);
     socket_util::SetNonBlock(server_https_hls_fd);
+    socket_util::GetSocketName(server_https_hls_fd, local_ip, local_port);
 
     SslSocket server_https_hls_socket(&epoller, server_https_hls_fd, std::bind(&ProtocolFactory::GenHttpHlsProtocol, std::placeholders::_1, std::placeholders::_2));
+    server_https_hls_socket.ModName(local_ip + ":" + Util::Num2Str(local_port));
     server_https_hls_socket.EnableRead();
     server_https_hls_socket.AsServerSocket();
 
@@ -389,8 +402,10 @@ int main(int argc, char* argv[])
     socket_util::Bind(web_socket_fd, "0.0.0.0", web_socket_port);
     socket_util::Listen(web_socket_fd);
     socket_util::SetNonBlock(web_socket_fd);
+    socket_util::GetSocketName(web_socket_fd, local_ip, local_port);
 
     TcpSocket web_socket_socket(&epoller, web_socket_fd, std::bind(&ProtocolFactory::GenWebSocketProtocol, std::placeholders::_1, std::placeholders::_2));
+    web_socket_socket.ModName(local_ip + ":" + Util::Num2Str(local_port));
     web_socket_socket.EnableRead();
     web_socket_socket.AsServerSocket();
 
@@ -401,22 +416,12 @@ int main(int argc, char* argv[])
     socket_util::Bind(ssl_web_socket_fd, "0.0.0.0", ssl_web_socket_port);
     socket_util::Listen(ssl_web_socket_fd);
     socket_util::SetNonBlock(ssl_web_socket_fd);
+    socket_util::GetSocketName(ssl_web_socket_fd, local_ip, local_port);
 
     SslSocket ssl_web_socket_socket(&epoller, ssl_web_socket_fd, std::bind(&ProtocolFactory::GenWebSocketProtocol, std::placeholders::_1, std::placeholders::_2));
+    ssl_web_socket_socket.ModName(local_ip + ":" + Util::Num2Str(local_port));
     ssl_web_socket_socket.EnableRead();
     ssl_web_socket_socket.AsServerSocket();
-
-    // === Init Server Http File Socket ===
-    int server_https_file_fd = socket_util::CreateNonBlockTcpSocket();
-
-    socket_util::ReuseAddr(server_https_file_fd);
-    socket_util::Bind(server_https_file_fd, "0.0.0.0", https_file_port);
-    socket_util::Listen(server_https_file_fd);
-    socket_util::SetNonBlock(server_https_file_fd);
-
-    SslSocket server_https_file_socket(&epoller, server_https_file_fd, std::bind(&ProtocolFactory::GenHttpFileProtocol, std::placeholders::_1, std::placeholders::_2));
-    server_https_file_socket.EnableRead();
-    server_https_file_socket.AsServerSocket();
 
     // === Init Server Http File Socket ===
     int server_http_file_fd = socket_util::CreateNonBlockTcpSocket();
@@ -425,10 +430,26 @@ int main(int argc, char* argv[])
     socket_util::Bind(server_http_file_fd, "0.0.0.0", http_file_port);
     socket_util::Listen(server_http_file_fd);
     socket_util::SetNonBlock(server_http_file_fd);
+    socket_util::GetSocketName(server_http_file_fd, local_ip, local_port);
 
     TcpSocket server_http_file_socket(&epoller, server_http_file_fd, std::bind(&ProtocolFactory::GenHttpFileProtocol, std::placeholders::_1, std::placeholders::_2));
+    server_http_file_socket.ModName(local_ip + ":" + Util::Num2Str(local_port));
     server_http_file_socket.EnableRead();
     server_http_file_socket.AsServerSocket();
+
+    // === Init Server Https File Socket ===
+    int server_https_file_fd = socket_util::CreateNonBlockTcpSocket();
+
+    socket_util::ReuseAddr(server_https_file_fd);
+    socket_util::Bind(server_https_file_fd, "0.0.0.0", https_file_port);
+    socket_util::Listen(server_https_file_fd);
+    socket_util::SetNonBlock(server_https_file_fd);
+    socket_util::GetSocketName(server_http_file_fd, local_ip, local_port);
+
+    SslSocket server_https_file_socket(&epoller, server_https_file_fd, std::bind(&ProtocolFactory::GenHttpFileProtocol, std::placeholders::_1, std::placeholders::_2));
+    server_https_file_socket.ModName(local_ip + ":" + Util::Num2Str(local_port));
+    server_https_file_socket.EnableRead();
+    server_https_file_socket.AsServerSocket();
 
     // === Init WebRTC Socket ===
     int webrtc_fd = socket_util::CreateNonBlockUdpSocket();
@@ -438,6 +459,7 @@ int main(int argc, char* argv[])
     socket_util::SetNonBlock(webrtc_fd);
 
     UdpSocket server_webrtc_socket(&epoller, webrtc_fd, std::bind(&ProtocolFactory::GenWebrtcProtocol, std::placeholders::_1, std::placeholders::_2));
+    server_webrtc_socket.ModName("udp");
     server_webrtc_socket.EnableRead();
 
     srt_startup();
@@ -459,6 +481,7 @@ int main(int argc, char* argv[])
     srt_socket_util::Listen(server_srt_fd);
 
     SrtSocket server_srt_socket(&srt_epoller, server_srt_fd, std::bind(&ProtocolFactory::GenSrtProtocol, std::placeholders::_1, std::placeholders::_2));
+    server_srt_socket.ModName("srt");
     server_srt_socket.EnableRead();
     server_srt_socket.AsServerSocket();
 

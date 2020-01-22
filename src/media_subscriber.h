@@ -31,10 +31,11 @@ public:
 
     uint16_t GetType() const { return type_; }
 
-    bool IsRtmp() { return type_ == kRtmp; }
-    bool IsHttpFlv() { return type_ == kHttpFlv; }
-    bool IsHttpHls() { return type_ == kHttpHls; }
-    bool IsSrt() { return type_ == kSrt; }
+    bool IsRtmp() const { return type_ == kRtmp; }
+    bool IsHttpFlv() const { return type_ == kHttpFlv; }
+    bool IsHttpHls() const { return type_ == kHttpHls; }
+    bool IsSrt() const { return type_ == kSrt; }
+    bool IsWebrtc() const { return type_ == kWebrtc; }
 
     virtual int SendVideoHeader(const std::string& header)
     {

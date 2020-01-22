@@ -94,22 +94,24 @@ const uint32_t kAudioSSRC = 3233846890;
 
 WebrtcProtocol::WebrtcProtocol(IoLoop* io_loop, Fd* socket)
     : MediaPublisher()
-      , MediaSubscriber(kWebRtc)
-      , io_loop_(io_loop)
-      , socket_(socket)
-      , create_time_ms_(Util::GetNowMs())
-      , dtls_hello_send_(false)
-      , dtls_(NULL)
-      , dtls_handshake_done_(false)
-      , timestamp_base_(0)
-      , timestamp_(0)
-      , media_input_open_count_(0)
-      , media_input_read_video_frame_count(0)
-      , send_begin_time_(Util::GetNowMs())
-      , datachannel_open_(false)
-      , video_seq_(0)
-      , pre_recv_data_time_ms_(Util::GetNowMs())
+    , MediaSubscriber(kWebrtc)
+    , io_loop_(io_loop)
+    , socket_(socket)
+    , create_time_ms_(Util::GetNowMs())
+    , register_publisher_stream_(false)
+    , dtls_hello_send_(false)
+    , dtls_(NULL)
+    , dtls_handshake_done_(false)
+    , timestamp_base_(0)
+    , timestamp_(0)
+    , media_input_open_count_(0)
+    , media_input_read_video_frame_count(0)
+    , send_begin_time_(Util::GetNowMs())
+    , datachannel_open_(false)
+    , video_seq_(0)
+    , pre_recv_data_time_ms_(Util::GetNowMs())
 {
+    std::cout << LMSG << std::endl;
 }
 
 WebrtcProtocol::~WebrtcProtocol()
@@ -159,6 +161,30 @@ int WebrtcProtocol::Parse(IoBuffer& io_buffer)
     }
 
     return kNoEnoughData;
+}
+
+void WebrtcProtocol::SubscribeStream()
+{
+	MediaPublisher* media_publisher = g_local_stream_center.GetMediaPublisherByAppStream(session_info_.app, session_info_.stream);
+
+    if (media_publisher != NULL)
+    {    
+        SetPublisher(media_publisher);
+        media_publisher->AddSubscriber(this);
+        std::cout << LMSG << "publisher " << media_publisher << " add subscriber for stream " << session_info_.stream << std::endl;
+    }    
+    else
+    {   
+        std::cout << LMSG << "can't find stream " << session_info_.stream << ", choose random one to debug"<< std::endl;
+        std::string app, stream;
+        MediaPublisher* media_publisher = g_local_stream_center._DebugGetRandomMediaPublisher(app, stream);
+        if (media_publisher)
+        {    
+            SetPublisher(media_publisher);
+            media_publisher->AddSubscriber(this);
+            std::cout << LMSG << "random publisher " << media_publisher << " add subscriber for app " << app << ", stream " << stream << std::endl;
+        }   
+    }  
 }
 
 void WebrtcProtocol::SendVideoData(const uint8_t* data, const int& size, const uint32_t& timestamp, const int& flag)
@@ -537,7 +563,6 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
     {
         case 0x0001:
         {
-#if 1
             std::cout << LMSG << "Binding Request" << std::endl;
 
             uint32_t magic_cookie = 0x2112A442;
@@ -609,48 +634,11 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
 
             GetUdpSocket()->Send(binding_response_header.GetData(), binding_response_header.SizeInBytes());
 
-            // send binding request
-#else
-			ByteBufferReader byte_buffer_read((const char*)data, len);
-    		StunMessage stun_req;
-
-    		if (! stun_req.Read(&byte_buffer_read))
-    		{   
-    		    std::cout << LMSG << "invalid stun message" << std::endl;
-    		}   
-
-    		if (stun_req.type() == STUN_BINDING_REQUEST)
-    		{ 
-                const StunByteStringAttribute* username_attr = stun_req.GetByteString(STUN_ATTR_USERNAME);
-
-				IceMessage stun_rsp;
-
-            	stun_rsp.SetType(GetStunSuccessResponseType(stun_req.type()));
-            	stun_rsp.SetTransactionID(stun_req.transaction_id());
-
-                uint32_t ip_num;
-                IpStr2Num(GetUdpSocket()->GetClientIp(), ip_num);
-
-            	SocketAddress addr(htobe32(ip_num), GetUdpSocket()->GetClientPort());
-            	stun_rsp.AddAttribute(new StunXorAddressAttribute(STUN_ATTR_XOR_MAPPED_ADDRESS, addr));
-            	stun_rsp.AddAttribute(new StunByteStringAttribute(STUN_ATTR_USERNAME, username_attr->GetString()));
-            	stun_rsp.AddMessageIntegrity(local_pwd_);
-            	stun_rsp.AddFingerprint();
-
-            	ByteBufferWriter byte_buffer_write;
-            	stun_rsp.Write(&byte_buffer_write);
-
-                std::cout << LMSG << "webrtc binding_response\n" << Util::Bin2Hex((const uint8_t*)byte_buffer_write.Data(), byte_buffer_write.Length()) << std::endl;
-
-            	GetUdpSocket()->Send((const uint8_t*)byte_buffer_write.Data(), byte_buffer_write.Length());
-            }
-#endif
-
-            if (true)
-            //if (! g_webrtc_mgr->IsRemoteUfragExist(remote_ufrag))
+            static std::set<std::string> client_ufrag_set;
+            if (! client_ufrag_set.count(remote_ufrag))
             {
                 std::cout << LMSG << "connect udp socket:" << GetUdpSocket()->GetClientIp() << ":" << GetUdpSocket()->GetClientPort() << std::endl;
-                //g_webrtc_mgr->AddRemoteUfrag(remote_ufrag);
+                client_ufrag_set.insert(remote_ufrag);
 
                 int fd = socket_util::CreateNonBlockUdpSocket();
                 socket_util::ReuseAddr(fd);
@@ -687,21 +675,16 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
                 udp_socket->EnableRead();
 
                 WebrtcProtocol* webrtc_protocol = (WebrtcProtocol*)udp_socket->socket_handler();
+
+                SessionInfo session_info;
+                g_webrtc_session_mgr.GetSession(g_remote_ice_ufrag, session_info);
+                webrtc_protocol->SetSessionInfo(session_info);
                 webrtc_protocol->SetLocalUfrag(g_local_ice_ufrag);
                 webrtc_protocol->SetLocalPwd(g_local_ice_pwd);
                 webrtc_protocol->SetRemoteUfrag(g_remote_ice_ufrag);
                 webrtc_protocol->SetRemotePwd(g_remote_ice_pwd);
-
-                /*
                 // FIXME:这里可能需要根据角色,比如客户端是上行还是下行来做SetConnectState还是SetAcceptState
-#if 1
-                g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SetConnectState();
-#else
-                // datachannel
-                g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SetAcceptState();
-#endif
-                //g_webrtc_mgr->GetOrCreateProtocol(*udp_socket)->SendBindingRequest();
-                */
+                webrtc_protocol->SetConnectState();
             }
             else
             {
@@ -1537,7 +1520,21 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
                          << std::endl;
         }
 
-        //std::cout << LMSG << "rtp have read bytes:" << rtp_bit_buffer.HaveReadBytes() << std::endl;
+        if (! register_publisher_stream_)
+        {
+            register_publisher_stream_ = true;
+            g_local_stream_center.RegisterStream("webrtc", "test", this);
+
+            std::string app;
+            std::string stream;
+			MediaPublisher* media_publisher = g_local_stream_center._DebugGetRandomMediaPublisher(app, stream);
+        	if (media_publisher)
+        	{    
+        	    SetPublisher(media_publisher);
+        	    media_publisher->AddSubscriber(this);
+        	    std::cout << LMSG << "webrtc subscribe self, app=" << app << ",stream=" << stream << std::endl;
+        	}   
+        }
 
         // 解析
         if (payload_type == (uint8_t)WebRTCPayloadType::VP8)
@@ -1626,7 +1623,7 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
             video_publisher_ssrc_ = ssrc;
             rtp_header->setSSRC(kVideoSSRC);
 
-            // 视频带了MID的extension, 将其玻璃, 不然某些版本chrome会demux failed
+            // 视频带了MID的extension, 将其剥离, 不然某些版本chrome会demux failed
             if (rtp_header->getExtension())
             {
                 uint32_t extension_length = 4 + rtp_header->getExtLength() * 4;
@@ -1639,11 +1636,24 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
 
                 rtp_header = (RtpHeader*)changed_buf;
                 rtp_header->setExtension(0);
-                //g_webrtc_mgr->__DebugBroadcast(changed_buf, changed_buf_len);
+
+                for (const auto& sub : wait_header_subscriber_)
+                {
+                    if (sub->IsWebrtc())
+                    {
+                        sub->SendData(std::string((const char*)changed_buf, changed_buf_len));
+                    }
+                }
             }
             else
             {
-                //g_webrtc_mgr->__DebugBroadcast(unprotect_buf, unprotect_buf_len);
+                for (const auto& sub : wait_header_subscriber_)
+                {
+                    if (sub->IsWebrtc())
+                    {
+                        sub->SendData(std::string((const char*)unprotect_buf, unprotect_buf_len));
+                    }
+                }
             }
         }
         else if (payload_type == (uint8_t)WebRTCPayloadType::OPUS)
@@ -2115,28 +2125,28 @@ void WebrtcProtocol::SendBindingIndication()
 }
 
 // 注意, 要拒绝SEI帧发送,不然chrome只能解码关键帧
-void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_len, const uint32_t& dts)
+int WebrtcProtocol::SendMediaData(const Payload& payload)
 {
+    if (! DtlsHandshakeDone())
+    {
+        std::cout << LMSG << "dtls handshake no done" << std::endl;
+        return -1;
+    }
+
+    if (payload.IsAudio())
+    {
+        return 0;
+    }
+
+    const uint8_t* frame_data = payload.GetRawData();
+    int frame_len = payload.GetRawLen();
+    uint32_t dts = payload.GetDts();
     webrtc::RTPVideoTypeHeader rtp_video_head;
+
+    std::cout << "media data peek:\n" << Util::Bin2Hex(frame_data, frame_len > 128 ? 128 : frame_len) << std::endl;
 
     webrtc::RTPVideoHeaderH264& rtp_header_h264 = rtp_video_head.H264;
 
-#if 0
-    rtp_header_h264.nalu_type = frame_data[0];
-
-    //if (frame_len < 900)
-    if (true)
-    {
-        //rtp_header_h264.packetization_type = kH264SingleNalu;
-        rtp_header_h264.packetization_type = kH264StapA;
-    }
-    else
-    {
-        //rtp_header_h264.packetization_type = kH264StapA;
-        //rtp_header_h264.packetization_type = kH264FuA;
-    }
-
-#endif
     webrtc::FrameType frame_type = webrtc::kVideoFrameDelta;
 
 
@@ -2205,7 +2215,6 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
             int protect_buf_len = rtp_header.getHeaderLength() + rtp_packet_len;
             int ret = ProtectRtp(rtp, protect_buf_len, protect_buf, protect_buf_len);
 
-
             if (ret == 0)
             {
                 std::cout << "ProtectRtp success" << std::endl;
@@ -2216,15 +2225,8 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
                     send_map_.erase(send_map_.begin());
                 }
 
-                //if (video_seq_ % 10000 == 1)
-                if (false)
-                {
-                    std::cout << LMSG << "NACK TEST, skip " << video_seq_ << std::endl;
-                }
-                else
-                {
-                    GetUdpSocket()->Send((const uint8_t*)protect_buf, protect_buf_len);
-                }
+                std::cout << "rtp peek=\n" << Util::Bin2Hex(protect_buf, protect_buf_len > 128 ? 128 : protect_buf_len) << std::endl;
+                GetUdpSocket()->Send((const uint8_t*)protect_buf, protect_buf_len);
             }
             else
             {
@@ -2240,38 +2242,62 @@ void WebrtcProtocol::SendH264Data(const uint8_t* frame_data, const int& frame_le
 
 	delete rtp_packetizer;
 
-    // 构造一个假的音频包过去
-#if 0
-	RtpHeader rtp_header;
+    return 0;
+}
 
-    uint8_t rtp[1500];
-    uint8_t* rtp_packet = rtp + 12; 
-
-    static uint32_t audio_seq_ = 0;
-
-    rtp_header.setSSRC(kAudioSSRC);
-    rtp_header.setSeqNumber(++audio_seq_);
-    rtp_header.setPayloadType((uint8_t)WebRTCPayloadType::OPUS);
-
-    rtp_header.setTimestamp(dts * 48);
-
-    int size = 192;
-    memcpy(rtp, &rtp_header, 12/*rtp head size*/);
-
-    uint8_t protect_buf[1500];
-    int protect_buf_len = 12 + size;;
-    memcpy(protect_buf, rtp, protect_buf_len);
-
-    int ret = ProtectRtp(rtp, protect_buf_len, protect_buf, protect_buf_len);
-    if (ret == 0)
+int WebrtcProtocol::SendVideoHeader(const std::string& header)
+{
+    if (header[0] == 0x00 && header[1] == 0x00 && header[2] == 0x00 && header[3] == 0x01)
     {
-        GetUdpSocket()->Send((const uint8_t*)protect_buf, protect_buf_len);
+        std::string sps = header.substr(0, header.size() - 4 - 5);
+        std::string pps = header.substr(sps.size());
+
+        std::cout << "header=" << Util::Bin2Hex(header) << std::endl;
+        std::cout << "sps=" << Util::Bin2Hex(sps) << std::endl;
+        std::cout << "pps=" << Util::Bin2Hex(pps) << std::endl;
+
+        uint8_t* sps_buffer = (uint8_t*)malloc(sps.size());
+        memcpy(sps_buffer, (const uint8_t*)sps.data(), sps.size());
+        Payload nal_sps(sps_buffer, sps.size());
+        nal_sps.SetVideo();
+        nal_sps.SetDts(0);
+
+        SendMediaData(nal_sps);
+
+        uint8_t* pps_buffer = (uint8_t*)malloc(pps.size());
+        memcpy(pps_buffer, (const uint8_t*)pps.data(), pps.size());
+        Payload nal_pps(pps_buffer, pps.size());
+        nal_pps.SetVideo();
+        nal_pps.SetDts(0);
+
+        SendMediaData(nal_pps);
     }
     else
     {
-        std::cout << LMSG << "srtp_protect faile:" << ret << std::endl;
     }
-#endif
+    std::cout << LMSG << "video header=\n" << Util::Bin2Hex(header) << std::endl;
+    return 0;
+}
+
+int WebrtcProtocol::SendData(const std::string& data)
+{
+    std::cout << LMSG << std::endl;
+    if (DtlsHandshakeDone())
+    {
+		uint8_t protect_rtp[1500];
+        int protect_rtp_len = data.size();
+        if (ProtectRtp((const uint8_t*)data.data(), data.size(), protect_rtp, protect_rtp_len) == 0)
+        {
+			std::cout << LMSG << "send webrtc to " << GetUdpSocket()->name() << std::endl;
+            GetUdpSocket()->Send(protect_rtp, protect_rtp_len);
+        }
+    }
+    else
+    {
+        std::cout << LMSG << "dtls handshake no finish" << std::endl;
+    }
+
+    return 0;
 }
 
 bool WebrtcProtocol::CheckCanClose()

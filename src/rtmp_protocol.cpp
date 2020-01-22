@@ -116,7 +116,6 @@ RtmpProtocol::RtmpProtocol(IoLoop* io_loop, Fd* fd)
     , in_chunk_size_(128)
     , out_chunk_size_(128)
     , transaction_id_(0.0)
-    , media_publisher_(NULL)
     , can_publish_(false)
 {
     std::cout << LMSG << std::endl;
@@ -1336,7 +1335,7 @@ int RtmpProtocol::OnPlayCommand(RtmpMessage& rtmp_msg, AmfCommand& amf_command)
                 SendRtmpMessage(rtmp_msg.cs_id, rtmp_msg.message_stream_id, kAmf0Command, data, len);
             }
 
-            SetMediaPublisher(media_publisher);
+            SetPublisher(media_publisher);
             media_publisher->AddSubscriber(this);
         }
     }
@@ -1525,11 +1524,11 @@ int RtmpProtocol::OnStatusCommand(AmfCommand& amf_command)
 
             if (role_ == RtmpRole::kPushServer)
             {
-                media_publisher_->AddSubscriber(this);
+                publisher_->AddSubscriber(this);
             }
             else if (role_ == RtmpRole::kClientPull)
             {
-                media_publisher_->AddSubscriber(this);
+                publisher_->AddSubscriber(this);
             }
         }
     }
@@ -1712,18 +1711,18 @@ int RtmpProtocol::HandleClose(IoBuffer& io_buffer, Fd& socket)
     }
     else if (role_ == RtmpRole::kPushServer)
     {
-        if (media_publisher_ != NULL)
+        if (publisher_ != NULL)
         {
             std::cout << LMSG << "remove forward" << std::endl;
-            media_publisher_->RemoveSubscriber(this);
+            publisher_->RemoveSubscriber(this);
         }
     }
     else if (role_ == RtmpRole::kClientPull)
     {
-        if (media_publisher_ != NULL)
+        if (publisher_ != NULL)
         {
             std::cout << LMSG << "remove player" << std::endl;
-            media_publisher_->RemoveSubscriber(this);
+            publisher_->RemoveSubscriber(this);
         }
     }
 
@@ -2400,7 +2399,7 @@ int RtmpProtocol::OnPendingArrive()
             SendRtmpMessage(pending_rtmp_msg_.cs_id, pending_rtmp_msg_.message_stream_id, kAmf0Command, data, len);
         }
 
-        SetMediaPublisher(media_publisher);
+        SetPublisher(media_publisher);
         media_publisher->AddSubscriber(this);
     }
 

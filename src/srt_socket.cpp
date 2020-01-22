@@ -49,8 +49,9 @@ int SrtSocket::OnRead()
 
             socket_util::SocketAddrToIpPort(sa, client_ip, client_port);
             srt_socket_util::SetBlock(client_srt_socket, false);
+            srt_socket->ModName(name() + " <-> " + client_ip + ":" + Util::Num2Str(client_port));
 
-            std::cout << LMSG << "accept client:" << client_ip << ":" << client_port << ", fd:" << client_srt_socket 
+            std::cout << LMSG << srt_socket->name() << " accept, fd:" << client_srt_socket 
                     << ", streamid:" << UDT::getstreamid(client_srt_socket) << std::endl;
         }   
 
@@ -61,7 +62,7 @@ int SrtSocket::OnRead()
         SRT_SOCKSTATUS srt_status = srt_getsockstate(fd());
         if (srt_status == SRTS_CLOSED || srt_status == SRTS_BROKEN)
         {   
-            std::cout << LMSG << "srt socket=" << fd() << ", srt_status=" << (int)srt_status << std::endl;
+            std::cout << LMSG << name() << ", srt_status=" << (int)srt_status << std::endl;
             socket_handler_->HandleClose(read_buffer_, *this);
 
             return kClose;
@@ -81,7 +82,7 @@ int SrtSocket::OnRead()
 
             if (ret == SRT_ERROR)
             {
-                std::cout << LMSG << "srt error " << std::endl;
+                std::cout << LMSG << name() << " read error" << std::endl;
                 socket_handler_->HandleError(read_buffer_, *this);
 
                 return kError;
@@ -96,7 +97,7 @@ int SrtSocket::OnRead()
 
 		    if (ret == kClose || ret == kError)
             {   
-                std::cout << LMSG << "read error:" << ret << std::endl;
+                std::cout << LMSG << name() << " handle error" << std::endl;
                 socket_handler_->HandleClose(read_buffer_, *this);
                 return kClose;
             } 

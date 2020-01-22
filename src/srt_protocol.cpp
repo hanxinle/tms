@@ -11,7 +11,6 @@ SrtProtocol::SrtProtocol(IoLoop* io_loop, Fd* socket)
     : MediaSubscriber(kSrt)
     , io_loop_(io_loop)
     , socket_(socket)
-    , media_publisher_(NULL)
     , register_publisher_stream_(false)
     , dump_fd_(-1)
 {
@@ -22,7 +21,7 @@ SrtProtocol::SrtProtocol(IoLoop* io_loop, Fd* socket)
 
     if (media_publisher != NULL)
     {    
-        SetMediaPublisher(media_publisher);
+        SetPublisher(media_publisher);
         media_publisher->AddSubscriber(this);
         std::cout << LMSG << "publisher " << media_publisher << " add subscriber for stream " << GetSrtSocket()->GetStreamId() << std::endl;
     }    
@@ -33,7 +32,7 @@ SrtProtocol::SrtProtocol(IoLoop* io_loop, Fd* socket)
         MediaPublisher* media_publisher = g_local_stream_center._DebugGetRandomMediaPublisher(app, stream);
         if (media_publisher)
         {    
-            SetMediaPublisher(media_publisher);
+            SetPublisher(media_publisher);
             media_publisher->AddSubscriber(this);
             std::cout << LMSG << "random publisher " << media_publisher << " add subscriber for app " << app << ", stream " << stream << std::endl;
         }
@@ -104,9 +103,9 @@ int SrtProtocol::HandleClose(IoBuffer& io_buffer, Fd& socket)
     std::cout << LMSG << "srt protocol stop, fd=" << socket_->fd() << ", socket=" << (void*)socket_ 
          << ", stream=" << GetSrtSocket()->GetStreamId() << std::endl;
 
-    if (media_publisher_)
+    if (publisher_)
     {
-        media_publisher_->RemoveSubscriber(this);
+        publisher_->RemoveSubscriber(this);
     }
 
     return kSuccess;

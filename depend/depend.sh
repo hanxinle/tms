@@ -77,3 +77,34 @@ if [[ ! -f ${depend_dir}/lib/libssl.a || ! -d ${depend_dir}/include/openssl ]]; 
     cp ${depend_dir}/tmp/lib/libcrypto.a ${depend_dir}/lib
     cd -
 fi
+
+librapidjson="rapidjson"
+
+if [[ ! -d "${depend_dir}/download/${librapidjson}" ]]; then
+    echo "no libsrtp dir and tar file found"
+    mkdir ./download/${librapidjson}
+    git clone --depth 1 https://github.com/Tencent/rapidjson.git ./download/${librapidjson}
+fi
+
+if [[ ! -d "${depend_dir}/include/${librapidjson}" ]]; then
+    cd download/${librapidjson}
+	mkdir build
+    cd build && cmake -DCMAKE_INSTALL_PREFIX:PATH=${depend_dir} ../ && make install
+    echo $?
+fi
+
+libsrt="srt"
+
+if [[ ! -d "${depend_dir}/download/${libsrt}" ]]; then
+    echo "no ${libsrt} dir and tar file found"
+    mkdir ./download/${libsrt}
+    git clone --depth 1 https://github.com/Haivision/srt.git ./download/${libsrt}
+fi
+
+if [[ ! -d "${depend_dir}/include/${libsrt}" ]]; then
+    cd download/${libsrt}
+	./configure --prefix="${depend_dir}" --disable-c++11 --disable-shared --enable-static && \
+	make -j4 && \
+	make install
+    echo $?
+fi

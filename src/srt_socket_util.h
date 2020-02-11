@@ -38,9 +38,9 @@ namespace srt_socket_util
         return ret;
     }
 
-    inline int BindPeerOf(const int& srtsocket, const int& udpsocket)
+    inline int BindPeerOf(const int& fd, const int& udpsocket)
     {
-        int ret = srt_bind_peerof(srtsocket, udpsocket);
+        int ret = srt_bind_peerof(fd, udpsocket);
     
         if (ret == SRT_ERROR)
         {
@@ -188,6 +188,17 @@ namespace srt_socket_util
         }
     
         return 0;
+    }
+
+    inline int SetSendOnly(const int& fd, const bool& send_only)
+    {
+        int ret = srt_setsockopt(fd, 0, SRTO_SENDER, &send_only, sizeof(send_only));
+        if (ret == SRT_ERROR)
+        {   
+            std::cout << LMSG << "srt_setsockopt SRTO_SENDER failed, err=" << srt_getlasterror_str() << std::endl;
+        }
+    
+        return ret;
     }
 
 } // namespace srt_socket_util

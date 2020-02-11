@@ -490,6 +490,8 @@ int main(int argc, char* argv[])
     server_srt_socket.AsServerSocket();
 
     SrtEventFd srt_event_fd(&epoller, server_srt_udp_fd);
+    srt_event_fd.SetSrtEpoller(&srt_epoller);
+    srt_event_fd.EnableRead();
 
     // Event Loop
     while (true)

@@ -12,6 +12,7 @@
 #include "ref_ptr.h"
 #include "socket_util.h"
 #include "srt_epoller.h"
+#include "srt_event_fd.h"
 #include "srt_socket_util.h"
 #include "srt_socket.h"
 #include "ssl_socket.h"
@@ -468,6 +469,9 @@ int main(int argc, char* argv[])
     SrtEpoller srt_epoller;
     srt_epoller.Create();
 
+    int server_srt_udp_fd = socket_util::CreateNonBlockUdpSocket();
+    socket_util::Bind(server_srt_udp_fd, "0.0.0.0", 9000);
+
     int server_srt_fd = srt_socket_util::CreateSrtSocket();
     srt_socket_util::SetTransTypeLive(server_srt_fd);
     srt_socket_util::SetBlock(server_srt_fd, false);
@@ -477,7 +481,7 @@ int main(int argc, char* argv[])
     srt_socket_util::SetUdpRecvBufSize(server_srt_fd, 10*1024*1024);
     srt_socket_util::SetPeerIdleTimeout(server_srt_fd, 20*60*1000);
     srt_socket_util::SetLatency(server_srt_fd, 1000);
-    srt_socket_util::Bind(server_srt_fd, "0.0.0.0", 9000);
+    srt_socket_util::BindPeerOf(server_srt_fd, server_srt_udp_fd);
     srt_socket_util::Listen(server_srt_fd);
 
     SrtSocket server_srt_socket(&srt_epoller, server_srt_fd, std::bind(&ProtocolFactory::GenSrtProtocol, std::placeholders::_1, std::placeholders::_2));
@@ -485,11 +489,12 @@ int main(int argc, char* argv[])
     server_srt_socket.EnableRead();
     server_srt_socket.AsServerSocket();
 
+    SrtEventFd srt_event_fd(&epoller, server_srt_udp_fd);
+
     // Event Loop
     while (true)
     {
         epoller.WaitIO(100);
-        srt_epoller.WaitIO(0);
     }
 
     return 0;

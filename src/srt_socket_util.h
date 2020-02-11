@@ -37,6 +37,18 @@ namespace srt_socket_util
     
         return ret;
     }
+
+    inline int BindPeerOf(const int& srtsocket, const int& udpsocket)
+    {
+        int ret = srt_bind_peerof(srtsocket, udpsocket);
+    
+        if (ret == SRT_ERROR)
+        {
+            std::cout << LMSG << "srt_bind_peerof failed, err=" << srt_getlasterror_str() << std::endl;
+        }
+    
+        return ret;
+    }
     
     inline int Connect(const int& fd, const std::string& ip, const uint16_t& port)
     {

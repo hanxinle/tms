@@ -5,8 +5,6 @@
 
 #include "base_64.h"
 
-using namespace std;
-
 char kEncodeBase64Dict[64] = 
 {
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
@@ -15,7 +13,7 @@ char kEncodeBase64Dict[64] =
     '+', '/',
 };
 
-map<char, uint8_t> kDecodeBase64Map = 
+std::map<char, uint8_t> kDecodeBase64Map = 
 {
     {'A', 0}, {'B', 1}, {'C', 2}, {'D', 3}, {'E', 4}, {'F', 5}, {'G', 6}, {'H', 7}, {'I', 8}, {'J', 9}, {'K', 10}, 
     {'L', 11}, {'M', 12}, {'N', 13}, {'O', 14}, {'P', 15}, {'Q', 16}, {'R', 17}, {'S', 18}, {'T', 19}, {'U', 20}, 
@@ -30,12 +28,12 @@ map<char, uint8_t> kDecodeBase64Map =
     {'+', 62}, {'/', 63},
 };
 
-int Base64::Encode(const uint8_t* input, const uint32_t& len, string& output)
+int Base64::Encode(const uint8_t* input, const uint32_t& len, std::string& output)
 {
     uint32_t three_times_len = len - len % 3;
     uint32_t left_len = len % 3;
 
-    cout << "three_times_len:" << three_times_len << ", left_len:" << left_len << endl;
+    std::cout << "three_times_len:" << three_times_len << ", left_len:" << left_len << std::endl;
 
     for (uint32_t i = 0; i < three_times_len; i += 3)
     {
@@ -78,12 +76,12 @@ int Base64::Encode(const uint8_t* input, const uint32_t& len, string& output)
     return 0;
 }
 
-int Base64::Encode(const string& input, string& output)
+int Base64::Encode(const std::string& input, std::string& output)
 {
     return Encode((const uint8_t*)input.data(), input.size(), output);
 }
 
-int Base64::Decode(const uint8_t* input, const uint32_t& len, string& output)
+int Base64::Decode(const uint8_t* input, const uint32_t& len, std::string& output)
 {
     uint32_t four_times_len = len - len % 4;
     uint32_t len_left = len % 4;
@@ -144,7 +142,7 @@ int Base64::Decode(const uint8_t* input, const uint32_t& len, string& output)
     return 0;
 }
 
-int Base64::Decode(const string& input, string& output)
+int Base64::Decode(const std::string& input, std::string& output)
 {
     return Decode((const uint8_t*)input.data(), input.size(), output);
 }

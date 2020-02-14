@@ -5,14 +5,10 @@
 
 #include "common_define.h"
 #include "io_buffer.h"
-#include "trace_tool.h"
 #include "util.h"
 
-using namespace std;
-
 IoBuffer::IoBuffer(const size_t& capacity)
-    :
-    capacity_(capacity)
+    : capacity_(capacity)
 {
     if (capacity_ != 0)
     {
@@ -32,7 +28,7 @@ IoBuffer::~IoBuffer()
 {
     if (buf_ != NULL)
     {
-        //VERBOSE << LMSG << "capacity_:" << capacity_ << ",Size():" << Size() << ",CapacityLeft():" << CapacityLeft() << ",buf:" << (void*)buf_ << endl;
+        //VERBOSE << LMSG << "capacity_:" << capacity_ << ",Size():" << Size() << ",CapacityLeft():" << CapacityLeft() << ",buf:" << (void*)buf_ << std::endl;
 
         free(buf_);
         buf_ = NULL;
@@ -48,7 +44,7 @@ int IoBuffer::ReadFromFdAndWrite(const int& fd)
 {
     MakeSpaceIfNeed(kEnlargeSize);
 
-    //VERBOSE << LMSG << "IoBuffer capacity:" << CapacityLeft() << endl;
+    //VERBOSE << LMSG << "IoBuffer capacity:" << CapacityLeft() << std::endl;
     size_t max_read = CapacityLeft();
     if (max_read > 1024*64)
     {
@@ -59,18 +55,18 @@ int IoBuffer::ReadFromFdAndWrite(const int& fd)
 
     if (bytes > 0)
     {
-        //VERBOSE << LMSG << "read " << bytes << " bytes" << endl;
+        //VERBOSE << LMSG << "read " << bytes << " bytes" << std::endl;
         end_ += bytes;
     }
     else if (bytes == 0)
     {
-        cout << LMSG << "close by peer" << endl;
+        std::cout << LMSG << "close by peer" << std::endl;
     }
     else
     {
         if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
         {
-            cout << LMSG << "read err:" << strerror(errno) << endl;
+            std::cout << LMSG << "read err:" << strerror(errno) << std::endl;
         }
     }
 
@@ -81,25 +77,25 @@ int IoBuffer::ReadFromFdAndWrite(const int& fd, sockaddr* addr, socklen_t* addr_
 {
     MakeSpaceIfNeed(kUdpMaxSize);
 
-    //VERBOSE << LMSG << "IoBuffer capacity:" << CapacityLeft() << endl;
+    //VERBOSE << LMSG << "IoBuffer capacity:" << CapacityLeft() << std::endl;
 
     int bytes = recvfrom(fd, end_, CapacityLeft(), 0, addr, addr_len);
 
     if (bytes > 0)
     {
-        //VERBOSE << LMSG << "read " << bytes << " bytes" << endl;
+        //VERBOSE << LMSG << "read " << bytes << " bytes" << std::endl;
         end_ += bytes;
     }
     else if (bytes == 0)
     {
-        cout << LMSG << "udp read 0 bytes is impossible" << endl;
+        std::cout << LMSG << "udp read 0 bytes is impossible" << std::endl;
         assert(false);
     }
     else
     {
         if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
         {
-            cout << LMSG << "read err:" << strerror(errno) << endl;
+            std::cout << LMSG << "read err:" << strerror(errno) << std::endl;
         }
     }
 
@@ -123,7 +119,7 @@ int IoBuffer::WriteToFd(const int& fd)
     return ret;
 }
 
-int IoBuffer::Write(const string& data)
+int IoBuffer::Write(const std::string& data)
 {
     return Write((const uint8_t*)data.data(), data.length());
 }
@@ -216,9 +212,9 @@ int IoBuffer::MakeSpaceIfNeed(const size_t& len)
         return 0;
     }
 
-    size_t new_capacity = max(capacity_ + len, capacity_ * 2);
+    size_t new_capacity = std::max(capacity_ + len, capacity_ * 2);
 
-    //cout << LMSG << "cur_capacity:" << cur_capacity << ",new_capacity:" << new_capacity << endl;
+    //std::cout << LMSG << "cur_capacity:" << cur_capacity << ",new_capacity:" << new_capacity << std::endl;
 
     buf_ = (uint8_t*)realloc(buf_, new_capacity);
 
@@ -359,7 +355,7 @@ int IoBuffer::Peek(uint8_t*& data, const size_t& begin_pos, const size_t& len)
 {
     if (Size() < (begin_pos + len))
     {
-        cout << LMSG << "[" << begin_pos << "," << (begin_pos + len) << ") overflow" << endl;
+        std::cout << LMSG << "[" << begin_pos << "," << (begin_pos + len) << ") overflow" << std::endl;
         return -1;
     }
 
@@ -454,7 +450,7 @@ int IoBuffer::Skip(const size_t& len)
 {
     if (Size() < len)
     {
-        cout << LMSG << "len:" << len << " overflow" << endl;
+        std::cout << LMSG << "len:" << len << " overflow" << std::endl;
     }
 
     start_ += len;

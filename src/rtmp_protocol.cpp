@@ -15,31 +15,11 @@
 #include "http_flv_protocol.h"
 #include "io_buffer.h"
 #include "local_stream_center.h"
+#include "protocol_factory.h"
 #include "rtmp_protocol.h"
 #include "fd.h"
-#include "rtmp_mgr.h"
 #include "tcp_socket.h"
 #include "util.h"
-
-#define WS "ws.upstream.huya.com"
-#define TX "tx.direct.huya.com"
-#define AL "al.direct.huya.com"
-#define WS_PUSH "ws1.upstream.huya.com"
-#define TX_PUSH "tx.push.huya.com"
-#define AL_PUSH "al.push.huya.com"
-
-#define CDN_PORT 1935
-
-using namespace std;
-using namespace socket_util;
-
-using any::Any;
-using any::Int;
-using any::Double;
-using any::String;
-using any::Vector;
-using any::Map;
-using any::Null;
 
 extern LocalStreamCenter g_local_stream_center;
 
@@ -72,7 +52,7 @@ static uint8_t kFlashPlayerKey[] =
     0xE6, 0x36, 0xCF, 0xEB, 0x31, 0xAE 
 };
 
-static int HmacEncode(const string& algo, const uint8_t* key, const int& key_length,  
+static int HmacEncode(const std::string& algo, const uint8_t* key, const int& key_length,  
                       const uint8_t* input, const int& input_length,  
                       uint8_t* output, unsigned int& output_length) 
 {  
@@ -108,7 +88,7 @@ static int HmacEncode(const string& algo, const uint8_t* key, const int& key_len
     }    
     else 
     {    
-        cout << LMSG << "Algorithm " << algo << " is not supported by this program!" << endl;  
+        std::cout << LMSG << "Algorithm " << algo << " is not supported by this program!" << std::endl;  
         return -1;  
     }    
   
@@ -123,53 +103,46 @@ static int HmacEncode(const string& algo, const uint8_t* key, const int& key_len
     return 0;   
 }
 
-RtmpProtocol::RtmpProtocol(Epoller* epoller, Fd* fd)
-    :
-    MediaPublisher(),
-    MediaSubscriber(kRtmp),
-    epoller_(epoller),
-    socket_(fd),
-    handshake_status_(kStatus_0),
-    role_(RtmpRole::kUnknownRtmpRole),
-    version_(3),
-    scheme_(0),
-    encrypted_(false),
-    in_chunk_size_(128),
-    out_chunk_size_(128),
-    transaction_id_(0.0),
-    media_publisher_(NULL),
-    can_publish_(false),
-    video_frame_send_(0),
-    audio_frame_send_(0),
-    last_video_timestamp_(0),
-    last_video_timestamp_delta_(0),
-    last_audio_timestamp_(0),
-    last_audio_timestamp_delta_(0),
-    last_video_message_length_(0),
-    last_audio_message_length_(0),
-    last_message_type_id_(0),
-    dump_(false),
-    dump_fd_(-1)
+RtmpProtocol::RtmpProtocol(IoLoop* io_loop, Fd* fd)
+    : MediaPublisher()
+    , MediaSubscriber(kRtmp)
+    , io_loop_(io_loop)
+    , socket_(fd)
+    , handshake_status_(kStatus_0)
+    , role_(RtmpRole::kUnknownRtmpRole)
+    , version_(3)
+    , scheme_(0)
+    , encrypted_(false)
+    , in_chunk_size_(128)
+    , out_chunk_size_(128)
+    , transaction_id_(0.0)
+    , can_publish_(false)
 {
-    cout << LMSG << endl;
-
-    if (dump_)
-    {
-        OpenDumpFile();
-    }
+    std::cout << LMSG << std::endl;
 }
 
 RtmpProtocol::~RtmpProtocol()
 {
-    cout << LMSG << endl;
+    std::cout << LMSG << std::endl;
 }
 
-int RtmpProtocol::ParseRtmpUrl(const string& url, RtmpUrl& rtmp_url)
+int RtmpProtocol::HandleRead(IoBuffer& io_buffer, Fd& socket)
+{ 
+    int ret = kError;
+    do
+    {
+        ret = Parse(io_buffer);
+    } while (ret == kSuccess);
+
+    return ret;
+}
+
+int RtmpProtocol::ParseRtmpUrl(const std::string& url, RtmpUrl& rtmp_url)
 {
     size_t pre_pos = 0;
     auto pos = url.find("rtmp://");
 
-    if (pos == string::npos)
+    if (pos == std::string::npos)
     {
         return -1;
     }
@@ -179,18 +152,18 @@ int RtmpProtocol::ParseRtmpUrl(const string& url, RtmpUrl& rtmp_url)
 
     pos = url.find("/", pre_pos);
 
-    if (pos == string::npos)
+    if (pos == std::string::npos)
     {
         return -1;
     }
 
-    string ip_port = url.substr(pre_pos, pos - pre_pos);
+    std::string ip_port = url.substr(pre_pos, pos - pre_pos);
 
-    string ip;
+    std::string ip;
     uint16_t port;
     {
         auto pos = ip_port.find(":");
-        if (pos == string::npos)
+        if (pos == std::string::npos)
         {
             ip = ip_port;
             port = 1935;
@@ -207,20 +180,20 @@ int RtmpProtocol::ParseRtmpUrl(const string& url, RtmpUrl& rtmp_url)
 
     pos = url.find("/", pre_pos);
 
-    if (pos == string::npos)
+    if (pos == std::string::npos)
     {
         return -1;
     }
 
-    string app = url.substr(pre_pos, pos - pre_pos);
+    std::string app = url.substr(pre_pos, pos - pre_pos);
 
     pos += 1;
     pre_pos = pos;
     
     pos = url.find("?", pre_pos);
 
-    string stream = "";
-    if (pos == string::npos)
+    std::string stream = "";
+    if (pos == std::string::npos)
     {
         stream = url.substr(pre_pos);
     }
@@ -237,15 +210,15 @@ int RtmpProtocol::ParseRtmpUrl(const string& url, RtmpUrl& rtmp_url)
     pos += 1;
     pre_pos = pos;
 
-    string args_str = url.substr(pos);
+    std::string args_str = url.substr(pos);
 
-    vector<string> kv_vec = Util::SepStr(args_str, "&");
-    map<string, string> args;
+    std::vector<std::string> kv_vec = Util::SepStr(args_str, "&");
+    std::map<std::string, std::string> args;
 
-    ostringstream os;
+    std::ostringstream os;
     for (const auto& item : kv_vec)
     {
-        vector<string> kv = Util::SepStr(item, "=");
+        std::vector<std::string> kv = Util::SepStr(item, "=");
 
         os << "(" << item << ") ";
 
@@ -261,7 +234,7 @@ int RtmpProtocol::ParseRtmpUrl(const string& url, RtmpUrl& rtmp_url)
     rtmp_url.stream = stream;
     rtmp_url.args = args;
 
-    cout << LMSG << "ip:" << ip << ",port:" << port << ",app:" << app << ",stream:" << stream << ",args:" << os.str() << endl;
+    std::cout << LMSG << "ip:" << ip << ",port:" << port << ",app:" << app << ",stream:" << stream << ",args:" << os.str() << std::endl;
 
     return 0;
 }
@@ -277,7 +250,7 @@ uint32_t RtmpProtocol::GetDigestOffset(const uint8_t scheme, const uint8_t* buf)
 
         if (offset + 32 >= 1536)
         {
-            cout << LMSG << "invalid offset:" << offset << endl;
+            std::cout << LMSG << "invalid offset:" << offset << std::endl;
         }
     }
     else if (scheme == 1)
@@ -288,11 +261,11 @@ uint32_t RtmpProtocol::GetDigestOffset(const uint8_t scheme, const uint8_t* buf)
 
         if (offset + 32 >= 1536)
         {
-            cout << LMSG << "invalid offset:" << offset << endl;
+            std::cout << LMSG << "invalid offset:" << offset << std::endl;
         }
     }
 
-    cout << LMSG << "scheme:" << (int)scheme << ",offset:" << offset << endl;
+    std::cout << LMSG << "scheme:" << (int)scheme << ",offset:" << offset << std::endl;
 
     return offset;
 }
@@ -308,7 +281,7 @@ uint32_t RtmpProtocol::GetKeyOffset(const uint8_t& scheme, const uint8_t* buf)
 
         if (offset + 128 >= 1536)
         {
-            cout << LMSG << "invalid offset:" << offset << endl;
+            std::cout << LMSG << "invalid offset:" << offset << std::endl;
         }
     }
     else if (scheme == 1)
@@ -319,19 +292,19 @@ uint32_t RtmpProtocol::GetKeyOffset(const uint8_t& scheme, const uint8_t* buf)
 
         if (offset + 128 >= 1536)
         {
-            cout << LMSG << "invalid offset:" << offset << endl;
+            std::cout << LMSG << "invalid offset:" << offset << std::endl;
         }
     }
 
-    cout << LMSG << "scheme:" << (int)scheme << ",offset:" << offset << endl;
+    std::cout << LMSG << "scheme:" << (int)scheme << ",offset:" << offset << std::endl;
 
     return offset;
 }
 
 bool RtmpProtocol::GuessScheme(const uint8_t& scheme, const uint8_t* buf)
 {
-    cout << LMSG << "s1:\n" << Util::Bin2Hex(buf, 1536) << endl;
-    cout << LMSG << "scheme:" << (int)scheme << endl;
+    std::cout << LMSG << "s1:\n" << Util::Bin2Hex(buf, 1536) << std::endl;
+    std::cout << LMSG << "scheme:" << (int)scheme << std::endl;
     uint32_t client_digest_offset = GetDigestOffset(scheme, buf);
 
     uint8_t cal_buf[1536 - 32] = {0};
@@ -339,16 +312,16 @@ bool RtmpProtocol::GuessScheme(const uint8_t& scheme, const uint8_t* buf)
     memcpy(cal_buf, buf, client_digest_offset);
     memcpy(cal_buf + client_digest_offset, buf + client_digest_offset + 32, 1536 - client_digest_offset - 32);
 
-    cout << LMSG << "cal_buf:\n" << Util::Bin2Hex(cal_buf, 1536 - 32) << endl;
+    std::cout << LMSG << "cal_buf:\n" << Util::Bin2Hex(cal_buf, 1536 - 32) << std::endl;
 
     uint8_t sha256[256] = {0};
     uint8_t* p_sha256 = sha256;
     unsigned int sha256_out_len = 0;
     HmacEncode("sha256", kFlashPlayerKey, 30, cal_buf, sizeof(cal_buf), p_sha256, sha256_out_len);
 
-    cout << LMSG << "sha256_out_len:" << sha256_out_len << endl;
-    cout << LMSG << Util::Bin2Hex(sha256, 32) << endl;
-    cout << LMSG << Util::Bin2Hex(buf + client_digest_offset, 32) << endl;
+    std::cout << LMSG << "sha256_out_len:" << sha256_out_len << std::endl;
+    std::cout << LMSG << Util::Bin2Hex(sha256, 32) << std::endl;
+    std::cout << LMSG << Util::Bin2Hex(buf + client_digest_offset, 32) << std::endl;
 
     return memcmp(sha256, buf + client_digest_offset, 32) == 0;
 }
@@ -363,19 +336,6 @@ void RtmpProtocol::GenerateRandom(uint8_t* data, const int& len)
 
 int RtmpProtocol::Parse(IoBuffer& io_buffer)
 {
-    // FIXME: 这个dump方法是不对的,可能会重复
-    if (dump_)
-    {
-        int io_buffer_size = io_buffer.Size();
-        uint8_t* dump = NULL;
-        io_buffer.Peek(dump, 0, io_buffer_size);
-
-        if (dump != NULL && io_buffer_size > 0)
-        {
-            DumpRtmp(dump, io_buffer_size);
-        }
-    }
-    
     if (IsHandshakeDone())
     {
         bool one_message_done = false;
@@ -582,7 +542,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
     {
         if (IsClientRole())
         {
-            cout << LMSG << "handshake_status_:" << handshake_status_ << ",io_buffer.Size():" << io_buffer.Size() << endl;
+            std::cout << LMSG << "handshake_status_:" << handshake_status_ << ",io_buffer.Size():" << io_buffer.Size() << std::endl;
 
             if (handshake_status_ == kStatus_2)
             {
@@ -624,7 +584,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
             }
             else
             {
-                cout << LMSG << "error" << endl;
+                std::cout << LMSG << "error" << std::endl;
                 return kError;
             }
         }
@@ -636,7 +596,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
                 {
                     if (io_buffer.ReadU8(version_) == 1)
                     {
-                        cout << LMSG << "version:" << (int)version_ << endl;
+                        std::cout << LMSG << "version:" << (int)version_ << std::endl;
                         handshake_status_ = kStatus_1;
                         return kSuccess;
                     }
@@ -651,7 +611,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
                 if (io_buffer.Size() >= s1_len)
                 {
                     uint8_t* peek_buf = NULL;
-                    cout << LMSG << io_buffer.Peek(peek_buf, 0, s1_len) << endl;
+                    std::cout << LMSG << io_buffer.Peek(peek_buf, 0, s1_len) << std::endl;
 
                     if (version_ == 3)
                     {
@@ -670,7 +630,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
 
                         if (zero == 0) // simple handshake
                         {
-                            cout << LMSG << "simple handshake" << endl;
+                            std::cout << LMSG << "simple handshake" << std::endl;
                             io_buffer.Read(buf, 1528);
 
                             // s0
@@ -690,7 +650,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
                             io_buffer.WriteU32(server_time);
                             io_buffer.Write(buf, 1528);
 
-                            io_buffer.WriteToFd(socket_->GetFd());
+                            io_buffer.WriteToFd(socket_->fd());
 
                             handshake_status_ = kStatus_2;
                             return kSuccess;
@@ -700,7 +660,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
                             // 已经peek了,剩下的不要
                             io_buffer.Skip(1528);
 
-                            cout << LMSG << "complex handshake" << endl;
+                            std::cout << LMSG << "complex handshake" << std::endl;
                             bool guess_success = false;
                             for (int i = 0; i < 2; ++i)
                             {
@@ -710,14 +670,14 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
                                 {
                                     scheme_ = i;
                                     guess_success = true;
-                                    cout << LMSG << "use scheme " << scheme_ << endl;
+                                    std::cout << LMSG << "use scheme " << scheme_ << std::endl;
                                     break;
                                 }
                             }
 
                             if (! guess_success)
                             {
-                                cout << LMSG << "scheme guess failed" << endl;
+                                std::cout << LMSG << "scheme guess failed" << std::endl;
                                 return kClose;
                             }
 
@@ -766,7 +726,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
                                 uint32_t server_dh_offset = GetKeyOffset(scheme_, s1);
                                 uint32_t client_dh_offset = GetKeyOffset(scheme_, peek_buf);
 
-                                cout << LMSG << "server_dh_offset:" << server_dh_offset << ",client_dh_offset:" << client_dh_offset << endl;
+                                std::cout << LMSG << "server_dh_offset:" << server_dh_offset << ",client_dh_offset:" << client_dh_offset << std::endl;
 
                                 DhTool dh_tool;
                                 dh_tool.Initialize(1024);
@@ -775,7 +735,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
 
                                 uint32_t server_digest_offset = GetDigestOffset(scheme_, s1);
 
-                                cout << LMSG << "server_digest_offset:" << server_digest_offset << endl;
+                                std::cout << LMSG << "server_digest_offset:" << server_digest_offset << std::endl;
 
                                 uint8_t cal_buf[1536 - 32];
 
@@ -786,12 +746,12 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
                                 unsigned int sha256_out_len = 0;
                                 HmacEncode("sha256", kFlashMediaServerKey/*key*/, 36/*key len*/, cal_buf/*data*/, sizeof(cal_buf)/*data len*/, p_sha256, sha256_out_len);
 
-                                cout << LMSG << "server digest\n" << Util::Bin2Hex(p_sha256, sha256_out_len) << endl;
-                                cout << LMSG << "s1\n" << Util::Bin2Hex(s1, s1_len) << endl;
+                                std::cout << LMSG << "server digest\n" << Util::Bin2Hex(p_sha256, sha256_out_len) << std::endl;
+                                std::cout << LMSG << "s1\n" << Util::Bin2Hex(s1, s1_len) << std::endl;
 
                                 // s1 response cal
                                 uint32_t client_digest_offset = GetDigestOffset(scheme_, peek_buf);
-                                cout << LMSG << "client_digest_offset:" << client_digest_offset << endl;
+                                std::cout << LMSG << "client_digest_offset:" << client_digest_offset << std::endl;
                                 uint8_t client_digest_sha256[32] = {0};
                                 // 将客户端的digest用kFlashMediaServerKey做一次sha256
                                 HmacEncode("sha256", kFlashMediaServerKey/*key*/, 68/*key len*/, peek_buf + client_digest_offset/*data*/, 32/*data len*/, client_digest_sha256, sha256_out_len);
@@ -806,7 +766,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
                                 io_buffer.WriteU8(3);
                                 io_buffer.Write(s1, s1_len);
                                 io_buffer.Write(s2, s2_len);
-                                io_buffer.WriteToFd(socket_->GetFd());
+                                io_buffer.WriteToFd(socket_->fd());
 
                                 handshake_status_ = kStatus_2;
                                 return kSuccess;
@@ -816,7 +776,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
                     }
                     else if (version_ == 6) 
                     {
-                        cout << LMSG << "encrypted" << endl;
+                        std::cout << LMSG << "encrypted" << std::endl;
                         encrypted_ = true;
                     }
                 }
@@ -846,7 +806,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
 
                     SetOutChunkSize(4096);
 
-                    cout << LMSG << "Handshake done!!!" << endl;
+                    std::cout << LMSG << "Handshake done!!!" << std::endl;
                     return kSuccess;
                 }
                 else
@@ -857,13 +817,13 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer)
         }
         //else
         //{
-        //    cout << LMSG << "unknow rtmp role " << (int)role_ << endl;
+        //    std::cout << LMSG << "unknow rtmp role " << (int)role_ << std::endl;
         //}
     }
 
     assert(false);
     // avoid warning
-    cout << LMSG << "error" << endl;
+    std::cout << LMSG << "error" << std::endl;
     return kError;
 }
 
@@ -874,7 +834,7 @@ int RtmpProtocol::OnSetChunkSize(RtmpMessage& rtmp_msg)
     uint32_t chunk_size = 0;
     bit_buffer.GetBytes(4, chunk_size);
 
-    cout << LMSG << "chunk_size:" << in_chunk_size_ << "->" << chunk_size << endl;
+    std::cout << LMSG << "chunk_size:" << in_chunk_size_ << "->" << chunk_size << std::endl;
 
     in_chunk_size_ = chunk_size;
 
@@ -888,7 +848,7 @@ int RtmpProtocol::OnAcknowledgement(RtmpMessage& rtmp_msg)
     uint32_t sequence_number = 0;
     bit_buffer.GetBytes(4, sequence_number);
 
-    cout << LMSG << "sequence_number:" << sequence_number << endl;
+    std::cout << LMSG << "sequence_number:" << sequence_number << std::endl;
 
     return kSuccess;
 }
@@ -900,7 +860,7 @@ int RtmpProtocol::OnWindowAcknowledgementSize(RtmpMessage& rtmp_msg)
     uint32_t ack_window_size = 0;
     bit_buffer.GetBytes(4, ack_window_size);
 
-    cout << LMSG << "ack_window_size:" << ack_window_size << endl;
+    std::cout << LMSG << "ack_window_size:" << ack_window_size << std::endl;
 
     SendUserControlMessage(0, 0);
 
@@ -917,9 +877,9 @@ int RtmpProtocol::OnSetPeerBandwidth(RtmpMessage& rtmp_msg)
     uint8_t limit_type = 0;
     bit_buffer.GetBytes(1, limit_type);
 
-    cout << LMSG << "ack_window_size:" << ack_window_size
+    std::cout << LMSG << "ack_window_size:" << ack_window_size
                  << ", limit_type:" << (int)limit_type 
-                 << endl;
+                 << std::endl;
 
     return kSuccess;
 }
@@ -934,14 +894,14 @@ int RtmpProtocol::OnUserControlMessage(RtmpMessage& rtmp_msg)
     uint32_t data = 0;
     bit_buffer.GetBytes(4, data);
 
-    cout << LMSG << "user control message, event:" << event << ",data:" << data << endl;
+    std::cout << LMSG << "user control message, event:" << event << ",data:" << data << std::endl;
 
     return kSuccess;
 }
 
 int RtmpProtocol::OnAudio(RtmpMessage& rtmp_msg)
 {
-    //cout << LMSG << "timestamp:" << rtmp_msg.timestamp << ",timestamp_delta:" << rtmp_msg.timestamp_delta << ",timestamp_calc:" << rtmp_msg.timestamp_calc << endl;
+    //std::cout << LMSG << "timestamp:" << rtmp_msg.timestamp << ",timestamp_delta:" << rtmp_msg.timestamp_delta << ",timestamp_calc:" << rtmp_msg.timestamp_calc << std::endl;
     if (rtmp_msg.len >= 2)
     {
         BitBuffer bit_buffer(rtmp_msg.msg, 2);
@@ -962,10 +922,10 @@ int RtmpProtocol::OnAudio(RtmpMessage& rtmp_msg)
         {
             if (aac_packet_type == 0)
             {
-                string audio_header((const char*)rtmp_msg.msg + 2, rtmp_msg.len - 2);
+                std::string audio_header((const char*)rtmp_msg.msg + 2, rtmp_msg.len - 2);
 
-                cout << LMSG << "recv audio_header,size:" << audio_header.size() << endl;
-                cout << Util::Bin2Hex(audio_header) << endl;
+                std::cout << LMSG << "recv audio_header,size:" << audio_header.size() << std::endl;
+                std::cout << Util::Bin2Hex(audio_header) << std::endl;
 
                 media_muxer_.OnAudioHeader(audio_header);
 
@@ -986,37 +946,12 @@ int RtmpProtocol::OnAudio(RtmpMessage& rtmp_msg)
                 {
                     sub->SendMediaData(audio_payload);
                 }
-
-                /*
-                for (auto& dst : rtmp_forwards_)
-                {
-                    if (dst->CanPublish())
-                    {
-                        dst->SendMediaData(audio_payload);
-                    }
-                }
-
-                for (auto& player : rtmp_player_)
-                {
-                    player->SendMediaData(audio_payload);
-                }
-
-                for (auto& player : flv_player_)
-                {
-                    player->SendMediaData(audio_payload);
-                }
-
-                for (auto& follow : server_follow_)
-                {
-                    follow->SendMediaData(audio_payload);
-                }
-                */
             }
         }
     }
     else
     {
-        cout << LMSG << "impossible?" << endl;
+        std::cout << LMSG << "impossible?" << std::endl;
         assert(false);
     }
 
@@ -1064,7 +999,7 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
 
                         if (nalu_len > raw_len)
                         {
-                            cout << LMSG << "nalu_len:" << nalu_len << " > raw_len:" << raw_len;
+                            std::cout << LMSG << "nalu_len:" << nalu_len << " > raw_len:" << raw_len;
                             break;
                         }
 
@@ -1082,36 +1017,36 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
 
                         Payload video_payload(video_raw_data, nalu_len + 4);
 
-                        cout << LMSG << "nalu_unit_type:" << (int)nalu_unit_type << endl;
+                        //std::cout << LMSG << "nalu_unit_type:" << (int)nalu_unit_type << std::endl;
                         // SEI不能传给webrtc,不然会导致只能解码关键帧,其他帧都无法解码
                         if (nalu_unit_type != 6)
                         {
-                            g_webrtc_mgr->__DebugSendH264(video_raw_data + 4, nalu_len, rtmp_msg.timestamp_calc);
+                            //g_webrtc_mgr->__DebugSendH264(video_raw_data + 4, nalu_len, rtmp_msg.timestamp_calc);
                         }
 
                         video_payload.SetVideo();
                         video_payload.SetDts(rtmp_msg.timestamp_calc);
                         video_payload.SetPts(rtmp_msg.timestamp_calc);
 
-                        //cout << LMSG << "NALU type + 4byte payload peek:[" << Util::Bin2Hex(data+cur_len+4, 5) << endl;
+                        //std::cout << LMSG << "NALU type + 4byte payload peek:[" << Util::Bin2Hex(data+cur_len+4, 5) << std::endl;
 
                         if (nalu_unit_type == 6)
                         {
-                            //cout << LMSG << "SEI [" << Util::Bin2Hex(data + cur_len + 4, nalu_len) << "]" << endl;
+                            //std::cout << LMSG << "SEI [" << Util::Bin2Hex(data + cur_len + 4, nalu_len) << "]" << std::endl;
                             to_media_muxer = false;
                         }
                         else if (nalu_unit_type == 7)
                         {
-                            cout << LMSG << "SPS [" << Util::Bin2Hex(data + cur_len + 4, nalu_len) << "]" << endl;
+                            std::cout << LMSG << "SPS [" << Util::Bin2Hex(data + cur_len + 4, nalu_len) << "]" << std::endl;
                         }
                         else if (nalu_unit_type == 8)
                         {
-                            cout << LMSG << "PPS [" << Util::Bin2Hex(data + cur_len + 4, nalu_len) << "]" << endl;
+                            std::cout << LMSG << "PPS [" << Util::Bin2Hex(data + cur_len + 4, nalu_len) << "]" << std::endl;
                         }
                         else if (nalu_unit_type == 5)
                         {
                             to_media_muxer = true;
-                            cout << LMSG << "IDR" << endl;
+                            std::cout << LMSG << "IDR" << std::endl;
                             video_payload.SetIFrame();
                             video_payload.SetPts(rtmp_msg.timestamp_calc + compositio_time_offset);
                         }
@@ -1121,13 +1056,13 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
 
                             if (nal_ref_idc == 2)
                             {
-                                //cout << LMSG << "P" << endl;
+                                //std::cout << LMSG << "P" << std::endl;
                                 video_payload.SetPFrame();
                                 video_payload.SetPts(rtmp_msg.timestamp_calc + compositio_time_offset);
                             }
                             else if (nal_ref_idc == 0)
                             {
-                                //cout << LMSG << "B" << endl;
+                                //std::cout << LMSG << "B" << std::endl;
                                 video_payload.SetBFrame();
                                 video_payload.SetPts(rtmp_msg.timestamp_calc + compositio_time_offset);
                             }
@@ -1135,13 +1070,13 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
                             {
                                 if (compositio_time_offset == 0)
                                 {
-                                    //cout << LMSG << "B/P => P" << endl;
+                                    //std::cout << LMSG << "B/P => P" << std::endl;
                                     video_payload.SetPFrame();
                                     video_payload.SetPts(rtmp_msg.timestamp_calc + compositio_time_offset);
                                 }
                                 else
                                 {
-                                    //cout << LMSG << "B/P => B" << endl;
+                                    //std::cout << LMSG << "B/P => B" << std::endl;
                                     video_payload.SetBFrame();
                                     video_payload.SetPts(rtmp_msg.timestamp_calc + compositio_time_offset);
                                 }
@@ -1154,44 +1089,12 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
 
                         if (to_media_muxer)
                         {
-                            if (media_muxer_.GetForwardToggleBit())
-                            {
-                                //ConnectForwardRtmpServer(WS_PUSH, CDN_PORT);
-                                //ConnectForwardRtmpServer(AL_PUSH, CDN_PORT);
-                                //ConnectForwardRtmpServer(TX_PUSH, CDN_PORT);
-                            }
-
                             media_muxer_.OnVideo(video_payload);
 
                             for (auto& sub : subscriber_)
                             {
                                 sub->SendMediaData(video_payload);
                             }
-
-                            /*
-                            for (auto& dst : rtmp_forwards_)
-                            {
-                                if (dst->CanPublish())
-                                {
-                                    dst->SendMediaData(video_payload);
-                                }
-                            }
-
-                            for (auto& player : rtmp_player_)
-                            {
-                                player->SendMediaData(video_payload);
-                            }
-
-                            for (auto& player : flv_player_)
-                            {
-                                player->SendMediaData(video_payload);
-                            }
-
-                            for (auto& follow : server_follow_)
-                            {
-                                follow->SendMediaData(video_payload);
-                            }
-                            */
                         }
 
                         cur_len += nalu_len + 4;
@@ -1204,7 +1107,7 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
     }
     else
     {
-        cout << LMSG << "impossible?" << endl;
+        std::cout << LMSG << "impossible?" << std::endl;
         assert(false);
     }
 
@@ -1213,11 +1116,11 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
 
 int RtmpProtocol::OnAmf0Message(RtmpMessage& rtmp_msg)
 {
-    string amf((const char*)rtmp_msg.msg, rtmp_msg.len);
+    std::string amf((const char*)rtmp_msg.msg, rtmp_msg.len);
 
     AmfCommand amf_command;
     int ret = Amf0::Decode(amf,  amf_command);
-    cout << LMSG << "ret:" << ret << ", amf_command.size():" <<  amf_command.size() << ",rtmp:" << rtmp_msg.ToString() << endl;
+    std::cout << LMSG << "ret:" << ret << ", amf_command.size():" <<  amf_command.size() << ",rtmp:" << rtmp_msg.ToString() << std::endl;
 
     for (size_t index = 0; index != amf_command.size(); ++index)
     {
@@ -1225,24 +1128,24 @@ int RtmpProtocol::OnAmf0Message(RtmpMessage& rtmp_msg)
 
         if (command != NULL)
         {
-            cout << LMSG << "v type:" << command->TypeStr() << endl;
+            std::cout << LMSG << "v type:" << command->TypeStr() << std::endl;
         }
         else
         {
-            cout << LMSG << "v NULL" << endl;
+            std::cout << LMSG << "v NULL" << std::endl;
         }
     }
 
     if (ret == 0 &&  amf_command.size() >= 1)
     {
-        string command = "";
+        std::string command = "";
         if ( amf_command[0]->GetString(command))
         {
-            cout << LMSG << "recv [" << command << " command]" << endl;
+            std::cout << LMSG << "recv [" << command << " command]" << std::endl;
 
             if (IsClientRole())
             {
-                cout << LMSG << "command:" << command << ",last_send_command_:" << last_send_command_ << ",transaction_id_:" << transaction_id_ << endl;
+                std::cout << LMSG << "command:" << command << ",last_send_command_:" << last_send_command_ << ",transaction_id_:" << transaction_id_ << std::endl;
             }
 
             if (command == "connect")
@@ -1302,13 +1205,13 @@ int RtmpProtocol::OnAmf0Message(RtmpMessage& rtmp_msg)
 int RtmpProtocol::OnConnectCommand(AmfCommand& amf_command)
 {
     double trans_id = 0;
-    map<string, Any*> command_object;
+    std::map<std::string, any::Any*> command_object;
 
     if (amf_command.size() >= 3)
     {
         if (amf_command[1]->GetDouble(trans_id))
         {
-            cout << LMSG << "transaction_id:" << trans_id << endl;
+            std::cout << LMSG << "transaction_id:" << trans_id << std::endl;
         }
         if (amf_command[2]->GetMap(command_object))
         {
@@ -1316,15 +1219,15 @@ int RtmpProtocol::OnConnectCommand(AmfCommand& amf_command)
             {
                 if (kv.first == "app")
                 {
-                    string app;
+                    std::string app;
                     if (kv.second->GetString(app))
                     {
                         auto pos = app.find("/");
-                        if (pos != string::npos)
+                        if (pos != std::string::npos)
                         {
                             app = app.substr(0, pos);
                         }
-                        cout << LMSG << "app = " << app << endl;
+                        std::cout << LMSG << "app = " << app << std::endl;
                         SetApp(app);
                     }
                 }
@@ -1333,7 +1236,7 @@ int RtmpProtocol::OnConnectCommand(AmfCommand& amf_command)
                 {
                     if (kv.second->GetString(tc_url_))
                     {
-                        cout << LMSG << "tcUrl = " << tc_url_ << endl;
+                        std::cout << LMSG << "tcUrl = " << tc_url_ << std::endl;
 
                         RtmpUrl rtmp_url;
                         ParseRtmpUrl(tc_url_, rtmp_url);
@@ -1349,21 +1252,21 @@ int RtmpProtocol::OnConnectCommand(AmfCommand& amf_command)
 
         if (! app_.empty())
         {
-            String result("_result");
-            Double transaction_id(trans_id);
-            Map properties;
+            any::String result("_result");
+            any::Double transaction_id(trans_id);
+            any::Map properties;
 
-            String code("NetConnection.Connect.Success");
-            Map information({{"code", (Any*)&code}});
+            any::String code("NetConnection.Connect.Success");
+            any::Map information({{"code", (any::Any*)&code}});
 
 
             IoBuffer output;
-            vector<Any*> connect_result = { 
-                (Any*)&result, (Any*)&transaction_id, (Any*)&properties, (Any*)&information 
+            std::vector<any::Any*> connect_result = { 
+                (any::Any*)&result, (any::Any*)&transaction_id, (any::Any*)&properties, (any::Any*)&information 
             };
 
             int ret = Amf0::Encode(connect_result, output);
-            cout << LMSG << "Amf0 encode ret:" << ret << endl;
+            std::cout << LMSG << "Amf0 encode ret:" << ret << std::endl;
             if (ret == 0)
             {
                 uint8_t* data = NULL;
@@ -1392,14 +1295,14 @@ int RtmpProtocol::OnPlayCommand(RtmpMessage& rtmp_msg, AmfCommand& amf_command)
     {
         if (amf_command[1]->GetDouble(trans_id))
         {
-            cout << LMSG << "transaction_id:" << trans_id << endl;
+            std::cout << LMSG << "transaction_id:" << trans_id << std::endl;
         }
 
         if (stream_.empty())
         {
             if (amf_command[3]->GetString(stream_))
             {
-                cout << LMSG << "stream:" << stream_ << endl;
+                std::cout << LMSG << "stream:" << stream_ << std::endl;
             }
         }
 
@@ -1407,21 +1310,21 @@ int RtmpProtocol::OnPlayCommand(RtmpMessage& rtmp_msg, AmfCommand& amf_command)
 
         if (media_publisher == NULL)
         {
-            cout << LMSG << "no found app:" << app_ << ", stream_:" << stream_ << endl;
+            std::cout << LMSG << "no found app:" << app_ << ", stream_:" << stream_ << std::endl;
 			return kError;
 		}
 
-        String on_status("onStatus");
-        Double transaction_id(0.0);
-        Null null;
+        any::String on_status("onStatus");
+        any::Double transaction_id(0.0);
+        any::Null null;
 
-        String code("NetStream.Play.Start");
-        Map information({{"code", (Any*)&code}});
+        any::String code("NetStream.Play.Start");
+        any::Map information({{"code", (any::Any*)&code}});
 
         IoBuffer output;
-        vector<Any*> play_result = {(Any*)&on_status, (Any*)&transaction_id, (Any*)&null, (Any*)&information};
+        std::vector<any::Any*> play_result = {(any::Any*)&on_status, (any::Any*)&transaction_id, (any::Any*)&null, (any::Any*)&information};
         int ret = Amf0::Encode(play_result, output);
-        cout << LMSG << "Amf0 encode ret:" << ret << endl;
+        std::cout << LMSG << "Amf0 encode ret:" << ret << std::endl;
         if (ret == 0)
         {
             uint8_t* data = NULL;
@@ -1432,7 +1335,7 @@ int RtmpProtocol::OnPlayCommand(RtmpMessage& rtmp_msg, AmfCommand& amf_command)
                 SendRtmpMessage(rtmp_msg.cs_id, rtmp_msg.message_stream_id, kAmf0Command, data, len);
             }
 
-            SetMediaPublisher(media_publisher);
+            SetPublisher(media_publisher);
             media_publisher->AddSubscriber(this);
         }
     }
@@ -1450,18 +1353,18 @@ int RtmpProtocol::OnPublishCommand(RtmpMessage& rtmp_msg, AmfCommand& amf_comman
     {
         if (amf_command[1]->GetDouble(trans_id))
         {
-            cout << LMSG << "transaction_id:" << trans_id << endl;
+            std::cout << LMSG << "transaction_id:" << trans_id << std::endl;
         }
 
         if (stream_.empty())
         {
-            string stream;
+            std::string stream;
             if (amf_command[3]->GetString(stream))
             {
-                cout << LMSG << "stream:" << stream << endl;
+                std::cout << LMSG << "stream:" << stream << std::endl;
 
                 auto args_pos = stream.find("?");
-                if (args_pos != string::npos)
+                if (args_pos != std::string::npos)
                 {
                     stream = stream.substr(0, args_pos);
                 }
@@ -1469,7 +1372,7 @@ int RtmpProtocol::OnPublishCommand(RtmpMessage& rtmp_msg, AmfCommand& amf_comman
 
 				if (g_local_stream_center.RegisterStream(app_, stream_, this) == false)
                 {
-                    cout << LMSG << "error" << endl;
+                    std::cout << LMSG << "error" << std::endl;
                     return kError;
                 }
             }
@@ -1478,21 +1381,21 @@ int RtmpProtocol::OnPublishCommand(RtmpMessage& rtmp_msg, AmfCommand& amf_comman
         {
 			if (g_local_stream_center.RegisterStream(app_, stream_, this) == false)
             {
-                cout << LMSG << "app:" << app_ << ",stream:" << stream_ << " already register" << endl;
+                std::cout << LMSG << "app:" << app_ << ",stream:" << stream_ << " already register" << std::endl;
             }
         }
 
-        String on_status("onStatus");
-        Double transaction_id(0.0);
-        Null null;
+        any::String on_status("onStatus");
+        any::Double transaction_id(0.0);
+        any::Null null;
 
-        String code("NetStream.Publish.Start");
-        Map information({{"code", (Any*)&code}});
+        any::String code("NetStream.Publish.Start");
+        any::Map information({{"code", (any::Any*)&code}});
 
         IoBuffer output;
-        vector<Any*> publish_result = {(Any*)&on_status, (Any*)&transaction_id, (Any*)&null, (Any*)&information};
+        std::vector<any::Any*> publish_result = {(any::Any*)&on_status, (any::Any*)&transaction_id, (any::Any*)&null, (any::Any*)&information};
         int ret = Amf0::Encode(publish_result, output);
-        cout << LMSG << "Amf0 encode ret:" << ret << endl;
+        std::cout << LMSG << "Amf0 encode ret:" << ret << std::endl;
         if (ret == 0)
         {
             uint8_t* data = NULL;
@@ -1517,20 +1420,20 @@ int RtmpProtocol::OnCreateStreamCommand(RtmpMessage& rtmp_msg, AmfCommand& amf_c
     {
         if (amf_command[1]->GetDouble(trans_id))
         {
-            cout << LMSG << "transaction_id:" << trans_id << endl;
+            std::cout << LMSG << "transaction_id:" << trans_id << std::endl;
 
-            String result("_result");
-            Double transaction_id(trans_id);
-            Null command_object;
-            Double stream_id(1.0);
+            any::String result("_result");
+            any::Double transaction_id(trans_id);
+            any::Null command_object;
+            any::Double stream_id(1.0);
 
             IoBuffer output;
-            vector<Any*> create_stream_result = { 
-                (Any*)&result, (Any*)&transaction_id, (Any*)&command_object, (Any*)&stream_id 
+            std::vector<any::Any*> create_stream_result = { 
+                (any::Any*)&result, (any::Any*)&transaction_id, (any::Any*)&command_object, (any::Any*)&stream_id 
             };
 
             int ret = Amf0::Encode(create_stream_result, output);
-            cout << LMSG << "Amf0 encode ret:" << ret << endl;
+            std::cout << LMSG << "Amf0 encode ret:" << ret << std::endl;
             if (ret == 0)
             {
                 uint8_t* data = NULL;
@@ -1552,14 +1455,14 @@ int RtmpProtocol::OnResultCommand(AmfCommand& amf_command)
     double transaction_id = 0.0;
     if (amf_command.size() >= 2 && amf_command[1]->GetDouble(transaction_id))
     {
-        cout << LMSG << "in _result, transaction_id:" << transaction_id << endl;
+        std::cout << LMSG << "in _result, transaction_id:" << transaction_id << std::endl;
     }
 
     if (id_command_.count(transaction_id))
     {
-        cout << LMSG << DumpIdCommand() << endl;
-        string pre_call = id_command_[transaction_id];
-        cout << LMSG << "pre_call " << transaction_id << " [" << pre_call << "]" << endl;
+        std::cout << LMSG << DumpIdCommand() << std::endl;
+        std::string pre_call = id_command_[transaction_id];
+        std::cout << LMSG << "pre_call " << transaction_id << " [" << pre_call << "]" << std::endl;
         if (pre_call == "connect")
         {
             if (role_ == RtmpRole::kPushServer)
@@ -1572,7 +1475,7 @@ int RtmpProtocol::OnResultCommand(AmfCommand& amf_command)
             else if (role_ == RtmpRole::kPullServer)
             {
                 SendCreateStream();
-                cout << LMSG << "pull server" << endl;
+                std::cout << LMSG << "pull server" << std::endl;
             }
         }
         else if (pre_call == "releaseStream")
@@ -1590,7 +1493,7 @@ int RtmpProtocol::OnResultCommand(AmfCommand& amf_command)
 
                 if (amf_command[3] != NULL && amf_command[3]->GetDouble(stream_id))
                 {
-                    cout << LMSG << "stream_id:" << stream_id << endl;
+                    std::cout << LMSG << "stream_id:" << stream_id << std::endl;
                 }
             }
 
@@ -1600,7 +1503,7 @@ int RtmpProtocol::OnResultCommand(AmfCommand& amf_command)
             }
             else if (role_ == RtmpRole::kPullServer)
             {
-                cout << LMSG << "pull server" << endl;
+                std::cout << LMSG << "pull server" << std::endl;
                 SendPlay(stream_id);
             }
         }
@@ -1621,11 +1524,11 @@ int RtmpProtocol::OnStatusCommand(AmfCommand& amf_command)
 
             if (role_ == RtmpRole::kPushServer)
             {
-                media_publisher_->AddSubscriber(this);
+                publisher_->AddSubscriber(this);
             }
             else if (role_ == RtmpRole::kClientPull)
             {
-                media_publisher_->AddSubscriber(this);
+                publisher_->AddSubscriber(this);
             }
         }
     }
@@ -1635,13 +1538,13 @@ int RtmpProtocol::OnStatusCommand(AmfCommand& amf_command)
 
 int RtmpProtocol::OnMetaData(RtmpMessage& rtmp_msg)
 {
-    string amf((const char*)rtmp_msg.msg, rtmp_msg.len);
+    std::string amf((const char*)rtmp_msg.msg, rtmp_msg.len);
 
     media_muxer_.OnMetaData(amf);
 
     AmfCommand amf_command;
     int ret = Amf0::Decode(amf,  amf_command);
-    cout << LMSG << "ret:" << ret << ", amf_command.size():" <<  amf_command.size() << endl;
+    std::cout << LMSG << "ret:" << ret << ", amf_command.size():" <<  amf_command.size() << std::endl;
 
     for (size_t index = 0; index != amf_command.size(); ++index)
     {
@@ -1649,11 +1552,11 @@ int RtmpProtocol::OnMetaData(RtmpMessage& rtmp_msg)
 
         if (command != NULL)
         {
-            cout << LMSG << "v type:" << command->TypeStr() << endl;
+            std::cout << LMSG << "v type:" << command->TypeStr() << std::endl;
         }
         else
         {
-            cout << LMSG << "v NULL" << endl;
+            std::cout << LMSG << "v NULL" << std::endl;
         }
     }
 
@@ -1665,7 +1568,7 @@ int RtmpProtocol::OnVideoHeader(RtmpMessage& rtmp_msg)
     // webrtc test
 #if 0
     {
-        string video_header((const char*)rtmp_msg.msg + 5, rtmp_msg.len - 5);
+        std::string video_header((const char*)rtmp_msg.msg + 5, rtmp_msg.len - 5);
         video_header.erase(0, 6);
 
         uint16_t sps_len = (uint8_t)(video_header[0]) << 8 | 
@@ -1673,22 +1576,22 @@ int RtmpProtocol::OnVideoHeader(RtmpMessage& rtmp_msg)
 
         video_header.erase(0, 2);
 
-        string sps = video_header.substr(0, sps_len);
+        std::string sps = video_header.substr(0, sps_len);
 
-        string pps = video_header.substr(sps_len + 3);
+        std::string pps = video_header.substr(sps_len + 3);
 
-        cout << "sps:" << Util::Bin2Hex(sps) << endl;
-        cout << "pps:" << Util::Bin2Hex(pps) << endl;
+        std::cout << "sps:" << Util::Bin2Hex(sps) << std::endl;
+        std::cout << "pps:" << Util::Bin2Hex(pps) << std::endl;
 
         g_webrtc_mgr->__DebugSendH264((const uint8_t*)sps.data(), sps.size(), 0);
         g_webrtc_mgr->__DebugSendH264((const uint8_t*)pps.data(), pps.size(), 0);
     }
 #endif
 
-    string video_header((const char*)rtmp_msg.msg + 5, rtmp_msg.len - 5);
+    std::string video_header((const char*)rtmp_msg.msg + 5, rtmp_msg.len - 5);
 
-    cout << LMSG << "recv video_header" << ",size:" << video_header.size() << endl;
-    cout << Util::Bin2Hex(video_header) << endl;
+    std::cout << LMSG << "recv video_header" << ",size:" << video_header.size() << std::endl;
+    std::cout << Util::Bin2Hex(video_header) << std::endl;
 
     return media_muxer_.OnVideoHeader(video_header);
 }
@@ -1697,7 +1600,7 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
 {
     if (IsClientRole())
     {
-        cout << LMSG << rtmp_msg.ToString() << endl;
+        std::cout << LMSG << rtmp_msg.ToString() << std::endl;
     }
 
     switch (rtmp_msg.message_type_id)
@@ -1770,18 +1673,21 @@ int RtmpProtocol::OnRtmpMessage(RtmpMessage& rtmp_msg)
 
         default: 
         {
-            cout << LMSG << "message_type_id:" << (uint16_t)rtmp_msg.message_type_id << endl;
+            std::cout << LMSG << "message_type_id:" << (uint16_t)rtmp_msg.message_type_id << std::endl;
             return kError;
         }
         break;
     }
 
-    cout << LMSG << "error" << endl;
+    std::cout << LMSG << "error" << std::endl;
     return kError;
 }
 
-int RtmpProtocol::OnStop()
+int RtmpProtocol::HandleClose(IoBuffer& io_buffer, Fd& socket)
 {
+    UNUSED(io_buffer);
+    UNUSED(socket);
+
     for (const auto& kv : csid_head_)
     {
         if (kv.second.msg != NULL)
@@ -1790,7 +1696,7 @@ int RtmpProtocol::OnStop()
         }
     }
 
-    cout << LMSG << "role:" << (int)role_ << endl;
+    std::cout << LMSG << "role:" << (int)role_ << std::endl;
 
     csid_head_.clear();
 
@@ -1805,18 +1711,18 @@ int RtmpProtocol::OnStop()
     }
     else if (role_ == RtmpRole::kPushServer)
     {
-        if (media_publisher_ != NULL)
+        if (publisher_ != NULL)
         {
-            cout << LMSG << "remove forward" << endl;
-            media_publisher_->RemoveSubscriber(this);
+            std::cout << LMSG << "remove forward" << std::endl;
+            publisher_->RemoveSubscriber(this);
         }
     }
     else if (role_ == RtmpRole::kClientPull)
     {
-        if (media_publisher_ != NULL)
+        if (publisher_ != NULL)
         {
-            cout << LMSG << "remove player" << endl;
-            media_publisher_->RemoveSubscriber(this);
+            std::cout << LMSG << "remove player" << std::endl;
+            publisher_->RemoveSubscriber(this);
         }
     }
 
@@ -1830,7 +1736,7 @@ int RtmpProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interv
         media_muxer_.EveryNSecond(now_in_ms, interval, count);
     }
 
-    cout << LMSG << "subscriber:" << subscriber_.size() << endl;
+    std::cout << LMSG << "subscriber:" << subscriber_.size() << std::endl;
 
     return kSuccess;
 }
@@ -1964,7 +1870,7 @@ int RtmpProtocol::SendData(const RtmpMessage& cur_info, const Payload& payload, 
             {
 				if (payload.IsIFrame())
     			{   
-    			    cout << LMSG << "I frame" << endl;
+    			    std::cout << LMSG << "I frame" << std::endl;
     			    header.WriteU8(0x17);
     			}   
     			else
@@ -2048,9 +1954,9 @@ int RtmpProtocol::SendMediaData(const Payload& payload)
     return SendData(rtmp_message, payload);
 }
 
-int RtmpProtocol::SendVideoHeader(const string& header)
+int RtmpProtocol::SendVideoHeader(const std::string& header)
 {
-    string video_header;
+    std::string video_header;
 
     video_header.append(1, 0x17);
     video_header.append(1, 0x00);
@@ -2064,9 +1970,9 @@ int RtmpProtocol::SendVideoHeader(const string& header)
     return 0;
 }
 
-int RtmpProtocol::SendAudioHeader(const string& header)
+int RtmpProtocol::SendAudioHeader(const std::string& header)
 {
-	string audio_header;
+	std::string audio_header;
     audio_header.append(1, 0xAF);
     audio_header.append(1, 0x00);
     audio_header.append(header);
@@ -2076,54 +1982,16 @@ int RtmpProtocol::SendAudioHeader(const string& header)
     return 0;
 }
 
-int RtmpProtocol::SendMetaData(const string& metadata)
+int RtmpProtocol::SendMetaData(const std::string& metadata)
 {
     SendRtmpMessage(4, 1, kMetaData_AMF0, (const uint8_t*)metadata.data(), metadata.size());
 
     return 0;
 }
 
-int RtmpProtocol::OpenDumpFile()
-{
-    if (dump_fd_ > 0)
-    {
-        return 0;
-    }
-
-    ostringstream os;
-    os << Util::GetNowStr() << "-rtmp" << this << ".dump";
-    string dump_file_name = os.str();
-    dump_fd_ = open(dump_file_name.c_str(), O_CREAT|O_TRUNC|O_RDWR, 0664);
-
-    if (dump_fd_ < 0)
-    {
-        cout << LMSG << "open " << dump_file_name << " failed" << endl;
-        return -1;
-    }
-
-    return 0;
-}
-
-int RtmpProtocol::DumpRtmp(const uint8_t* data, const int& size)
-{
-    if (dump_fd_ < 0)
-    {
-        return -1;
-    }
-
-    int nbytes = write(dump_fd_, data, size);
-
-    if (nbytes < 0)
-    {
-        cout << LMSG << "write failed" << endl;
-    }
-
-    return nbytes;
-}
-
 int RtmpProtocol::SendHandShakeStatus0()
 {
-    cout << LMSG << endl;
+    std::cout << LMSG << std::endl;
 
     uint8_t version = 3;
 
@@ -2136,7 +2004,7 @@ int RtmpProtocol::SendHandShakeStatus0()
 
 int RtmpProtocol::SendHandShakeStatus1()
 {
-    cout << LMSG << endl;
+    std::cout << LMSG << std::endl;
 
     IoBuffer io_buffer;
 
@@ -2224,34 +2092,34 @@ int RtmpProtocol::SendUserControlMessage(const uint16_t& event, const uint32_t& 
     return kSuccess;
 }
 
-int RtmpProtocol::SendConnect(const string& url)
+int RtmpProtocol::SendConnect(const std::string& url)
 {
-    cout << LMSG << "url:" << url << endl;
+    std::cout << LMSG << "url:" << url << std::endl;
     RtmpUrl rtmp_url;
     ParseRtmpUrl(url, rtmp_url);
 
     stream_ = rtmp_url.stream;
 
-    String command_name("connect");
-    Double transaction_id(GetTransactionId());
+    any::String command_name("connect");
+    any::Double transaction_id(GetTransactionId());
 
-    String app(rtmp_url.app);
+    any::String app(rtmp_url.app);
     //String tc_url("rtmp://" + rtmp_url.ip + ":" + Util::Num2Str(rtmp_url.port) + "/" + rtmp_url.app);
-    String tc_url("rtmp://" + rtmp_url.ip + "/" + rtmp_url.app);
+    any::String tc_url("rtmp://" + rtmp_url.ip + "/" + rtmp_url.app);
     
-    map<string, Any*> m = {{"app", &app}, {"tcUrl", &tc_url}};
+    std::map<std::string, any::Any*> m = {{"app", &app}, {"tcUrl", &tc_url}};
 
-    map<string, Any*> empty;
+    std::map<std::string, any::Any*> empty;
 
-    Map command_object(m);
-    Map optional_uer_args(empty);
+    any::Map command_object(m);
+    any::Map optional_uer_args(empty);
 
-    vector<Any*> connect = {(Any*)&command_name, (Any*)&transaction_id, (Any*)&command_object, (Any*)&optional_uer_args};
+    std::vector<any::Any*> connect = {(any::Any*)&command_name, (any::Any*)&transaction_id, (any::Any*)&command_object, (any::Any*)&optional_uer_args};
 
     IoBuffer output;
 
     int ret = Amf0::Encode(connect, output);
-    cout << LMSG << "Amf0 encode ret:" << ret << endl;
+    std::cout << LMSG << "Amf0 encode ret:" << ret << std::endl;
 
     if (ret == 0)
     {
@@ -2266,7 +2134,7 @@ int RtmpProtocol::SendConnect(const string& url)
 
             id_command_[transaction_id_] = last_send_command_;
 
-            cout << LMSG << "send [" << last_send_command_ << " command]" << endl;
+            std::cout << LMSG << "send [" << last_send_command_ << " command]" << std::endl;
         }
     }
 
@@ -2275,16 +2143,16 @@ int RtmpProtocol::SendConnect(const string& url)
 
 int RtmpProtocol::SendCreateStream()
 {
-    String command_name("createStream");
-    Double transaction_id(GetTransactionId());
-    Null null;
+    any::String command_name("createStream");
+    any::Double transaction_id(GetTransactionId());
+    any::Null null;
 
-    vector<Any*> create_stream = {&command_name, &transaction_id, &null};
+    std::vector<any::Any*> create_stream = {&command_name, &transaction_id, &null};
 
     IoBuffer output;
 
     int ret = Amf0::Encode(create_stream, output);
-    cout << LMSG << "Amf0 encode ret:" << ret << endl;
+    std::cout << LMSG << "Amf0 encode ret:" << ret << std::endl;
 
     if (ret == 0)
     {
@@ -2297,7 +2165,7 @@ int RtmpProtocol::SendCreateStream()
 
             last_send_command_ = "createStream";
             id_command_[transaction_id_] = last_send_command_;
-            cout << LMSG << "send [" << last_send_command_ << " command]" << endl;
+            std::cout << LMSG << "send [" << last_send_command_ << " command]" << std::endl;
         }
     }
 
@@ -2306,17 +2174,17 @@ int RtmpProtocol::SendCreateStream()
 
 int RtmpProtocol::SendReleaseStream()
 {
-    String command_name("releaseStream");
-    Double transaction_id(GetTransactionId());
-    Null null;
-    String playpath(stream_);
+    any::String command_name("releaseStream");
+    any::Double transaction_id(GetTransactionId());
+    any::Null null;
+    any::String playpath(stream_);
 
-    vector<Any*> releaseStream = {&command_name, &transaction_id, &null, &playpath};
+    std::vector<any::Any*> releaseStream = {&command_name, &transaction_id, &null, &playpath};
 
     IoBuffer output;
 
     int ret = Amf0::Encode(releaseStream, output);
-    cout << LMSG << "Amf0 encode ret:" << ret << endl;
+    std::cout << LMSG << "Amf0 encode ret:" << ret << std::endl;
 
     if (ret == 0)
     {
@@ -2329,7 +2197,7 @@ int RtmpProtocol::SendReleaseStream()
 
             last_send_command_ = "releaseStream";
             id_command_[transaction_id_] = last_send_command_;
-            cout << LMSG << "send [" << last_send_command_ << " command]" << endl;
+            std::cout << LMSG << "send [" << last_send_command_ << " command]" << std::endl;
         }
     }
 
@@ -2338,17 +2206,17 @@ int RtmpProtocol::SendReleaseStream()
 
 int RtmpProtocol::SendFCPublish()
 {
-    String command_name("FCPublish");
-    Double transaction_id(GetTransactionId());
-    Null null;
-    String playpath("");
+    any::String command_name("FCPublish");
+    any::Double transaction_id(GetTransactionId());
+    any::Null null;
+    any::String playpath("");
 
-    vector<Any*> fcpublish = {&command_name, &transaction_id, &null, &playpath};
+    std::vector<any::Any*> fcpublish = {&command_name, &transaction_id, &null, &playpath};
 
     IoBuffer output;
 
     int ret = Amf0::Encode(fcpublish, output);
-    cout << LMSG << "Amf0 encode ret:" << ret << endl;
+    std::cout << LMSG << "Amf0 encode ret:" << ret << std::endl;
 
     if (ret == 0)
     {
@@ -2361,7 +2229,7 @@ int RtmpProtocol::SendFCPublish()
 
             last_send_command_ = "FCPublish";
             id_command_[transaction_id_] = last_send_command_;
-            cout << LMSG << "send [" << last_send_command_ << " command]" << endl;
+            std::cout << LMSG << "send [" << last_send_command_ << " command]" << std::endl;
         }
     }
 
@@ -2370,16 +2238,16 @@ int RtmpProtocol::SendFCPublish()
 
 int RtmpProtocol::SendCheckBw()
 {
-    String command_name("_checkbw");
-    Double transaction_id(GetTransactionId());
-    Null null;
+    any::String command_name("_checkbw");
+    any::Double transaction_id(GetTransactionId());
+    any::Null null;
 
-    vector<Any*> checkbw = {&command_name, &transaction_id, &null};
+    std::vector<any::Any*> checkbw = {&command_name, &transaction_id, &null};
 
     IoBuffer output;
 
     int ret = Amf0::Encode(checkbw, output);
-    cout << LMSG << "Amf0 encode ret:" << ret << endl;
+    std::cout << LMSG << "Amf0 encode ret:" << ret << std::endl;
 
     if (ret == 0)
     {
@@ -2392,7 +2260,7 @@ int RtmpProtocol::SendCheckBw()
 
             last_send_command_ = "_checkbw";
             id_command_[transaction_id_] = last_send_command_;
-            cout << LMSG << "send [" << last_send_command_ << " command]" << endl;
+            std::cout << LMSG << "send [" << last_send_command_ << " command]" << std::endl;
         }
     }
 
@@ -2401,18 +2269,18 @@ int RtmpProtocol::SendCheckBw()
 
 int RtmpProtocol::SendPublish(const double& stream_id)
 {
-    String command_name("publish");
-    Double transaction_id(GetTransactionId());
-    Null null;
-    String stream(stream_);
-    String publish_type("live");
+    any::String command_name("publish");
+    any::Double transaction_id(GetTransactionId());
+    any::Null null;
+    any::String stream(stream_);
+    any::String publish_type("live");
 
-    vector<Any*> publish = {&command_name, &transaction_id, &null, &stream, &publish_type};
+    std::vector<any::Any*> publish = {&command_name, &transaction_id, &null, &stream, &publish_type};
 
     IoBuffer output;
 
     int ret = Amf0::Encode(publish, output);
-    cout << LMSG << "Amf0 encode ret:" << ret << endl;
+    std::cout << LMSG << "Amf0 encode ret:" << ret << std::endl;
 
     if (ret == 0)
     {
@@ -2424,7 +2292,7 @@ int RtmpProtocol::SendPublish(const double& stream_id)
             SendRtmpMessage(8, stream_id, kAmf0Command, data, len);
             last_send_command_ = "publish";
             id_command_[transaction_id_] = last_send_command_;
-            cout << LMSG << "send [" << last_send_command_ << " command]" << endl;
+            std::cout << LMSG << "send [" << last_send_command_ << " command]" << std::endl;
         }
     }
 
@@ -2433,19 +2301,19 @@ int RtmpProtocol::SendPublish(const double& stream_id)
 
 int RtmpProtocol::SendPlay(const double& stream_id)
 {
-    String command_name("play");
-    Double transaction_id(GetTransactionId());
-    Null null;
-    String stream(stream_);
-    Double start(-2);
-    Double duration(-1);
+    any::String command_name("play");
+    any::Double transaction_id(GetTransactionId());
+    any::Null null;
+    any::String stream(stream_);
+    any::Double start(-2);
+    any::Double duration(-1);
 
-    vector<Any*> publish = {&command_name, &transaction_id, &null, &stream, &start, &duration};
+    std::vector<any::Any*> publish = {&command_name, &transaction_id, &null, &stream, &start, &duration};
 
     IoBuffer output;
 
     int ret = Amf0::Encode(publish, output);
-    cout << LMSG << "Amf0 encode ret:" << ret << endl;
+    std::cout << LMSG << "Amf0 encode ret:" << ret << std::endl;
 
     if (ret == 0)
     {
@@ -2457,7 +2325,7 @@ int RtmpProtocol::SendPlay(const double& stream_id)
             SendRtmpMessage(8, stream_id, kAmf0Command, data, len);
             last_send_command_ = "play";
             id_command_[transaction_id_] = last_send_command_;
-            cout << LMSG << "send [" << last_send_command_ << " command]" << endl;
+            std::cout << LMSG << "send [" << last_send_command_ << " command]" << std::endl;
         }
     }
 
@@ -2478,57 +2346,9 @@ int RtmpProtocol::SendVideo(const RtmpMessage& video)
     return kSuccess;
 }
 
-int RtmpProtocol::ConnectForwardRtmpServer(const string& ip, const uint16_t& port)
+int RtmpProtocol::HandleConnected(Fd& socket)
 {
-    int fd = CreateNonBlockTcpSocket();
-
-    if (fd < 0)
-    {
-        cout << LMSG << "ConnectForwardRtmpServer ret:" << fd << endl;
-        return -1;
-    }
-
-    int ret = ConnectHost(fd, ip, port);
-
-    if (ret < 0 && errno != EINPROGRESS)
-    {
-        cout << LMSG << "Connect ret:" << ret << endl;
-        return -1;
-    }
-
-    Fd* socket = new TcpSocket(epoller_, fd, (SocketHandle*)g_rtmp_mgr);
-
-    RtmpProtocol* rtmp_forward = g_rtmp_mgr->GetOrCreateProtocol(*socket);
-
-    rtmp_forward->SetApp(app_);
-    rtmp_forward->SetStreamName(stream_);
-    rtmp_forward->SetPushServer();
-    rtmp_forward->SetDomain(ip);
-
-    if (errno == EINPROGRESS)
-    {
-        rtmp_forward->GetTcpSocket()->SetConnecting();
-        rtmp_forward->GetTcpSocket()->EnableWrite();
-    }
-    else
-    {
-        rtmp_forward->GetTcpSocket()->SetConnected();
-        rtmp_forward->GetTcpSocket()->EnableRead();
-
-        rtmp_forward->SendHandShakeStatus0();
-        rtmp_forward->SendHandShakeStatus1();
-    }
-
-    rtmp_forward->SetMediaPublisher(this);
-
-    cout << LMSG << endl;
-
-    return kSuccess;
-}
-
-int RtmpProtocol::OnConnected()
-{
-    cout << LMSG << endl;
+    UNUSED(socket);
 
     GetTcpSocket()->SetConnected();
     GetTcpSocket()->EnableRead();
@@ -2548,27 +2368,27 @@ int RtmpProtocol::OnConnected()
 
 int RtmpProtocol::OnPendingArrive()
 {
-    cout << LMSG << endl;
+    std::cout << LMSG << std::endl;
 
     MediaPublisher* media_publisher = g_local_stream_center.GetMediaPublisherByAppStream(app_, stream_);
 
     if (media_publisher == NULL)
     {
-        cout << LMSG << "no found app:" << app_ << ", stream_:" << stream_ << endl;
+        std::cout << LMSG << "no found app:" << app_ << ", stream_:" << stream_ << std::endl;
         return kClose;
     }
 
-    String on_status("onStatus");
-    Double transaction_id(0.0);
-    Null null;
+    any::String on_status("onStatus");
+    any::Double transaction_id(0.0);
+    any::Null null;
 
-    String code("NetStream.Play.Start");
-    Map information({{"code", (Any*)&code}});
+    any::String code("NetStream.Play.Start");
+    any::Map information({{"code", (any::Any*)&code}});
 
     IoBuffer output;
-    vector<Any*> play_result = {(Any*)&on_status, (Any*)&transaction_id, (Any*)&null, (Any*)&information};
+    std::vector<any::Any*> play_result = {(any::Any*)&on_status, (any::Any*)&transaction_id, (any::Any*)&null, (any::Any*)&information};
     int ret = Amf0::Encode(play_result, output);
-    cout << LMSG << "Amf0 encode ret:" << ret << endl;
+    std::cout << LMSG << "Amf0 encode ret:" << ret << std::endl;
     if (ret == 0)
     {
         uint8_t* data = NULL;
@@ -2579,7 +2399,7 @@ int RtmpProtocol::OnPendingArrive()
             SendRtmpMessage(pending_rtmp_msg_.cs_id, pending_rtmp_msg_.message_stream_id, kAmf0Command, data, len);
         }
 
-        SetMediaPublisher(media_publisher);
+        SetPublisher(media_publisher);
         media_publisher->AddSubscriber(this);
     }
 

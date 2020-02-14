@@ -1,84 +1,60 @@
-#ifndef __SOCKET_H__
-#define __SOCKET_H__
+#ifndef __FD_H__
+#define __FD_H__
 
 #include <unistd.h>
+#include <stdint.h>
 
-#include <iostream>
-#include <string>
+#include <atomic>
+#include <functional>
 
-#include "common_define.h"
-#include "epoller.h"
-
-using std::cout;
-using std::endl;
-using std::string;
+class SocketHandler;
+class IoLoop;
 
 class Fd
 {
 public:
-    Fd(Epoller* epoller, const int& fd)
-        :
-        epoller_(epoller),
-        fd_(fd)
+    explicit Fd(IoLoop* io_loop, const int& fd = -1);
+    virtual ~Fd();
+
+    void EnableRead();
+    void EnableWrite();
+    void DisableRead();
+    void DisableWrite();
+
+    virtual int OnRead()    = 0;
+    virtual int OnWrite()   = 0;
+
+    int fd() const { return fd_; }
+    uint32_t events() const { return events_; }
+    SocketHandler* socket_handler() { return socket_handler_; }
+    uint64_t id() const { return id_; }
+    std::string name() const { return name_; }
+
+    void ModName(const std::string& name)
     {
+        name_ = name;
     }
 
-    virtual ~Fd()
-    {
-        cout << LMSG << "remove " << fd_ << " in epoller and close it" << endl;
-        epoller_->RemoveSocket(this);
-        close(fd_);
-    }
+    virtual int Send(const uint8_t* data, const size_t& len) { return 0; }
 
-    void SetFd(const int& fd)
+    static uint64_t GenID()
     {
-        fd_ = fd;
+        return  id_generator_.fetch_add(1);
     }
-
-    virtual int OnRead()
-    {
-        return 0;
-    }
-
-    virtual int OnWrite()
-    {
-        return 0;
-    }
-
-    virtual int EnableRead()
-    {
-        return epoller_->EnableSocket(this, EPOLLIN);
-    }
-
-    virtual int EnableWrite()
-    {
-        return epoller_->EnableSocket(this, EPOLLOUT);
-    }
-
-    virtual int DisableWrite()
-    {
-        return epoller_->DisableSocket(this, EPOLLOUT);
-    }
-
-    virtual int DisableRead()
-    {
-        return epoller_->DisableSocket(this, EPOLLIN);
-    }
-
-    int GetFd()
-    {
-        return fd_;
-    }
-
-    virtual int Send(const uint8_t* data, const size_t& len) = 0;
-    virtual int SendTo(const uint8_t* data, const size_t& len, const string& dst_ip, const uint16_t& dst_port)
-    {
-        return 0;
-    };
 
 protected:
-    Epoller* epoller_;
-    int fd_;
+
+    uint32_t        events_;
+    int             fd_;
+    IoLoop*         io_loop_;
+    SocketHandler*  socket_handler_;
+    uint64_t        id_;
+    std::string     name_;
+
+private:
+    static std::atomic<uint64_t>    id_generator_;
 };
 
-#endif // __SOCKET_H__
+typedef std::function<SocketHandler*(IoLoop*, Fd*)> HandlerFactoryT;
+
+#endif // __FD_H__

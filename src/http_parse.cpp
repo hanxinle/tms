@@ -6,16 +6,13 @@
 #include "io_buffer.h"
 #include "tcp_socket.h"
 
-using namespace std;
-
 HttpParse::HttpParse()
-    :
-    r_pos_(-1),
-    n_pos_(-1),
-    m_pos_(-1),
-    x_pos_(-1),
-    next_pos_(0),
-    key_value_(false)
+    : r_pos_(-1)
+    , n_pos_(-1)
+    , m_pos_(-1)
+    , x_pos_(-1)
+    , next_pos_(0)
+    , key_value_(false)
 {
 }
 
@@ -26,25 +23,25 @@ int HttpParse::Decode(IoBuffer& io_buffer)
     // 不要全部读完, 可能会把非http的也读到了
     int size = io_buffer.Peek(data, 0, io_buffer.Size());
 
-    //cout << LMSG << "size:" << size << endl;
+    //std::cout << LMSG << "size:" << size << std::endl;
 
     int i = 0;
     int n = next_pos_;
     for ( ; i < size; ++n, ++i)
     {
-        //cout << LMSG << "data[" << i << "]:" << (int)data[i] << "[" << data[i] << "]" << endl;
+        //std::cout << LMSG << "data[" << i << "]:" << (int)data[i] << "[" << data[i] << "]" << std::endl;
         if (data[i] == '\r')
         {
             r_pos_ = n;
         }
         else if (data[i] == '\n')
         {
-            cout << LMSG << "n:" << n << ",i:" << i << ",r_pos_:" << r_pos_ << ",n_pos_:" << n_pos_ << endl;
+            std::cout << LMSG << "n:" << n << ",i:" << i << ",r_pos_:" << r_pos_ << ",n_pos_:" << n_pos_ << std::endl;
             if (n == r_pos_ + 1)
             {
                 if (n == n_pos_ + 2) // \r\n\r\n
                 {
-                    cout << LMSG << "http done" << endl;
+                    std::cout << LMSG << "http done" << std::endl;
 
                     int http_size = i + 1;
                     io_buffer.Skip(http_size);
@@ -55,15 +52,15 @@ int HttpParse::Decode(IoBuffer& io_buffer)
                 {
                     key_value_ = false;
 
-                    cout << LMSG << "http one line [" << key_ << "] => [" << value_ << "]" << endl;
+                    std::cout << LMSG << "http one line [" << key_ << "] => [" << value_ << "]" << std::endl;
 
                     // TODO: post, content type, content length
-                    if (key_.find("GET") != string::npos)
+                    if (key_.find("GET") != std::string::npos)
                     {
                         //GET /test.flv HTTP/1.1
 
 
-                        vector<string> vec = Util::SepStr(key_, " ");
+                        std::vector<std::string> vec = Util::SepStr(key_, " ");
 
                         if (vec.size() >= 2)
                         {
@@ -72,9 +69,9 @@ int HttpParse::Decode(IoBuffer& io_buffer)
                                 return kError;
                             }
 
-                            string tmp_path;
-                            string tmp_key;
-                            string tmp_value;
+                            std::string tmp_path;
+                            std::string tmp_key;
+                            std::string tmp_value;
 
                             int state = 0; // 0 = path, 1 = args_key 2 = args_value
 
@@ -147,7 +144,7 @@ int HttpParse::Decode(IoBuffer& io_buffer)
                             // path debug
                             for (const auto& path : path_)
                             {
-                                cout << LMSG << "path:" << path << endl;
+                                std::cout << LMSG << "path:" << path << std::endl;
                             }
 
                             if (path_.size() > 0)
@@ -156,19 +153,19 @@ int HttpParse::Decode(IoBuffer& io_buffer)
 
                                 auto dot_pos = file_name_.find(".");
 
-                                if (dot_pos != string::npos)
+                                if (dot_pos != std::string::npos)
                                 {
                                     file_type_ = file_name_.substr(dot_pos + 1);
                                     file_name_ = file_name_.substr(0, dot_pos);
                                 }
 
-                                cout << LMSG << "file_name_:" << file_name_ << ",file_type_:" << file_type_ << endl;
+                                std::cout << LMSG << "file_name_:" << file_name_ << ",file_type_:" << file_type_ << std::endl;
                             }
 
                             // args debug
                             for (const auto& kv : args_)
                             {
-                                cout << LMSG << "[" << kv.first << "]=>[" << kv.second << "]" << endl;
+                                std::cout << LMSG << "[" << kv.first << "]=>[" << kv.second << "]" << std::endl;
                             }
                         }
 
@@ -249,12 +246,12 @@ int HttpParse::Decode(IoBuffer& io_buffer)
     next_pos_ = n;
     io_buffer.Skip(i);
 
-    //cout << LMSG << "next_pos_:" <<next_pos_ << endl;
+    //std::cout << LMSG << "next_pos_:" <<next_pos_ << std::endl;
 
     return kNoEnoughData;
 }
 
-bool HttpParse::IsFlvRequest(string& app, string& stream)
+bool HttpParse::IsFlvRequest(std::string& app, std::string& stream)
 {
     if (file_type_ == "flv" && path_.size() == 2)
     {
@@ -267,7 +264,7 @@ bool HttpParse::IsFlvRequest(string& app, string& stream)
     return false;
 }
 
-bool HttpParse::IsHlsRequest(string& app, string& stream)
+bool HttpParse::IsHlsRequest(std::string& app, std::string& stream)
 {
     if (file_type_ == "hls" && path_.size() == 2)
     {

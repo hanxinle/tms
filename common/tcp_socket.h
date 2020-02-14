@@ -1,17 +1,19 @@
 #ifndef __TCP_SOCKET_H__
 #define __TCP_SOCKET_H__
 
-#include "epoller.h"
+#include <functional>
+
+#include "io_loop.h"
 #include "io_buffer.h"
 #include "fd.h"
 
-class Epoller;
-class SocketHandle;
+class IoLoop;
+class SocketHandler;
 
 class TcpSocket : public Fd
 {
 public:
-    TcpSocket(Epoller* epoller, const int& fd, SocketHandle* handler);
+    TcpSocket(IoLoop* io_loop, const int& fd, HandlerFactoryT handler_factory);
     ~TcpSocket();
 
     void AsServerSocket()
@@ -44,12 +46,13 @@ public:
     }
 
 private:
-    bool server_socket_;
-    SocketHandle* handler_;
-    IoBuffer      read_buffer_;
-    IoBuffer      write_buffer_;
+    bool            server_socket_;
+    IoBuffer        read_buffer_;
+    IoBuffer        write_buffer_;
 
-    int           connect_status_;
+    int             connect_status_;
+
+    HandlerFactoryT  handler_factory_;
 };
 
 #endif // __TCP_SOCKET_H__

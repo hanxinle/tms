@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-cmn-Hans">
+<head>
+<meta charset="utf-8">
+</head>
+  
+
+<body>
+
+<input type="text" name="ws_data_input" id="ws_input">
+
+<button onclick="sendMsg()">
+Click Here Send Msg
+</button>
+<br>
+
+Remote Media: <br>
+<video id = "remote_media" autoplay></video>
+
+</body>
+
+<script>
+
+var PeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection;
+var SessionDescription = window.RTCSessionDescription || window.mozRTCSessionDescription || window.webkitRTCSessionDescription;
+
+var socket = new WebSocket("wss://hw.com:8943/client.sdp");
+var pc = new PeerConnection(null);
+
+pc.onaddstream = function(event)
+{
+    console.log('onaddstream');
+    document.getElementById('remote_media').srcObject = event.stream;
+    remote_media.load();
+};
+
+pc.onicecandidate = function(event)
+{
+    console.log('onicecandidate');
+};
+
+pc.onconnectionstatechange = function(event)
+{
+    console.log('onconnectionstatechange');
+};
+
+pc.onicegatheringstatechange = function(event)
+{
+    console.log('onicegatheringstatechange');
+};
+
+pc.onsignalingstatechange = function(event)
+{
+    console.log('onsignalingstatechange');
+};
+
+socket.onerror = function(event)
+{
+    console.log('websocket error');
+};
+
+socket.onclose = function(event) 
+{
+    console.log('websocket close' + event.code);
+};
+
+var sendViewerOfferFn = function(desc)
+{
+    console.log('sendOfferFn: ', desc);
+
+    pc.setLocalDescription(desc);
+
+    var sdp_json = {"sdp":desc.sdp, "app":"webrtc", "stream":"test"};
+    socket.send(JSON.stringify(sdp_json))
+
+};
+
+socket.onopen = function(event) 
+{
+    var constraints = 
+    {
+        mandatory:
+        {
+            OfferToReceiveAudio: true,
+            OfferToReceiveVideo: true
+        }
+    };
+
+    pc.createOffer(sendViewerOfferFn, function(error) { console.log('sendViewerOfferFn error: ' + error); }, constraints);
+};
+
+socket.onmessage = function(event)
+{
+    console.log('onmessage: ', event.data);
+    var json = JSON.parse(event.data);
+
+    pc.setRemoteDescription(new SessionDescription({type:'answer', sdp:json.sdpAnswer}));
+    console.log('onmessage viewerResponse: ', json.sdpAnswer);
+}
+
+function sendMsg()
+{
+    var t = document.getElementById("ws_input").value;
+    socket.send(t)
+}
+
+</script>
+
+</html>

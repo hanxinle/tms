@@ -4,16 +4,14 @@
 #include "http_sender.h"
 #include "util.h"
 
-using namespace std;
-
-map<string, string> kStatusMap = 
+std::map<std::string, std::string> kStatusMap = 
 {
     {"200", "OK"},
     {"403", "Forbidden"},
     {"404", "Not Found"},
 };
 
-map<string, string> kTypeMap = 
+std::map<std::string, std::string> kTypeMap = 
 {
     {"flv", "flv-application/octet-stream"},
     {"m3u8", "application/x-mpegurl"},
@@ -37,31 +35,31 @@ map<string, string> kTypeMap =
 
 HttpSender::HttpSender()
 {
-    header_kv_.push_back(make_pair("Server", "Trs"));
-    header_kv_.push_back(make_pair("Date", Util::GetNowStrHttpFormat()));
+    header_kv_.push_back(std::make_pair("Server", "Trs"));
+    header_kv_.push_back(std::make_pair("Date", Util::GetNowStrHttpFormat()));
 }
 
 HttpSender::~HttpSender()
 {
 }
 
-int HttpSender::SetStatus(const string& status)
+int HttpSender::SetStatus(const std::string& status)
 {
     status_ = "HTTP/1.1 " + status + " " + kStatusMap[status];
 
     return 0;
 }
 
-int HttpSender::SetHeader(const string& key, const string& val)
+int HttpSender::SetHeader(const std::string& key, const std::string& val)
 {
     header_kv_.push_back(make_pair(key, val));
 
     return 0;
 }
 
-string HttpSender::Encode()
+std::string HttpSender::Encode()
 {
-    ostringstream os;
+    std::ostringstream os;
 
     os << status_ << CRLF;
 
@@ -81,7 +79,7 @@ string HttpSender::Encode()
         os << CRLF;
     }
 
-    cout << Util::Bin2Hex(os.str()) << endl;
+    std::cout << Util::Bin2Hex(os.str()) << std::endl;
 
     return os.str();
 }
@@ -96,7 +94,7 @@ void HttpSender::SetClose()
     SetHeader("Connection", "close");
 }
 
-void HttpSender::SetContentType(const string& type)
+void HttpSender::SetContentType(const std::string& type)
 {
     SetHeader("Content-Type", kTypeMap[type]);
 }

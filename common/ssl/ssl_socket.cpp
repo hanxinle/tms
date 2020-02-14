@@ -3,30 +3,29 @@
 #include <iostream>
 
 #include "common_define.h"
+#include "fd.h"
 #include "socket_util.h"
-#include "socket_handle.h"
+#include "socket_handler.h"
 #include "ssl_socket.h"
 
 extern SSL_CTX* g_tls_ctx;
 
-using namespace std;
-using namespace socket_util;
-
-SslSocket::SslSocket(Epoller* epoller, const int& fd, SocketHandle* handler)
-    :
-    Fd(epoller, fd),
-    server_socket_(false),
-    handler_(handler)
+SslSocket::SslSocket(IoLoop* io_loop, const int& fd, HandlerFactoryT handler_factory)
+    : Fd(io_loop, fd)
+    , server_socket_(false)
+    , handler_factory_(handler_factory)
 {
     assert(g_tls_ctx != NULL);
     ssl_ = SSL_new(g_tls_ctx);
 
     assert(ssl_ != NULL);
 
-    cout << LMSG << "ssl_:" << ssl_ << endl;
+    std::cout << LMSG << "ssl_:" << ssl_ << std::endl;
 
     read_buffer_.SetSsl(ssl_);
     write_buffer_.SetSsl(ssl_);
+
+    socket_handler_ = handler_factory_(io_loop, this);
 }
 
 SslSocket::~SslSocket()
@@ -37,25 +36,25 @@ int SslSocket::OnRead()
 {
     if (server_socket_)
     {
-        string client_ip;
+        std::string client_ip;
         uint16_t client_port;
 
-        int client_fd = Accept(fd_, client_ip, client_port);
+        int client_fd = socket_util::Accept(fd_, client_ip, client_port);
 
         if (client_fd > 0)
         {
-            cout << LMSG << "accept " << client_ip << ":" << client_port << endl;
+            std::cout << LMSG << "accept " << client_ip << ":" << client_port << std::endl;
 
-            NoCloseWait(client_fd);
+            socket_util::NoCloseWait(client_fd);
 
-            SslSocket* ssl_socket = new SslSocket(epoller_, client_fd, handler_);
-            SetNonBlock(client_fd);
+            SslSocket* ssl_socket = new SslSocket(io_loop_, client_fd, handler_factory_);
+            socket_util::SetNonBlock(client_fd);
 
             ssl_socket->SetConnected();
             ssl_socket->SetFd();
             ssl_socket->SetHandshakeing();
 
-            handler_->HandleAccept(*ssl_socket);
+            socket_handler_->HandleAccept(*ssl_socket);
 
             ssl_socket->EnableRead();
         }
@@ -68,30 +67,24 @@ int SslSocket::OnRead()
             {
                 int ret = read_buffer_.ReadFromFdAndWrite(fd_);
 
-                cout << LMSG << "ssl read ret:" << ret << ",err:" << strerror(errno) << endl;
+                std::cout << LMSG << "ssl read ret:" << ret << ",err:" << strerror(errno) << std::endl;
 
                 if (ret > 0)
                 {
-					if (handler_ != NULL)
-                    {   
-                        int ret = handler_->HandleRead(read_buffer_, *this);
+                    int ret = socket_handler_->HandleRead(read_buffer_, *this);
 
-                        if (ret == kClose || ret == kError)
-                        {   
-                            cout << LMSG << "read error:" << ret << endl;
-                            handler_->HandleClose(read_buffer_, *this);
-                            return kClose;
-                        }   
+                    if (ret == kClose || ret == kError)
+                    {   
+                        std::cout << LMSG << "read error:" << ret << std::endl;
+                        socket_handler_->HandleClose(read_buffer_, *this);
+                        return kClose;
                     }
                 }
                 else if (ret == 0)
                 {
-					cout << LMSG << "close by peer" << endl;
+					std::cout << LMSG << "close by peer" << std::endl;
 
-                    if (handler_ != NULL)
-                    {   
-                        handler_->HandleClose(read_buffer_, *this);
-                    }   
+                    socket_handler_->HandleClose(read_buffer_, *this);
 
                     return kClose;
                 }
@@ -103,16 +96,8 @@ int SslSocket::OnRead()
                         break;
                     }
 
-                    // XXX:DEBUG CODE
-                    // char buf[1024];
-                    // int bytes = read(fd_, buf, sizeof(buf));
-                    // cout << LMSG << "bytes:" << bytes << ",err:" << strerror(errno) << endl;
-
-                    cout << LMSG << "ssl read err:" << err << endl;
-					if (handler_ != NULL)
-                    {   
-                        handler_->HandleError(read_buffer_, *this);
-                    }
+                    std::cout << LMSG << "ssl read err:" << err << std::endl;
+                    socket_handler_->HandleError(read_buffer_, *this);
 
                     return kError;
                 }
@@ -131,12 +116,12 @@ int SslSocket::OnWrite()
 {
     if (connect_status_ == kHandshaked)
     {
-        cout << LMSG << endl;
+        std::cout << LMSG << std::endl;
         write_buffer_.WriteToFd(fd_);
 
         if (write_buffer_.Empty())
         {
-            cout << LMSG << endl;
+            std::cout << LMSG << std::endl;
             DisableWrite();
         }
 
@@ -149,16 +134,16 @@ int SslSocket::OnWrite()
     else if (connect_status_ == kConnecting)
     {
         int err = -1;
-        if (GetSocketError(fd_, err) != 0 || err != 0)
+        if (socket_util::GetSocketError(fd_, err) != 0 || err != 0)
         {
-            cout << LMSG << "when socket connected err:" << strerror(err) << endl;
-            handler_->HandleError(read_buffer_, *this);
+            std::cout << LMSG << "when socket connected err:" << strerror(err) << std::endl;
+            socket_handler_->HandleError(read_buffer_, *this);
         }
         else
         {
-            cout << LMSG << "connected" << endl;
+            std::cout << LMSG << "connected" << std::endl;
             SetConnected();
-            handler_->HandleConnected(*this);
+            socket_handler_->HandleConnected(*this);
         }
     }
 
@@ -170,66 +155,13 @@ int SslSocket::Send(const uint8_t* data, const size_t& len)
     assert(connect_status_ == kHandshaked);
     int ret = -1;
 
-#if 0 // 下面的写法会造成when write would block, 再次发送就发不出去了
-    if (write_buffer_.Empty())
-    {
-        ret = SSL_write(ssl_, data, len);
-
-        cout << LMSG << "ssl write " << len << " ret:" << ret << ",err:" << strerror(errno) << endl;
-
-        if (ret > 0)
-        {
-            //VERBOSE << LMSG << "direct send " << ret << " bytes" << ",left:" << (len - ret) << " bytes" << endl;
-
-            if (ret < (int)len)
-            {
-                write_buffer_.Write(data + ret, len - ret);
-                EnableWrite();
-            }
-        }
-        else if (ret == 0)
-        {
-            if (len != 0)
-            {
-                assert(false);
-            }
-        }
-        else
-        {
-            int err = SSL_get_error(ssl_, ret);
-            cout << LMSG << "ssl write err:" << err << endl;
-            cout << LMSG << "buffer size:" << write_buffer_.Size() << endl;
-
-            if (err == SSL_ERROR_WANT_WRITE)
-            {
-                write_buffer_.Write(data, len);
-                EnableWrite();
-                cout << LMSG << "buffer size:" << write_buffer_.Size() << endl;
-                cout << LMSG << "peek:" << Util::Bin2Hex(data, 10) << endl;
-            }
-        }
-
-        return ret;
-    }
-    else
-    {
-        if (write_buffer_.Empty())
-        {
-            EnableWrite();
-        }
-        cout << LMSG << "buffer size:" << write_buffer_.Size() << endl;
-        ret = write_buffer_.Write(data, len);
-        cout << LMSG << "buffer size:" << write_buffer_.Size() << endl;
-    }
-#else
     if (write_buffer_.Empty())
     {   
         EnableWrite();
     }   
 
-    // FIXME:SSL暂时不能在缓冲区空的时候直接写,不然就会发不出去, 一定要放到send buffer里面, 依靠事件循环触发, 目前搞不懂是为什么
+    // FIXME: SSL暂时不能在缓冲区空的时候直接写,不然就会发不出去, 一定要放到send buffer里面, 依靠事件循环触发, 目前搞不懂是为什么
     ret = write_buffer_.Write(data, len);
-#endif
 
     // avoid warning
     return ret;
@@ -241,11 +173,11 @@ int SslSocket::DoHandshake()
 
     int ret = SSL_do_handshake(ssl_);
 
-    cout << LMSG << endl;
+    std::cout << LMSG << std::endl;
 
     if (ret == 1)
     {
-        cout << LMSG << "ssl handshake done" << endl;
+        std::cout << LMSG << "ssl handshake done" << std::endl;
         SetHandshaked();
 
         return kSuccess;
@@ -256,19 +188,19 @@ int SslSocket::DoHandshake()
 
         if (err == SSL_ERROR_WANT_WRITE)
         {
-            cout << LMSG << endl;
+            std::cout << LMSG << std::endl;
             EnableWrite();
             return kNoEnoughData;
         }
         else if (err == SSL_ERROR_WANT_READ)
         {
-            cout << LMSG << endl;
+            std::cout << LMSG << std::endl;
             EnableRead();
             return kNoEnoughData;
         }
         else
         {
-            cout << LMSG << "err:" << err << endl;
+            std::cout << LMSG << "err:" << err << std::endl;
             return kError;
         }
     }

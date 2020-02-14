@@ -4,23 +4,22 @@
 
 #include "common_define.h"
 #include "socket_util.h"
-#include "socket_handle.h"
+#include "socket_handler.h"
 #include "udp_socket.h"
 
-using namespace std;
-using namespace socket_util;
-
-UdpSocket::UdpSocket(Epoller* epoller, const int& fd, SocketHandle* handler)
-    :
-    Fd(epoller, fd),
-    handler_(handler)
+UdpSocket::UdpSocket(IoLoop* io_loop, const int& fd, HandlerFactoryT handler_factory)
+    : Fd(io_loop, fd)
+    , handler_factory_(handler_factory)
 {
     memset(&src_addr_, 0, sizeof(src_addr_));
     src_addr_len_ = sizeof(src_addr_);
+
+    socket_handler_ = handler_factory_(io_loop, this);
 }
 
 UdpSocket::~UdpSocket()
 {
+    delete socket_handler_;
 }
 
 int UdpSocket::OnRead()
@@ -32,16 +31,9 @@ int UdpSocket::OnRead()
 
         int bytes = io_buffer.ReadFromFdAndWrite(fd_, &src_addr_, &src_addr_len_);
 
-        SocketAddrInetToIpPort(*(sockaddr_in*)(&src_addr_), client_ip_, client_port_);
-
         if (bytes > 0)
         {
-            //cout << LMSG << "udp recv from:" << client_ip_ << ":" << client_port_ << endl;
-
-            if (handler_)
-            {
-                handler_->HandleRead(io_buffer, *this);
-            }
+            socket_handler_->HandleRead(io_buffer, *this);
         }
         else if (bytes == 0)
         {
@@ -52,7 +44,7 @@ int UdpSocket::OnRead()
         {
 			if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
             {   
-                //cout << LMSG << "block" << endl;
+                //std::cout << LMSG << "block" << std::endl;
             }
 
             break;
@@ -72,10 +64,5 @@ int UdpSocket::Send(const uint8_t* data, const size_t& len)
 {
     sendto(fd_, data, len, 0, &src_addr_, src_addr_len_);
 
-    return kSuccess;
-}
-
-int UdpSocket::SendTo(const uint8_t* data, const size_t& len, const string& dst_ip, const uint16_t& dst_port)
-{
     return kSuccess;
 }

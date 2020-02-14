@@ -8,17 +8,14 @@
 
 class Payload;
 
-using std::string;
-
 // 所有可能是接收者的Protocol都需要继承这个类
 class MediaSubscriber
 {
 public:
     MediaSubscriber(const uint16_t& type)
-        :
-        type_(type),
-        expired_time_ms_(0),
-        publisher_(NULL)
+        : type_(type)
+        , expired_time_ms_(0)
+        , publisher_(NULL)
     {
     }
 
@@ -30,49 +27,29 @@ public:
         }
     }
 
-    void SetPublisher(MediaPublisher* publisher)
-    {
-        publisher_ = publisher;
-    }
+    void SetPublisher(MediaPublisher* publisher) { publisher_ = publisher; }
 
-    uint16_t GetType() const
-    {
-        return type_;
-    }
+    uint16_t GetType() const { return type_; }
 
-    bool IsRtmp()
-    {
-        return type_ == kRtmp;
-    }
+    bool IsRtmp() const { return type_ == kRtmp; }
+    bool IsHttpFlv() const { return type_ == kHttpFlv; }
+    bool IsHttpHls() const { return type_ == kHttpHls; }
+    bool IsSrt() const { return type_ == kSrt; }
+    bool IsWebrtc() const { return type_ == kWebrtc; }
 
-    bool IsTcpServer()
-    {
-        return type_ == kTcpServer;
-    }
-
-    bool IsHttpFlv()
-    {
-        return type_ == kHttpFlv;
-    }
-
-    bool IsHttpHls()
-    {
-        return type_ == kHttpHls;
-    }
-
-    virtual int SendVideoHeader(const string& header)
+    virtual int SendVideoHeader(const std::string& header)
     {
         UNUSED(header);
         return 0;
     }
 
-    virtual int SendAudioHeader(const string& header)
+    virtual int SendAudioHeader(const std::string& header)
     {
         UNUSED(header);
         return 0;
     }
 
-    virtual int SendMetaData(const string& metadata)
+    virtual int SendMetaData(const std::string& metadata)
     {
         UNUSED(metadata);
         return 0;
@@ -81,6 +58,12 @@ public:
     virtual int SendMediaData(const Payload& payload)
     {
         UNUSED(payload);
+        return 0;
+    }
+
+    virtual int SendData(const std::string& data)
+    {
+        UNUSED(data);
         return 0;
     }
 

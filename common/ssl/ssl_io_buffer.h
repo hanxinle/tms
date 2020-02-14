@@ -6,13 +6,8 @@
 
 #include "common_define.h"
 #include "io_buffer.h"
-#include "trace_tool.h"
 
 #include "openssl/ssl.h"
-
-using std::string;
-using std::cout;
-using std::endl;
 
 class SslIoBuffer : public IoBuffer
 {

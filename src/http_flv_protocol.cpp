@@ -3,30 +3,36 @@
 
 #include "common_define.h"
 #include "global.h"
-#include "http_flv_mgr.h"
 #include "http_flv_protocol.h"
 #include "http_sender.h"
 #include "io_buffer.h"
 #include "local_stream_center.h"
 #include "ref_ptr.h"
 #include "rtmp_protocol.h"
-#include "rtmp_mgr.h"
 #include "tcp_socket.h"
 
-using namespace std;
-
-HttpFlvProtocol::HttpFlvProtocol(Epoller* epoller, Fd* socket)
-    :
-    MediaSubscriber(kHttpFlv),
-    epoller_(epoller),
-    socket_(socket),
-    media_publisher_(NULL),
-    pre_tag_size_(0)
+HttpFlvProtocol::HttpFlvProtocol(IoLoop* io_loop, Fd* socket)
+    : MediaSubscriber(kHttpFlv)
+    , io_loop_(io_loop)
+    , socket_(socket)
+    , media_publisher_(NULL)
+    , pre_tag_size_(0)
 {
 }
 
 HttpFlvProtocol::~HttpFlvProtocol()
 {
+}
+
+int HttpFlvProtocol::HandleRead(IoBuffer& io_buffer, Fd& socket)
+{
+    int ret = kError;
+    do
+    {
+        ret = Parse(io_buffer);
+    } while (ret == kSuccess);
+
+    return ret;
 }
 
 int HttpFlvProtocol::Parse(IoBuffer& io_buffer)
@@ -48,7 +54,7 @@ int HttpFlvProtocol::Parse(IoBuffer& io_buffer)
                     http_rsp.SetContentType("flv");
                     http_rsp.SetKeepAlive();
 
-	                string http_response = http_rsp.Encode();
+	                std::string http_response = http_rsp.Encode();
 
 		            GetTcpSocket()->Send((const uint8_t*)http_response.data(), http_response.size());
                     SendFlvHeader();
@@ -61,7 +67,7 @@ int HttpFlvProtocol::Parse(IoBuffer& io_buffer)
             }
             else
             {
-                cout << LMSG << "no flv" << endl;
+                std::cout << LMSG << "no flv" << std::endl;
 
                 HttpSender http_rsp;
                 http_rsp.SetStatus("404");
@@ -69,14 +75,14 @@ int HttpFlvProtocol::Parse(IoBuffer& io_buffer)
                 http_rsp.SetClose();
                 http_rsp.SetContent("fuck you");
 
-	            string http_response = http_rsp.Encode();
+	            std::string http_response = http_rsp.Encode();
 
 		        GetTcpSocket()->Send((const uint8_t*)http_response.data(), http_response.size());
             }
         }
         else
         {
-            cout << LMSG << "no flv" << endl;
+            std::cout << LMSG << "no flv" << std::endl;
 
             HttpSender http_rsp;
             http_rsp.SetStatus("404");
@@ -84,7 +90,7 @@ int HttpFlvProtocol::Parse(IoBuffer& io_buffer)
             http_rsp.SetClose();
             http_rsp.SetContent("fuck you");
 
-	        string http_response = http_rsp.Encode();
+	        std::string http_response = http_rsp.Encode();
 
 		    GetTcpSocket()->Send((const uint8_t*)http_response.data(), http_response.size());
         }
@@ -110,7 +116,7 @@ int HttpFlvProtocol::SendFlvHeader()
     return kSuccess;
 }
 
-int HttpFlvProtocol::SendMetaData(const string& metadata)
+int HttpFlvProtocol::SendMetaData(const std::string& metadata)
 {
     IoBuffer flv_tag;
 
@@ -167,7 +173,7 @@ int HttpFlvProtocol::SendVideo(const Payload& payload)
 
     if (payload.IsIFrame())
     {
-        cout << LMSG << "I frame" << endl;
+        std::cout << LMSG << "I frame" << std::endl;
         flv_tag.WriteU8(0x17);
     }
     else
@@ -218,7 +224,7 @@ int HttpFlvProtocol::SendAudio(const Payload& payload)
     return kSuccess;
 }
 
-int HttpFlvProtocol::SendVideoHeader(const string& video_header)
+int HttpFlvProtocol::SendVideoHeader(const std::string& video_header)
 {
     IoBuffer flv_tag;
 
@@ -248,7 +254,7 @@ int HttpFlvProtocol::SendVideoHeader(const string& video_header)
     return kSuccess;
 }
 
-int HttpFlvProtocol::SendAudioHeader(const string& audio_header)
+int HttpFlvProtocol::SendAudioHeader(const std::string& audio_header)
 {
     IoBuffer flv_tag;
 
@@ -277,8 +283,11 @@ int HttpFlvProtocol::SendAudioHeader(const string& audio_header)
     return kSuccess;
 }
 
-int HttpFlvProtocol::OnStop()
+int HttpFlvProtocol::HandleClose(IoBuffer& io_buffer, Fd& socket)
 {
+    UNUSED(io_buffer);
+    UNUSED(socket);
+
     if (media_publisher_ != NULL)
     {
         media_publisher_->RemoveSubscriber(this);
@@ -296,7 +305,7 @@ int HttpFlvProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& int
     {
         if (now_in_ms > expired_time_ms_)
         {
-            cout << LMSG << "expired, can't find media source, app_:" << app_ << ",stream_:" << stream_ << endl;
+            std::cout << LMSG << "expired, can't find media source, app_:" << app_ << ",stream_:" << stream_ << std::endl;
 
             OnPendingArrive();
         }
@@ -307,24 +316,24 @@ int HttpFlvProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& int
 
 int HttpFlvProtocol::OnPendingArrive()
 {
-    cout << LMSG << "pending done" << endl;
+    std::cout << LMSG << "pending done" << std::endl;
 
     if (! app_.empty() && ! stream_.empty())
     {
         media_publisher_ = g_local_stream_center.GetMediaPublisherByAppStream(app_, stream_);
 
-        cout << LMSG << endl;
+        std::cout << LMSG << std::endl;
 
         if (media_publisher_ != NULL) // 从MediaCenter查到了publish node
         {
-            cout << LMSG << endl;
+            std::cout << LMSG << std::endl;
 
             HttpSender http_rsp;
             http_rsp.SetStatus("200");
             http_rsp.SetContentType("flv");
             http_rsp.SetKeepAlive();
 
-	        string http_response = http_rsp.Encode();
+	        std::string http_response = http_rsp.Encode();
 
 	        GetTcpSocket()->Send((const uint8_t*)http_response.data(), http_response.size());
             SendFlvHeader();
@@ -334,9 +343,9 @@ int HttpFlvProtocol::OnPendingArrive()
         }
         else
         {
-            cout << LMSG << "can't find media source, app_:" << app_ << ",stream_:" << stream_ << endl;
+            std::cout << LMSG << "can't find media source, app_:" << app_ << ",stream_:" << stream_ << std::endl;
 
-			ostringstream os; 
+            std::ostringstream os; 
 
             os << "HTTP/1.1 404 Not Found\r\n"
                << "Server: trs\r\n"

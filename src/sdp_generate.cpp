@@ -3,14 +3,12 @@
 #include "common_define.h"
 #include "sdp_generate.h"
 
-using namespace std;
+std::map<int, std::string> SdpGenerate::audio_name_ = {{111, "opus"}};
+std::map<int, std::string> SdpGenerate::video_name_ = {{96, "VP8"}, {98, "VP9"}, {100, "H264"}};
 
-map<int, string> SdpGenerate::audio_name_ = {{111, "opus"}};
-map<int, string> SdpGenerate::video_name_ = {{96, "VP8"}, {98, "VP9"}, {100, "H264"}};
-
-string SdpGenerate::Generate()
+std::string SdpGenerate::Generate()
 {
-    ostringstream os;
+    std::ostringstream os;
 
     os << "v=0" << CRLF;
     os << "o=- " << Util::GetNowMs() << " 2 IN IP4 " << server_ip_ << CRLF;
@@ -116,8 +114,8 @@ string SdpGenerate::Generate()
         os << "a=ssrc:" << video_ssrc_ << " label:" << label_ << CRLF;
     }
 
-    cout << LMSG << "sdp generate" << endl;
-    cout << os.str() << endl;
+    std::cout << LMSG << "sdp generate" << std::endl;
+    std::cout << os.str() << std::endl;
 
     return os.str();
 }

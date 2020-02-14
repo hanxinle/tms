@@ -7,8 +7,9 @@
 
 #include "http_parse.h"
 #include "media_subscriber.h"
+#include "socket_handler.h"
 
-class Epoller;
+class IoLoop;
 class Fd;
 class IoBuffer;
 class HttpFlvMgr;
@@ -20,33 +21,41 @@ class ServerMgr;
 class RtmpMgr;
 class TcpSocket;
 
-using std::string;
-
-class HttpFlvProtocol : public MediaSubscriber
+class HttpFlvProtocol 
+    : public MediaSubscriber
+    , public SocketHandler
 {
 public:
-    HttpFlvProtocol(Epoller* epoller, Fd* socket);
+    HttpFlvProtocol(IoLoop* io_loop, Fd* socket);
     ~HttpFlvProtocol();
+
+	virtual int HandleRead(IoBuffer& io_buffer, Fd& socket);
+    virtual int HandleClose(IoBuffer& io_buffer, Fd& socket);
+    virtual int HandleError(IoBuffer& io_buffer, Fd& socket) 
+    { 
+        return HandleClose(io_buffer, socket); 
+    }
 
     int Parse(IoBuffer& io_buffer);
 
     int SendFlvHeader();
 
     virtual int SendMediaData(const Payload& payload);
-    virtual int SendAudioHeader(const string& audio_header);
-    virtual int SendVideoHeader(const string& video_header);
-    virtual int SendMetaData(const string& metadata);
+    virtual int SendAudioHeader(const std::string& audio_header);
+    virtual int SendVideoHeader(const std::string& video_header);
+    virtual int SendMetaData(const std::string& metadata);
 
     int SendVideo(const Payload& payload);
     int SendAudio(const Payload& payload);
 
-    int OnStop();
     virtual int OnPendingArrive();
 
     int EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
 
-    string GetApp() { return app_; }
-    string GetStream() { return stream_; }
+    int EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count) { return 0; }
+
+    std::string GetApp() { return app_; }
+    std::string GetStream() { return stream_; }
 
 private:
     TcpSocket* GetTcpSocket()
@@ -55,12 +64,12 @@ private:
     }
 
 private:
-    Epoller* epoller_;
+    IoLoop* io_loop_;
     Fd* socket_;
     MediaPublisher* media_publisher_;
 
-    string app_;
-    string stream_;
+    std::string app_;
+    std::string stream_;
 
     uint32_t pre_tag_size_;
 

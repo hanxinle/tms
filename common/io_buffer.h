@@ -9,11 +9,6 @@
 #include <string>
 
 #include "common_define.h"
-#include "trace_tool.h"
-
-using std::string;
-using std::cout;
-using std::endl;
 
 const uint64_t kDefaultSize = 1024*64;
 const uint64_t kShrinkSize = 2*1024*64;
@@ -30,7 +25,7 @@ public:
     virtual int ReadFromFdAndWrite(const int& fd, sockaddr* addr, socklen_t* addr_len);
     virtual int WriteToFd(const int& fd);
 
-    int Write(const string& data);
+    int Write(const std::string& data);
     int Write(const uint8_t* data, const size_t& len);
     int WriteU8(const uint8_t& u8);
     int WriteU16(const uint16_t& u16);
@@ -70,7 +65,7 @@ public:
         {
             ShrinkCapacity(kDefaultSize);
 
-            //VERBOSE << LMSG << "adjust start_ and end_ to buf_" << endl;
+            //VERBOSE << LMSG << "adjust start_ and end_ to buf_" << std::endl;
         }
 
         assert(end_ >= start_);
@@ -89,7 +84,7 @@ protected:
     {
         if (capacity_ > kShrinkSize)
         {
-            cout << LMSG << "shrink " << capacity_ << "->" << capacity << endl;
+            std::cout << LMSG << "shrink " << capacity_ << "->" << capacity << std::endl;
 
             free(buf_);
             capacity_ = capacity;

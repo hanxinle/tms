@@ -4,17 +4,11 @@
 #include <iostream>
 #include <sstream>
 
-using std::cout;
-using std::endl;
-using std::ostringstream;
-using std::ostream;
-
 class Log
 {
 public:
     Log(const uint8_t& log_level) 
-        :
-        log_level_(log_level)
+        : log_level_(log_level)
     { 
     }
 
@@ -22,7 +16,7 @@ public:
     { 
         if (log_level_ >= g_log_level_)
         {
-            cout << os_.str();
+            std::cout << os_.str();
         }
     }
 
@@ -36,7 +30,7 @@ public:
         return *this;
     }
 
-    Log& operator<<(ostream& (*pf)(ostream&))
+    Log& operator<<(std::ostream& (*pf)(std::ostream&))
     {
         if (log_level_ >= g_log_level_)
         {
@@ -53,7 +47,7 @@ public:
     }
 
 private:
-    ostringstream os_;
+    std::ostringstream os_;
     uint8_t log_level_;
 };
 

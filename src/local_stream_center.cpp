@@ -11,7 +11,7 @@ LocalStreamCenter::~LocalStreamCenter()
 {
 }
 
-bool LocalStreamCenter::RegisterStream(const string& app, const string& stream, MediaPublisher* media_publisher)
+bool LocalStreamCenter::RegisterStream(const std::string& app, const std::string& stream, MediaPublisher* media_publisher)
 {
     if (app.empty() || stream.empty())
     {
@@ -22,17 +22,17 @@ bool LocalStreamCenter::RegisterStream(const string& app, const string& stream, 
 
     if (stream_protocol_.find(stream) != stream_protocol_.end())
     {
-        cout << LMSG << "stream:" << stream << " already registered" << endl;
+        std::cout << LMSG << "stream:" << stream << " already registered" << std::endl;
         return false;
     }
 
     stream_protocol_.insert(make_pair(stream, media_publisher));
-    cout << LMSG << "register app:" << app << ", stream:" << stream << endl;
+    std::cout << LMSG << "register app:" << app << ", stream:" << stream << std::endl;
 
     return true;
 }
 
-bool LocalStreamCenter::UnRegisterStream(const string& app, const string& stream, MediaPublisher* media_publisher)
+bool LocalStreamCenter::UnRegisterStream(const std::string& app, const std::string& stream, MediaPublisher* media_publisher)
 {
     auto iter_app = app_stream_publisher_.find(app);
 
@@ -55,12 +55,12 @@ bool LocalStreamCenter::UnRegisterStream(const string& app, const string& stream
         app_stream_publisher_.erase(iter_app);
     }
 
-    cout << LMSG << "unregister app:" << app << ", stream:" << stream << endl;
+    std::cout << LMSG << "unregister app:" << app << ", stream:" << stream << std::endl;
 
     return true;
 }
 
-MediaPublisher* LocalStreamCenter::GetMediaPublisherByAppStream(const string& app, const string& stream)
+MediaPublisher* LocalStreamCenter::GetMediaPublisherByAppStream(const std::string& app, const std::string& stream)
 {
     auto iter_app = app_stream_publisher_.find(app);
 
@@ -79,7 +79,7 @@ MediaPublisher* LocalStreamCenter::GetMediaPublisherByAppStream(const string& ap
     return iter_stream->second;
 }
 
-bool LocalStreamCenter::IsAppStreamExist(const string& app, const string& stream)
+bool LocalStreamCenter::IsAppStreamExist(const std::string& app, const std::string& stream)
 {
     auto iter_app = app_stream_publisher_.find(app);
 
@@ -98,7 +98,7 @@ bool LocalStreamCenter::IsAppStreamExist(const string& app, const string& stream
     return true;
 }
 
-MediaPublisher* LocalStreamCenter::_DebugGetRandomMediaPublisher(string& app, string& stream)
+MediaPublisher* LocalStreamCenter::_DebugGetRandomMediaPublisher(std::string& app, std::string& stream)
 {
     if (app_stream_publisher_.empty())
     {

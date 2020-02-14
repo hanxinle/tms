@@ -5,14 +5,12 @@
 
 #include "fd.h"
 
-using std::set;
-
 class TimerSecondHandle;
 
 class TimerInSecond : public Fd
 {
 public:
-    TimerInSecond(Epoller* epoller);
+    TimerInSecond(IoLoop* io_loop);
     ~TimerInSecond();
 
     bool AddTimerSecondHandle(TimerSecondHandle* handle)
@@ -33,9 +31,13 @@ public:
     }
 
     int OnRead();
+    int OnWrite() 
+    { 
+        return 0;
+    }
 
 private:
-    set<TimerSecondHandle*> second_handle_;
+    std::set<TimerSecondHandle*> second_handle_;
 
     uint64_t now_in_ms_;
     uint64_t count_;

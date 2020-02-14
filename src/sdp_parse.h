@@ -4,30 +4,27 @@
 #include <set>
 #include <string>
 
-using std::set;
-using std::string;
-
 class SdpParse
 {
 public:
     SdpParse();
     ~SdpParse();
 
-    int Parse(const string& sdp);
+    int Parse(const std::string& sdp);
 
 private:
-    int OnAttribute(const string& line);
-    int OnMediaDesc(const string& line);
-    int OnConnectionData(const string& line);
+    int OnAttribute(const std::string& line);
+    int OnMediaDesc(const std::string& line);
+    int OnConnectionData(const std::string& line);
 
 private:
-    string cur_media_desc_;
+    std::string cur_media_desc_;
 
-    set<int> audio_support_;
-    set<int> video_support_;
+    std::set<int> audio_support_;
+    std::set<int> video_support_;
 
-    string ice_ufrag_;
-    string ice_pwd_;
+    std::string ice_ufrag_;
+    std::string ice_pwd_;
 
     uint32_t audio_ssrc_;
     uint32_t video_ssrc_;

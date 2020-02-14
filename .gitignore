@@ -2,7 +2,6 @@
 *.d
 debug*
 tags*
-trs*
 *.swp
 rtmp_1936
 *.txt
@@ -12,8 +11,6 @@ gmon.out
 *.webm
 *.mp4
 *.pcm
-media_center/media_center
-media_node_discovery/media_node_discovery
 branch_src_2018_01_19_back/
 depend/bin/
 depend/download/
@@ -23,3 +20,9 @@ depend/share/
 depend/tmp/
 *_generated.h
 log
+tms*
+*.264
+*.aac
+*.ts
+git.sh
+*.srt

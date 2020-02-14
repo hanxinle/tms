@@ -48,6 +48,24 @@ enum VideoCodec
     kHEVC = 12,
 };
 
+enum H264NalType 
+{
+    H264NalType_SLICE           = 1,  
+    H264NalType_DPA             = 2,  
+    H264NalType_DPB             = 3,  
+    H264NalType_DPC             = 4,  
+    H264NalType_IDR_SLICE       = 5,  
+    H264NalType_SEI             = 6,  
+    H264NalType_SPS             = 7,  
+    H264NalType_PPS             = 8,  
+    H264NalType_AUD             = 9,  
+    H264NalType_END_SEQUENCE    = 10, 
+    H264NalType_END_STREAM      = 11, 
+    H264NalType_FILLER_DATA     = 12, 
+    H264NalType_SPS_EXT         = 13, 
+    H264NalType_AUXILIARY_SLICE = 19, 
+};
+
 enum AudioCodec
 {
     kAAC = 0x0F,
@@ -69,13 +87,8 @@ enum SubscriberType
     kRtmp = 0,
     kHttpFlv = 1,
     kHttpHls = 2,
-    kTcpServer = 3,
-    kWebRtc = 4,
-};
-
-enum ServerProtocolDefine
-{
-    kServerProtocolHeaderSize = 4,
+    kSrt = 3,
+    kWebrtc = 4,
 };
 
 enum WebSocketProtocolDefine
@@ -83,53 +96,15 @@ enum WebSocketProtocolDefine
     kWebSocketProtocolHeaderSize = 2,
 };
 
-enum ProtocolId
-{
-    kMedia = 1,
-    kSetApp = 2,
-    kSetStreamName = 3,
-    kPullAppStream = 4,
-};
 
-// mask
-const uint32_t kPayloadTypeMask = 0xC0000000;
-
-const uint32_t kFrameTypeMask = 0x38000000;
-
-// type
-const uint32_t kVideoTypeValue = 0x40000000;
-const uint32_t kAudioTypeValue = 0x80000000;
-const uint32_t kMetaTypeValue = 0xC0000000;
-
-const uint32_t kIFrameTypeValue = 0x08000000;
-const uint32_t kPFrameTypeValue = 0x10000000;
-const uint32_t kBFrameTypeValue = 0x18000000;
-const uint32_t kHeaderFrameTypeValue = 0x20000000;
-
-#define MaskVideo(Mask) Mask|=kVideoTypeValue
-#define MaskAudio(Mask) Mask|=kAudioTypeValue
-#define MaskMeta(Mask) Mask|=kMetaTypeValue
-#define MaskIFrame(Mask)    Mask|=kIFrameTypeValue
-#define MaskPFrame(Mask)    Mask|=kPFrameTypeValue
-#define MaskBFrame(Mask)    Mask|=kBFrameTypeValue
-#define MaskHeaderFrame(Mask) Mask |= kHeaderFrameTypeValue
-
-inline bool IsVideo(const uint32_t& mask)  { return (mask & kPayloadTypeMask) == kVideoTypeValue; }
-inline bool IsAudio(const uint32_t& mask)  { return (mask & kPayloadTypeMask) == kAudioTypeValue; }
-inline bool IsMetaData(const uint32_t& mask)  { return (mask & kPayloadTypeMask) == kMetaTypeValue; }
-inline bool IsIFrame(const uint32_t& mask) { return (mask & kFrameTypeMask)   == kIFrameTypeValue; }
-inline bool IsBFrame(const uint32_t& mask) { return (mask & kFrameTypeMask)   == kBFrameTypeValue; }
-inline bool IsPFrame(const uint32_t& mask) { return (mask & kFrameTypeMask)   == kPFrameTypeValue; }
-inline bool IsHeaderFrame(const uint32_t& mask) { return (mask & kFrameTypeMask)   == kHeaderFrameTypeValue; }
-
-#define  LMSG  Util::GetNowMsStr()<<" @ Trs ["<<__FILE__<<"]#"<<__func__<<":"<<__LINE__<<" "
+#define  LMSG  Util::GetNowMsStr()<<" @ tms ["<<__FILE__<<"]#"<<__func__<<":"<<__LINE__<<" "
 #define  TRACE "============================================================"
 
 //#define VERBOSE Log(kLevelVerbose)
 //#define DEBUG Log(kLevelDebug)
 
-#define VERBOSE cout<<LMSG
-#define DEBUG cout<<LMSG
+#define VERBOSE std::cout<<LMSG
+#define DEBUG std::cout<<LMSG
 
 
 #endif // __COMMON_DEFINE_H__

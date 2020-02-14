@@ -1,34 +1,24 @@
 #ifndef __EPOLLER_H__
 #define __EPOLLER_H__
 
-#include <sys/epoll.h>
-
-#include <map>
-
-using std::map;
+#include "io_loop.h"
 
 class Fd;
 
-class Epoller
+class Epoller : public IoLoop
 {
 public:
     Epoller();
     ~Epoller();
 
-    int Run();
-    int EnableSocket(Fd* fd, const uint32_t& event);
-    int DisableSocket(Fd* fd, const uint32_t& event);
-    int RemoveSocket(Fd* fd);
+    int Create();
+    void RunIOLoop(const int& timeout_in_millsecond);
 
-private:
-    int WaitIoEvent(const uint32_t& timeout_ms);
-    void HandleEvent(map<Fd*, uint32_t>& socket_event);
-    int Ctrl(const int& op, const int& fd, epoll_event& ep_ev);
-    void DumpSocketMap();
+    int AddFd(Fd* fd);
+    int DelFd(Fd* fd);
+    int ModFd(Fd* fd);
 
-private:
-    int fd_;
-    map<Fd*, uint32_t>  socket_map_; // Fd*:val
+    void WaitIO(const int& timeout_in_millsecond);
 };
-
+    
 #endif // __EPOLLER_H__

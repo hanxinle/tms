@@ -5,35 +5,28 @@
 #include "common_define.h"
 #include "io_buffer.h"
 
-using namespace std;
-
-using any::Int;
-using any::Double;
-using any::String;
-using any::Map;
-
-int Amf0::Decode(string& data, AmfCommand& result)
+int Amf0::Decode(std::string& data, AmfCommand& result)
 {
     BitBuffer bit_buffer(data);
 
     return Decode(bit_buffer, result);
 }
 
-int Amf0::Encode(const vector<Any*>& input, IoBuffer& output)
+int Amf0::Encode(const std::vector<any::Any*>& input, IoBuffer& output)
 {
     int ret = -1;
-    cout << "input.size():" << input.size() << endl;
+    std::cout << "input.size():" << input.size() << std::endl;
     for (const auto& any : input)
     {
         ret = Encode(any, output);
 
         if (ret != 0)
         {
-            cout << LMSG << "when encode " << any->TypeStr() << "," << any << " failed" << endl;
+            std::cout << LMSG << "when encode " << any->TypeStr() << "," << any << " failed" << std::endl;
             return ret;
         }
 
-        cout << LMSG << "when encode " << any->TypeStr() << " success!!!" << endl;
+        std::cout << LMSG << "when encode " << any->TypeStr() << " success!!!" << std::endl;
     }
 
     return 0;
@@ -43,7 +36,7 @@ int Amf0::GetType(BitBuffer& bit_buffer, int& type)
 {
     if (! bit_buffer.MoreThanBytes(1))
     {
-        cout << LMSG << "bit_buffer no more than 1 bytes" << endl;
+        std::cout << LMSG << "bit_buffer no more than 1 bytes" << std::endl;
         return -1;
     }
 
@@ -57,7 +50,7 @@ int Amf0::PeekType(BitBuffer& bit_buffer)
 {
     if (! bit_buffer.MoreThanBytes(1))
     {
-        cout << LMSG << "bit_buffer no more than 1 bytes" << endl;
+        std::cout << LMSG << "bit_buffer no more than 1 bytes" << std::endl;
         return -1;
     }
 
@@ -74,9 +67,9 @@ int Amf0::Decode(BitBuffer& bit_buffer, AmfCommand& result)
     int ret = 0;
     while (bit_buffer.GetBytes(1, type) == 0 && type != kUnknown)
     {
-        cout << LMSG << "type:" << type << "->" << Amf0MarkerToStr(type) << ",bit_buffer.size():" << bit_buffer.BytesLeft() << endl;
+        std::cout << LMSG << "type:" << type << "->" << Amf0MarkerToStr(type) << ",bit_buffer.size():" << bit_buffer.BytesLeft() << std::endl;
 
-        Any* any = NULL;
+        any::Any* any = NULL;
         if (Decode(type, bit_buffer, any) == 0)
         {
             result.PushBack(any);
@@ -90,7 +83,7 @@ int Amf0::Decode(BitBuffer& bit_buffer, AmfCommand& result)
     return ret;
 }
 
-int Amf0::Decode(const int& type, BitBuffer& bit_buffer, Any*& result)
+int Amf0::Decode(const int& type, BitBuffer& bit_buffer, any::Any*& result)
 {
     int ret = -1;
     switch (type)
@@ -140,11 +133,11 @@ int Amf0::Decode(const int& type, BitBuffer& bit_buffer, Any*& result)
     return ret;
 }
 
-int Amf0::DecodeNumber(BitBuffer& bit_buffer, Any*& result)
+int Amf0::DecodeNumber(BitBuffer& bit_buffer, any::Any*& result)
 {
     if (! bit_buffer.MoreThanBytes(8))
     {
-        cout << LMSG << "bit_buffer no more than 8 bytes" << endl;
+        std::cout << LMSG << "bit_buffer no more than 8 bytes" << std::endl;
         return -1;
     }
 
@@ -153,34 +146,34 @@ int Amf0::DecodeNumber(BitBuffer& bit_buffer, Any*& result)
 
     double num = *(double*)&n;
 
-    cout << LMSG << "num:[" << num << "]" << endl;
+    std::cout << LMSG << "num:[" << num << "]" << std::endl;
 
-    result = new Double(num);
+    result = new any::Double(num);
 
     return 0;
 }
 
-int Amf0::DecodeBoolean(BitBuffer& bit_buffer, Any*& result)
+int Amf0::DecodeBoolean(BitBuffer& bit_buffer, any::Any*& result)
 {
     if (! bit_buffer.MoreThanBytes(1))
     {
-        cout << LMSG << "bit_buffer no more than 1 bytes" << endl;
+        std::cout << LMSG << "bit_buffer no more than 1 bytes" << std::endl;
         return -1;
     }
 
     uint8_t n;
     bit_buffer.GetBytes(1, n);
 
-    result = new Int(n);
+    result = new any::Int(n);
 
     return 0;
 }
 
-int Amf0::DecodeString(BitBuffer& bit_buffer, Any*& result)
+int Amf0::DecodeString(BitBuffer& bit_buffer, any::Any*& result)
 {
     if (! bit_buffer.MoreThanBytes(2))
     {
-        cout << LMSG << "bit_buffer no more than 2 bytes" << endl;
+        std::cout << LMSG << "bit_buffer no more than 2 bytes" << std::endl;
         return -1;
     }
 
@@ -189,42 +182,42 @@ int Amf0::DecodeString(BitBuffer& bit_buffer, Any*& result)
 
     if (! bit_buffer.MoreThanBytes(len))
     {
-        cout << LMSG << "bit_buffer no more than " << len << " bytes" << endl;
+        std::cout << LMSG << "bit_buffer no more than " << len << " bytes" << std::endl;
         return -1;
     }
 
-    string str;
+    std::string str;
     bit_buffer.GetString(len, str);
 
-    cout << LMSG << "len:" << len << "[" << str << "]" << endl;
+    std::cout << LMSG << "len:" << len << "[" << str << "]" << std::endl;
 
-    result = new String(str);
+    result = new any::String(str);
 
     return 0;
 }
 
-int Amf0::DecodeObject(BitBuffer& bit_buffer, Any*& result)
+int Amf0::DecodeObject(BitBuffer& bit_buffer, any::Any*& result)
 {
     uint16_t key_len = 0;
 
     bool error = false;
 
-    result = new Map(true);
+    result = new any::Map(true);
 
     while (bit_buffer.GetBytes(2, key_len) == 0)
     {
         if (! bit_buffer.MoreThanBytes(key_len))
         {
-            cout << LMSG << "bit_buffer no more than " << key_len << " bytes" << endl;
+            std::cout << LMSG << "bit_buffer no more than " << key_len << " bytes" << std::endl;
             error = true;
             break;
         }
 
-        string key;
+        std::string key;
 
         bit_buffer.GetString(key_len, key);
 
-        cout << LMSG << "key:" << key << ",key_len:" << key_len << ",bit_buffer.size:" << bit_buffer.BytesLeft() << endl;
+        std::cout << LMSG << "key:" << key << ",key_len:" << key_len << ",bit_buffer.size:" << bit_buffer.BytesLeft() << std::endl;
 
         int type = kUnknown;
         if (GetType(bit_buffer, type) != 0)
@@ -244,10 +237,10 @@ int Amf0::DecodeObject(BitBuffer& bit_buffer, Any*& result)
             break;
         }
 
-        Any* val;
+        any::Any* val;
         if (Decode(type, bit_buffer, val) != 0)
         {
-            cout << LMSG << "decode key" << key << " failed" << endl;
+            std::cout << LMSG << "decode key" << key << " failed" << std::endl;
             error = true;
             break;
         }
@@ -264,13 +257,13 @@ int Amf0::DecodeObject(BitBuffer& bit_buffer, Any*& result)
     return 0;
 }
 
-int Amf0::DecodeEcmaArray(BitBuffer& bit_buffer, Any*& result)
+int Amf0::DecodeEcmaArray(BitBuffer& bit_buffer, any::Any*& result)
 {
     uint32_t element_count = 0;
 
     if (! bit_buffer.MoreThanBytes(4))
     {
-        cout << LMSG << "bit_buffer no more than 4 bytes" << endl;
+        std::cout << LMSG << "bit_buffer no more than 4 bytes" << std::endl;
         return -1;
     }
 
@@ -278,9 +271,9 @@ int Amf0::DecodeEcmaArray(BitBuffer& bit_buffer, Any*& result)
 
     bit_buffer.GetBytes(4, element_count);
 
-    cout << LMSG << "element_count:" << element_count << endl;
+    std::cout << LMSG << "element_count:" << element_count << std::endl;
 
-    result = new Map(true);
+    result = new any::Map(true);
 
     for (uint32_t c = 0; c != element_count; ++c)
     {
@@ -290,16 +283,16 @@ int Amf0::DecodeEcmaArray(BitBuffer& bit_buffer, Any*& result)
         {
             if (! bit_buffer.MoreThanBytes(key_len))
             {
-                cout << LMSG << "bit_buffer no more than " << key_len << " bytes" << endl;
+                std::cout << LMSG << "bit_buffer no more than " << key_len << " bytes" << std::endl;
                 error = true;
                 break;
             }
 
-            string key;
+            std::string key;
 
             bit_buffer.GetString(key_len, key);
 
-            cout << LMSG << "index:" << c << ",key:[" << key << "],key_len:" << key_len << ",bit_buffer.size:" << bit_buffer.BytesLeft() << endl;
+            std::cout << LMSG << "index:" << c << ",key:[" << key << "],key_len:" << key_len << ",bit_buffer.size:" << bit_buffer.BytesLeft() << std::endl;
 
             int type = kUnknown;
             if (GetType(bit_buffer, type) != 0)
@@ -319,10 +312,10 @@ int Amf0::DecodeEcmaArray(BitBuffer& bit_buffer, Any*& result)
                 break;
             }
 
-            Any* val = NULL;
+            any::Any* val = NULL;
             if (Decode(type, bit_buffer, val) != 0)
             {
-                cout << LMSG << "decode key" << key << " failed" << endl;
+                std::cout << LMSG << "decode key" << key << " failed" << std::endl;
                 error = true;
                 break;
             }
@@ -340,7 +333,7 @@ int Amf0::DecodeEcmaArray(BitBuffer& bit_buffer, Any*& result)
     return 0;
 }
 
-int Amf0::DecodeNull(BitBuffer& bit_buffer, Any*& result)
+int Amf0::DecodeNull(BitBuffer& bit_buffer, any::Any*& result)
 {
     UNUSED(bit_buffer);
     UNUSED(result);
@@ -350,7 +343,7 @@ int Amf0::DecodeNull(BitBuffer& bit_buffer, Any*& result)
     return 0;
 }
 
-int Amf0::Encode(const Any* any, IoBuffer& output)
+int Amf0::Encode(const any::Any* any, IoBuffer& output)
 {
     int ret = -1;
     if (any->IsInt())
@@ -380,7 +373,7 @@ int Amf0::Encode(const Any* any, IoBuffer& output)
     }
     else
     {
-        cout << "unknown any, type:" << (uint16_t)any->GetType() << endl;
+        std::cout << "unknown any, type:" << (uint16_t)any->GetType() << std::endl;
     }
 
     return ret;
@@ -423,7 +416,7 @@ int Amf0::EncodeBoolean(const uint8_t& val, IoBuffer& output)
     return 0;
 }
 
-int Amf0::EncodeString(const string& val, IoBuffer& output)
+int Amf0::EncodeString(const std::string& val, IoBuffer& output)
 {
     int ret = output.WriteU16(val.size());  
     if (ret != 2)
@@ -441,13 +434,13 @@ int Amf0::EncodeString(const string& val, IoBuffer& output)
     return 0;
 }
 
-int Amf0::EncodeObject(const map<string, Any*>& val, IoBuffer& output)
+int Amf0::EncodeObject(const std::map<std::string, any::Any*>& val, IoBuffer& output)
 {
     int ret = 0;
     for (const auto& kv : val)
     {
-        const string& key = kv.first;
-        const Any* val = kv.second;
+        const std::string& key = kv.first;
+        const any::Any* val = kv.second;
 
         uint16_t key_len = key.length();
 

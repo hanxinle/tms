@@ -4,38 +4,34 @@
 #include "bit_stream.h"
 #include "global.h"
 #include "media_publisher.h"
+#include "media_subscriber.h"
 #include "media_muxer.h"
 #include "util.h"
 
-using namespace std;
-using namespace socket_util;
-
 MediaMuxer::MediaMuxer(MediaPublisher* media_publisher)
-    :
-    video_frame_id_(0),
-    audio_frame_id_(0),
-    video_frame_recv_count_(0),
-    audio_frame_recv_count_(0),
-    video_key_frame_recv_count_(0),
-    pre_video_key_frame_id_(0),
-    pre_audio_key_frame_id_(0),
-    video_calc_fps_(0),
-    audio_calc_fps_(0),
-    pre_calc_fps_ms_(0),
-    forward_toggle_bit_(false),
-    ts_seq_(0),
-    ts_couter_(0),
-    ts_video_pid_(0x100),
-    ts_audio_pid_(0x101),
-    ts_pmt_pid_(0xABC),
-    ts_pat_continuity_counter_(0),
-    ts_pmt_continuity_counter_(0),
-    ts_audio_continuity_counter_(0),
-    ts_video_continuity_counter_(0),
-    crc_32_(CRC32_HLS),
-    media_publisher_(media_publisher)
+    : video_frame_id_(0)
+    , audio_frame_id_(0)
+    , video_frame_recv_count_(0)
+    , audio_frame_recv_count_(0)
+    , video_key_frame_recv_count_(0)
+    , pre_video_key_frame_id_(0)
+    , pre_audio_key_frame_id_(0)
+    , video_calc_fps_(0)
+    , audio_calc_fps_(0)
+    , pre_calc_fps_ms_(0)
+    , ts_seq_(0)
+    , ts_couter_(0)
+    , ts_video_pid_(0x100)
+    , ts_audio_pid_(0x101)
+    , ts_pmt_pid_(0xABC)
+    , ts_pat_continuity_counter_(0)
+    , ts_pmt_continuity_counter_(0)
+    , ts_audio_continuity_counter_(0)
+    , ts_video_continuity_counter_(0)
+    , crc_32_(CRC32_HLS)
+    , media_publisher_(media_publisher)
 {
-    cout << LMSG << endl;
+    std::cout << LMSG << std::endl;
 
     adts_header_[0] = 0;
     adts_header_[1] = 0;
@@ -48,7 +44,7 @@ MediaMuxer::MediaMuxer(MediaPublisher* media_publisher)
 
 MediaMuxer::~MediaMuxer()
 {
-    cout << LMSG << endl;
+    std::cout << LMSG << std::endl;
 }
 
 void MediaMuxer::UpdateM3U8()
@@ -88,7 +84,7 @@ void MediaMuxer::UpdateM3U8()
 
     uint32_t new_ts_seq = riter->first;
 
-    ostringstream os;
+    std::ostringstream os;
 
     os << "#EXTM3U\n"
        << "#EXT-X-VERSION:3\n"
@@ -106,7 +102,7 @@ void MediaMuxer::UpdateM3U8()
 
     m3u8_ = os.str();
 
-    cout << LMSG << "\n" << TRACE << "\n" << m3u8_ << TRACE << endl;
+    std::cout << LMSG << "\n" << TRACE << "\n" << m3u8_ << TRACE << std::endl;
 }
 
 void MediaMuxer::PacketTs(const Payload& payload)
@@ -118,13 +114,6 @@ void MediaMuxer::PacketTs(const Payload& payload)
         ts_queue_[ts_seq_].ts_data.append(PacketTsPat());
         ts_queue_[ts_seq_].ts_data.append(PacketTsPmt());
         ts_queue_[ts_seq_].first_dts = payload.GetDts();
-
-        srt_send_buf_ = ts_queue_[ts_seq_].ts_data;
-
-        if (g_srt_client_fd != -1)
-        {
-			//srt_send(g_srt_client_fd, srt_send_buf_.data(), srt_send_buf_.size());
-        }
     }
 
     ts_queue_[ts_seq_].duration = (payload.GetDts() - ts_queue_[ts_seq_].first_dts) / 1000.0;
@@ -181,8 +170,8 @@ void MediaMuxer::PacketTs(const Payload& payload)
                     adaption_stuffing_bytes = 188 - (payload.GetRawLen() + ts_header_size + adaptation_size + pes_header_size + extern_data_len);
                 }
 
-                //cout << LMSG << "payload size:" << payload.GetRawLen() << ", ts_header_size:" << (int)ts_header_size << ", adaptation_size:" << (int)adaptation_size
-                             //<< ",pes_header_size:" << (int)pes_header_size << ",extern_data_len:" << (int)extern_data_len << endl;
+                //std::cout << LMSG << "payload size:" << payload.GetRawLen() << ", ts_header_size:" << (int)ts_header_size << ", adaptation_size:" << (int)adaptation_size
+                             //<< ",pes_header_size:" << (int)pes_header_size << ",extern_data_len:" << (int)extern_data_len << std::endl;
 
                 if (! is_video)
                 {
@@ -390,7 +379,7 @@ void MediaMuxer::PacketTs(const Payload& payload)
             }
         }
 
-        //VERBOSE << LMSG << "header_size:" << header_size << ",ts_bs.SizeInBytes():" << ts_bs.SizeInBytes() << ",is_video:" << is_video << endl;
+        //VERBOSE << LMSG << "header_size:" << header_size << ",ts_bs.SizeInBytes():" << ts_bs.SizeInBytes() << ",is_video:" << is_video << std::endl;
         assert(header_size == ts_bs.SizeInBytes());
 
         // SPS PPS before I frame
@@ -407,7 +396,7 @@ void MediaMuxer::PacketTs(const Payload& payload)
 
                 ts_bs.WriteBytes(4, 0x00000001);
                 //ts_bs.WriteBytes(1, 0x65);
-                //VERBOSE << LMSG << frame_key << " I frame" << endl;
+                //VERBOSE << LMSG << frame_key << " I frame" << std::endl;
             }
             else if (payload.IsPFrame())
             {
@@ -415,7 +404,7 @@ void MediaMuxer::PacketTs(const Payload& payload)
                 ts_bs.WriteBytes(4, 0x00000001);
                 //ts_bs.WriteBytes(1, 0x41);
 
-                //VERBOSE << LMSG << "P frame" << endl;
+                //VERBOSE << LMSG << "P frame" << std::endl;
             }
             else if (payload.IsBFrame())
             {
@@ -423,11 +412,11 @@ void MediaMuxer::PacketTs(const Payload& payload)
                 ts_bs.WriteBytes(4, 0x00000001);
                 //ts_bs.WriteBytes(1, 0x01);
 
-                //VERBOSE << LMSG << "B frame" << endl;
+                //VERBOSE << LMSG << "B frame" << std::endl;
             }
             else
             {
-                //VERBOSE << LMSG << "Unknown frame:" << (uint16_t)payload.GetFrameType() << endl;
+                //VERBOSE << LMSG << "Unknown frame:" << (uint16_t)payload.GetFrameType() << std::endl;
             }
         }
 
@@ -457,9 +446,15 @@ void MediaMuxer::PacketTs(const Payload& payload)
         assert(ts_bs.SizeInBytes() == 188);
         ts_queue_[ts_seq_].ts_data.append((const char*)ts_bs.GetData(), ts_bs.SizeInBytes());
 
-        if (g_srt_client_fd != -1)
+        if (media_publisher_ != NULL)
         {
-            //srt_send(g_srt_client_fd, (const char*)ts_bs.GetData(), ts_bs.SizeInBytes());
+            for (const auto& sub : media_publisher_->GetSubscriber())
+            {
+                if (sub->IsSrt())
+                {
+                    sub->SendData(std::string((const char*)ts_bs.GetData(), ts_bs.SizeInBytes()));
+                }
+            }
         }
 
         data += bytes_left;
@@ -467,7 +462,7 @@ void MediaMuxer::PacketTs(const Payload& payload)
     }
 }
 
-string& MediaMuxer::PacketTsPat()
+std::string& MediaMuxer::PacketTsPat()
 {
     if (ts_pat_.size() >= 4)
     {
@@ -522,7 +517,7 @@ string& MediaMuxer::PacketTsPat()
     return ts_pat_;
 }
 
-string& MediaMuxer::PacketTsPmt()
+std::string& MediaMuxer::PacketTsPmt()
 {
     if (ts_pmt_.size() >= 4)
     {
@@ -590,9 +585,9 @@ string& MediaMuxer::PacketTsPmt()
     return ts_pmt_;
 }
 
-int MediaMuxer::OnAudio(Payload& audio_payload)
+int MediaMuxer::OnAudio(const Payload& audio_payload)
 {
-    audio_queue_.insert(make_pair(audio_frame_id_, audio_payload));
+    audio_queue_.insert(std::make_pair(audio_frame_id_, audio_payload));
 
     PacketTs(audio_payload);
 
@@ -609,7 +604,7 @@ int MediaMuxer::OnAudio(Payload& audio_payload)
     return kSuccess;
 }
 
-int MediaMuxer::OnVideo(Payload& video_payload)
+int MediaMuxer::OnVideo(const Payload& video_payload)
 {
     if (video_payload.IsIFrame())
     {
@@ -626,7 +621,7 @@ int MediaMuxer::OnVideo(Payload& video_payload)
         pre_audio_key_frame_id_ = audio_frame_id_;
     }
 
-    video_queue_.insert(make_pair(video_frame_id_, video_payload));
+    video_queue_.insert(std::make_pair(video_frame_id_, video_payload));
 
     PacketTs(video_payload);
 
@@ -639,7 +634,7 @@ int MediaMuxer::OnVideo(Payload& video_payload)
     {
         if (video_queue_.begin()->second.IsIFrame())
         {
-            cout << LMSG << "erase " << ts_queue_.begin()->first << ".ts" << endl;
+            std::cout << LMSG << "erase " << ts_queue_.begin()->first << ".ts" << std::endl;
             ts_queue_.erase(ts_queue_.begin());
         }
 
@@ -649,11 +644,11 @@ int MediaMuxer::OnVideo(Payload& video_payload)
     return kSuccess;
 }
 
-int MediaMuxer::OnMetaData(const string& metadata)
+int MediaMuxer::OnMetaData(const std::string& metadata)
 {
     if (metadata_ == metadata)
     {
-        cout << LMSG << "metadata no change" << endl;
+        std::cout << LMSG << "metadata no change" << std::endl;
         return 0;
     }
 
@@ -662,29 +657,26 @@ int MediaMuxer::OnMetaData(const string& metadata)
     return 0;
 }
 
-int MediaMuxer::OnVideoHeader(const string& video_header)
+int MediaMuxer::OnVideoHeader(const std::string& video_header)
 {
-    cout << LMSG << endl;
+    std::cout << LMSG << std::endl;
 
-    bool wait_arrive = false;
+    bool pending_arrive = false;
 
     if (video_header_.empty() && ! video_header.empty() && ! audio_header_.empty())
     {
-        cout << LMSG << "forward_toggle_bit_ " << forward_toggle_bit_ << "->" << true << endl;
-        forward_toggle_bit_ = true;
-
-        wait_arrive = true;
+        pending_arrive = true;
     }
 
     if (video_header_ == video_header)
     {
-        cout << LMSG << "video header no change" << endl;
+        std::cout << LMSG << "video header no change" << std::endl;
         return 0;
     }
 
     video_header_ = video_header;
 
-    if (wait_arrive)
+    if (pending_arrive)
     {
         if (media_publisher_ != NULL)
         {
@@ -692,99 +684,136 @@ int MediaMuxer::OnVideoHeader(const string& video_header)
 
             for (const auto& subscriber : wait_subscriber)
             {
-                cout << LMSG << "wait_subscriber -> subscriber" << endl;
+                std::cout << LMSG << "wait_subscriber -> subscriber" << std::endl;
                 media_publisher_->AddSubscriber(subscriber);
             }
         }
     }
 
-	BitBuffer bit_buffer(video_header_);
-
-    uint8_t configuration_version = 0;
-    bit_buffer.GetBytes(1, configuration_version);
-    cout << "configuration_version:" << (int)configuration_version << endl;
-
-    uint8_t avc_profile_indication = 0;
-    bit_buffer.GetBytes(1, avc_profile_indication);
-    cout << "avc_profile_indication:" << (int)avc_profile_indication << endl;
-
-    uint8_t profile_compatibility = 0;
-    bit_buffer.GetBytes(1, profile_compatibility);
-    cout << "profile_compatibility:" << (int)profile_compatibility << endl;
-    
-    uint8_t avc_level_indication = 0;
-    bit_buffer.GetBytes(1, avc_level_indication);
-    cout << "avc_level_indication:" << (int)avc_level_indication << endl;
-
-    uint8_t resered_6bit = 0;
-    bit_buffer.GetBits(6, resered_6bit);
-    cout << "resered_6bit:" << (int)resered_6bit << endl;
-
-    uint8_t length_size_minus_one = 0;
-    bit_buffer.GetBits(2, length_size_minus_one);
-    cout << "length_size_minus_one:" << (int)length_size_minus_one << endl;
-
-    uint8_t resered_3bit = 0;
-    bit_buffer.GetBits(3, resered_3bit);
-    cout << "resered_3bit:" << (int)resered_3bit << endl;
-
-    uint8_t sps_num = 0;
-    bit_buffer.GetBits(5, sps_num);
-    cout << "sps_num:" << (int)sps_num << endl;
-
-    for (uint8_t i = 0; i < sps_num; ++i)
+    const uint8_t* p = (const uint8_t*)video_header_.data();
+    std::vector<std::pair<const uint8_t*, int>> nals;
+    int i = 0;
+    int len = video_header_.size();
+	if (p[i] == 0x00 && p[i+1] == 0x00 && p[i+2] == 0x00 && p[i+3] == 0x01)
     {
-        uint16_t sps_len = 0; 
-        bit_buffer.GetBytes(2, sps_len);
-        cout << "sps_len:" << sps_len << endl;
+        const uint8_t* nal = NULL;
+        while (i + 3 < len)
+        {
+            if (p[i] != 0x00 || p[i+1] != 0x00 || p[i+2] != 0x01)
+            {
+                ++i;
+                continue;
+            }
 
-        bit_buffer.GetString(sps_len, sps_);
+            if (nal != NULL)
+            {
+                nals.push_back(std::make_pair(nal, p + i - nal - 1));
+            }
 
-        cout << "SPS" << endl;
-        cout << Util::Bin2Hex(sps_) << endl;
+            i += 3;
+            nal = p + i;
+        }
+
+        if (nal != NULL)
+        {
+            nals.push_back(std::make_pair(nal, p + len - nal));
+        }
+
+        if (nals.size() == 2)
+        {
+            sps_.assign((const char*)nals[0].first, nals[0].second);
+            std::cout << LMSG << "sps=" << Util::Bin2Hex(sps_) << std::endl;
+            pps_.assign((const char*)nals[1].first, nals[1].second);
+            std::cout << LMSG << "pps=" << Util::Bin2Hex(pps_) << std::endl;
+        }
     }
-
-    uint8_t pps_num = 0; 
-    bit_buffer.GetBytes(1, pps_num);
-    cout << "pps_num:" << (int)pps_num << endl;
-
-    for (uint8_t i = 0; i < pps_num; ++i)
+    else
     {
-        uint16_t pps_len = 0; 
-        bit_buffer.GetBytes(2, pps_len);
+	    BitBuffer bit_buffer(video_header_);
 
-        cout << "pps_len:" << (int)pps_len << endl;
+        uint8_t configuration_version = 0;
+        bit_buffer.GetBytes(1, configuration_version);
+        std::cout << "configuration_version:" << (int)configuration_version << std::endl;
 
-        bit_buffer.GetString(pps_len, pps_);
+        uint8_t avc_profile_indication = 0;
+        bit_buffer.GetBytes(1, avc_profile_indication);
+        std::cout << "avc_profile_indication:" << (int)avc_profile_indication << std::endl;
 
-        cout << "PPS" << endl;
-        cout << Util::Bin2Hex(pps_) << endl;
+        uint8_t profile_compatibility = 0;
+        bit_buffer.GetBytes(1, profile_compatibility);
+        std::cout << "profile_compatibility:" << (int)profile_compatibility << std::endl;
+        
+        uint8_t avc_level_indication = 0;
+        bit_buffer.GetBytes(1, avc_level_indication);
+        std::cout << "avc_level_indication:" << (int)avc_level_indication << std::endl;
+
+        uint8_t resered_6bit = 0;
+        bit_buffer.GetBits(6, resered_6bit);
+        std::cout << "resered_6bit:" << (int)resered_6bit << std::endl;
+
+        uint8_t length_size_minus_one = 0;
+        bit_buffer.GetBits(2, length_size_minus_one);
+        std::cout << "length_size_minus_one:" << (int)length_size_minus_one << std::endl;
+
+        uint8_t resered_3bit = 0;
+        bit_buffer.GetBits(3, resered_3bit);
+        std::cout << "resered_3bit:" << (int)resered_3bit << std::endl;
+
+        uint8_t sps_num = 0;
+        bit_buffer.GetBits(5, sps_num);
+        std::cout << "sps_num:" << (int)sps_num << std::endl;
+
+        for (uint8_t i = 0; i < sps_num; ++i)
+        {
+            uint16_t sps_len = 0; 
+            bit_buffer.GetBytes(2, sps_len);
+            std::cout << "sps_len:" << sps_len << std::endl;
+
+            bit_buffer.GetString(sps_len, sps_);
+
+            std::cout << "SPS" << std::endl;
+            std::cout << Util::Bin2Hex(sps_) << std::endl;
+        }
+
+        uint8_t pps_num = 0; 
+        bit_buffer.GetBytes(1, pps_num);
+        std::cout << "pps_num:" << (int)pps_num << std::endl;
+
+        for (uint8_t i = 0; i < pps_num; ++i)
+        {
+            uint16_t pps_len = 0; 
+            bit_buffer.GetBytes(2, pps_len);
+
+            std::cout << "pps_len:" << (int)pps_len << std::endl;
+
+            bit_buffer.GetString(pps_len, pps_);
+
+            std::cout << "PPS" << std::endl;
+            std::cout << Util::Bin2Hex(pps_) << std::endl;
+        }
     }
 
     return kSuccess;
 }
 
-int MediaMuxer::OnAudioHeader(const string& audio_header)
+int MediaMuxer::OnAudioHeader(const std::string& audio_header)
 {
-    bool wait_arrive = false;
+    bool pending_arrive = false;
 
     if (audio_header_.empty() && ! audio_header.empty() && ! video_header_.empty())
     {
-        cout << LMSG << "forward_toggle_bit_ " << forward_toggle_bit_ << "->" << true << endl;
-        forward_toggle_bit_ = true;
-
-        wait_arrive = true;
+        pending_arrive = true;
     }
 
     if (audio_header_ == audio_header)
     {
-        cout << LMSG << "audio header no change" << endl;
+        std::cout << LMSG << "audio header no change" << std::endl;
         return 0;
     }
 
     audio_header_ = audio_header;
 
-    if (wait_arrive)
+    if (pending_arrive)
     {
         if (media_publisher_ != NULL)
         {
@@ -792,7 +821,7 @@ int MediaMuxer::OnAudioHeader(const string& audio_header)
 
             for (const auto& subscriber : wait_subscriber)
             {
-                cout << LMSG << "wait_subscriber -> subscriber" << endl;
+                std::cout << LMSG << "wait_subscriber -> subscriber" << std::endl;
                 media_publisher_->AddSubscriber(subscriber);
             }
         }
@@ -815,7 +844,7 @@ int MediaMuxer::OnAudioHeader(const string& audio_header)
     tmp >>= 7;
     sampling_frequency_index |= tmp;
 
-    cout << LMSG << "sampling_frequency_index:" << (uint16_t)sampling_frequency_index << endl;
+    std::cout << LMSG << "sampling_frequency_index:" << (uint16_t)sampling_frequency_index << std::endl;
 
     //channel config:4bits
     channel_config = audio_header_[1] & 0x78;
@@ -826,7 +855,7 @@ int MediaMuxer::OnAudioHeader(const string& audio_header)
     adts_header_[1] |= (0 << 3);    //MPEG Version:0 for MPEG-4,1 for MPEG-2  1bit
     adts_header_[1] |= (0 << 1);    //Layer:0                                 2bits 
     adts_header_[1] |= 1;           //protection absent:1                     1bit
-                                    // set to 1 if there is no CRC and 0 if there is CRC
+                                    // std::set to 1 if there is no CRC and 0 if there is CRC
 
     adts_header_[2] = (audio_object_type - 1)<<6;            //profile:audio_object_type - 1                      2bits
     adts_header_[2] |= (sampling_frequency_index & 0x0f)<<2; //sampling frequency index:sampling_frequency_index  4bits 
@@ -845,12 +874,12 @@ int MediaMuxer::OnAudioHeader(const string& audio_header)
     return kSuccess;
 }
 
-vector<Payload> MediaMuxer::GetFastOut()
+std::vector<Payload> MediaMuxer::GetFastOut()
 {
 	auto iter_video = video_queue_.find(pre_video_key_frame_id_);
     auto iter_audio = audio_queue_.find(pre_audio_key_frame_id_);
 
-	vector<Payload> fast_out;
+	std::vector<Payload> fast_out;
 
     while (iter_audio != audio_queue_.end() || iter_video != video_queue_.end())
     {    
@@ -888,15 +917,15 @@ int MediaMuxer::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval
 
     if (! video_queue_.empty())
     {
-        cout << LMSG << "video queue:" << video_queue_.size() << " [" << video_queue_.begin()->first << "-" << video_queue_.rbegin()->first << "]" << endl;
+        std::cout << LMSG << "video queue:" << video_queue_.size() << " [" << video_queue_.begin()->first << "-" << video_queue_.rbegin()->first << "]" << std::endl;
     }
 
     if (! audio_queue_.empty())
     {
-        cout << LMSG << "audio queue:" << audio_queue_.size() << " [" << audio_queue_.begin()->first << "-" << audio_queue_.rbegin()->first << "]" << endl;
+        std::cout << LMSG << "audio queue:" << audio_queue_.size() << " [" << audio_queue_.begin()->first << "-" << audio_queue_.rbegin()->first << "]" << std::endl;
     }
 
-    cout << LMSG << "ts queue:" << ts_queue_.size() << endl;
+    std::cout << LMSG << "ts queue:" << ts_queue_.size() << std::endl;
 
     if (pre_calc_fps_ms_ == 0)
     {
@@ -906,13 +935,13 @@ int MediaMuxer::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval
     {
         double duration = (now_in_ms - pre_calc_fps_ms_) / 1000.0;
 
-        cout << LMSG << "[STAT] app:" << app_ 
+        std::cout << LMSG << "[STAT] app:" << app_ 
                      << ",stream:" << stream_ 
                      << ",video_fps:" << (video_calc_fps_ / duration)
                      << ",audio_fps:" << (audio_calc_fps_ / duration)
                      << ",interval:" << interval 
                      << ",duration:" << duration
-                     << endl;
+                     << std::endl;
 
         pre_calc_fps_ms_ = now_in_ms;
 

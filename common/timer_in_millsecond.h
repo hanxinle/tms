@@ -5,14 +5,12 @@
 
 #include "fd.h"
 
-using std::set;
-
 class TimerMillSecondHandle;
 
 class TimerInMillSecond : public Fd
 {
 public:
-    TimerInMillSecond(Epoller* epoller);
+    TimerInMillSecond(IoLoop* io_loop);
     ~TimerInMillSecond();
 
     int RunEveryNMillSecond();
@@ -33,9 +31,13 @@ public:
     }
 
     int OnRead();
+    int OnWrite()
+    {
+        return 0;
+    }
 
 private:
-    set<TimerMillSecondHandle*> millsecond_handle_;
+    std::set<TimerMillSecondHandle*> millsecond_handle_;
 
     uint64_t now_in_ms_;
     uint64_t count_;

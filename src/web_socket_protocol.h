@@ -6,26 +6,37 @@
 #include <string>
 
 #include "http_parse.h"
+#include "socket_handler.h"
 
-class Epoller;
+class IoLoop;
 class Fd;
 class IoBuffer;
 class Payload;
 class TcpSocket;
 
-using std::string;
-
 class WebSocketProtocol
+    : public SocketHandler
 {
 public:
-    WebSocketProtocol(Epoller* epoller, Fd* socket);
+    WebSocketProtocol(IoLoop* io_loop, Fd* socket);
     ~WebSocketProtocol();
+
+	virtual int HandleRead(IoBuffer& io_buffer, Fd& socket);
+	virtual int HandleClose(IoBuffer& io_buffer, Fd& socket) 
+    { 
+        return kSuccess; 
+    }
+
+	virtual int HandleError(IoBuffer& io_buffer, Fd& socket) 
+    { 
+        return HandleClose(io_buffer, socket); 
+    }
 
     int Parse(IoBuffer& io_buffer);
     int Send(const uint8_t* data, const size_t& len);
 
-    int OnStop();
     int EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
+    int EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count) { return 0; }
 
 private:
     TcpSocket* GetTcpSocket()
@@ -34,7 +45,7 @@ private:
     }
 
 private:
-    Epoller* epoller_;
+    IoLoop* io_loop_;
     Fd* socket_;
 
     bool upgrade_;

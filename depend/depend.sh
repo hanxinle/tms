@@ -26,7 +26,7 @@ if [ ! -d "${depend_dir}/bin" ]; then
     mkdir "${depend_dir}/bin"
 fi
 
-sudo apt-get install autoconf libtool pkg-config 
+sudo apt-get install autoconf libtool pkg-config tcl cmake  libbz2-dev zlib1g-dev
 
 PATH="${depend_dir}/bin:$PATH"
 PKG_CONFIG_PATH="${depend_dir}/lib/pkgconfig"

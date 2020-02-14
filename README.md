@@ -5,10 +5,12 @@ tms(toy media server) is a toy media server for myself learning media develop.
 ## Feature
 - [x] publish media by rtmp
 - [x] publish media by webrtc
+- [x] publish media by srt
 - [x] plya media by rtmp
 - [x] play media by http-flv
 - [x] play media by http-hls
 - [x] play media by webrtc
+- [x] play media by srt
 - [x] media demux/remux, like rtmp(flv) to webrtc(rtp)
 - [ ] transcode
 - [ ] MCU

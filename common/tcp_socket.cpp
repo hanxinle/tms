@@ -49,11 +49,8 @@ int TcpSocket::OnRead()
     {
         if (connect_status_ == kConnected)
         {
-            int count = 0;
-            while (count < 1)
+            while (true)
             {
-                ++count;
-
                 int bytes = read_buffer_.ReadFromFdAndWrite(fd_);
                 if (bytes > 0)
                 {

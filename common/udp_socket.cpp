@@ -29,10 +29,11 @@ int UdpSocket::OnRead()
         // TODO:可以重用,加reset接口
         IoBuffer io_buffer(4096);
 
-        int bytes = io_buffer.ReadFromFdAndWrite(fd_, &src_addr_, &src_addr_len_);
+        int bytes = io_buffer.ReadFromFdAndWrite(fd_, (sockaddr*)&src_addr_, &src_addr_len_);
 
         if (bytes > 0)
         {
+            socket_util::SocketAddrInetToIpPort(src_addr_, client_ip_, client_port_);
             socket_handler_->HandleRead(io_buffer, *this);
         }
         else if (bytes == 0)
@@ -62,7 +63,7 @@ int UdpSocket::OnWrite()
 
 int UdpSocket::Send(const uint8_t* data, const size_t& len)
 {
-    sendto(fd_, data, len, 0, &src_addr_, src_addr_len_);
+    sendto(fd_, data, len, 0, (sockaddr*)&src_addr_, src_addr_len_);
 
     return kSuccess;
 }

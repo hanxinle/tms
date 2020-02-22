@@ -673,6 +673,7 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
                 udp_socket->SetSrcAddr(GetUdpSocket()->GetSrcAddr());
                 udp_socket->SetSrcAddrLen(GetUdpSocket()->GetSrcAddrLen());
                 udp_socket->EnableRead();
+                udp_socket->ModName("udp <-> " + GetUdpSocket()->GetClientIp() + ":" + Util::Num2Str(GetUdpSocket()->GetClientPort()));
 
                 WebrtcProtocol* webrtc_protocol = (WebrtcProtocol*)udp_socket->socket_handler();
 
@@ -1547,7 +1548,7 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
                 return kError;
             }
 
-            std::cout << LMSG << "parse vp8 success" << std::endl;
+            std::cout << LMSG << GetUdpSocket()->name() << " parse vp8 success" << std::endl;
         }
         else if (payload_type == (uint8_t)WebRTCPayloadType::VP9)
         {
@@ -1558,7 +1559,7 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len)
                 std::cout << LMSG << "parse vp9 failed" << std::endl;
                 return kError;
             }
-            std::cout << LMSG                       << "parse vp9 success"
+            std::cout << LMSG << GetUdpSocket()->name() << "parse vp9 success"
 #if defined(WEBRTC_DEBUG)
                  << ",payload_length:"         << (int64_t)parsed_payload.payload_length
 				 << ",frame_type:"             << (int64_t)parsed_payload.frame_type

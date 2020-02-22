@@ -18,14 +18,14 @@ public:
 
     uint16_t GetClientPort() { return client_port_; }
     std::string GetClientIp() { return client_ip_; }
-    sockaddr GetSrcAddr() { return src_addr_; }
+    sockaddr_in GetSrcAddr() { return src_addr_; }
     socklen_t GetSrcAddrLen() { return src_addr_len_; }
-    void SetSrcAddr(sockaddr src_addr) { src_addr_ = src_addr; }
+    void SetSrcAddr(sockaddr_in src_addr) { src_addr_ = src_addr; }
     void SetSrcAddrLen(socklen_t src_addr_len) { src_addr_len_ = src_addr_len; }
 
 private:
     HandlerFactoryT handler_factory_;
-    sockaddr src_addr_;
+    sockaddr_in src_addr_;
     socklen_t src_addr_len_;
 
     std::string client_ip_;

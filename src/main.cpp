@@ -254,7 +254,9 @@ int main(int argc, char* argv[])
     uint16_t http_hls_port          = 8888;
     uint16_t web_socket_port        = 8901;
     uint16_t ssl_web_socket_port    = 8943;
+    uint16_t srt_port               = 9000;
     uint16_t webrtc_port            = 11445;
+
     bool daemon                     = false;
 
     auto iter_server_ip     = args_map.find("server_ip");
@@ -329,8 +331,16 @@ int main(int argc, char* argv[])
     int server_rtmp_fd = socket_util::CreateNonBlockTcpSocket();
 
     socket_util::ReuseAddr(server_rtmp_fd);
-    socket_util::Bind(server_rtmp_fd, "0.0.0.0", rtmp_port);
-    socket_util::Listen(server_rtmp_fd);
+    if (socket_util::Bind(server_rtmp_fd, "0.0.0.0", rtmp_port) != 0)
+    {
+        std::cout << LMSG << "bind rtmp_port " << rtmp_port << " error" << std::endl;
+        return -1;
+    }
+    if (socket_util::Listen(server_rtmp_fd) != 0)
+    {
+        std::cout << LMSG << "listen rtmp_port " << rtmp_port << " error" << std::endl;
+        return -1;
+    }
     socket_util::SetNonBlock(server_rtmp_fd);
     socket_util::GetSocketName(server_rtmp_fd, local_ip, local_port);
 
@@ -343,8 +353,16 @@ int main(int argc, char* argv[])
     int server_http_flv_fd = socket_util::CreateNonBlockTcpSocket();
 
     socket_util::ReuseAddr(server_http_flv_fd);
-    socket_util::Bind(server_http_flv_fd, "0.0.0.0", http_flv_port);
-    socket_util::Listen(server_http_flv_fd);
+    if (socket_util::Bind(server_http_flv_fd, "0.0.0.0", http_flv_port) != 0)
+    {
+        std::cout << LMSG << "bind http_flv_port " << http_flv_port << " error" << std::endl;
+        return -1;
+    }
+    if (socket_util::Listen(server_http_flv_fd) != 0)
+    {
+        std::cout << LMSG << "bind http_flv_port " << http_flv_port << " error" << std::endl;
+        return -1;
+    }
     socket_util::SetNonBlock(server_http_flv_fd);
     socket_util::GetSocketName(server_http_flv_fd, local_ip, local_port);
 
@@ -357,8 +375,16 @@ int main(int argc, char* argv[])
     int server_https_flv_fd = socket_util::CreateNonBlockTcpSocket();
 
     socket_util::ReuseAddr(server_https_flv_fd);
-    socket_util::Bind(server_https_flv_fd, "0.0.0.0", https_flv_port);
-    socket_util::Listen(server_https_flv_fd);
+    if (socket_util::Bind(server_https_flv_fd, "0.0.0.0", https_flv_port) != 0)
+    {
+        std::cout << LMSG << "bind https_flv_port " << https_flv_port << " error" << std::endl;
+        return -1;
+    }
+    if (socket_util::Listen(server_https_flv_fd) != 0)
+    {
+        std::cout << LMSG << "bind https_flv_port " << https_flv_port << " error" << std::endl;
+        return -1;
+    }
     socket_util::SetNonBlock(server_https_flv_fd);
     socket_util::GetSocketName(server_https_flv_fd, local_ip, local_port);
 
@@ -371,8 +397,16 @@ int main(int argc, char* argv[])
     int server_http_hls_fd = socket_util::CreateNonBlockTcpSocket();
 
     socket_util::ReuseAddr(server_http_hls_fd);
-    socket_util::Bind(server_http_hls_fd, "0.0.0.0", http_hls_port);
-    socket_util::Listen(server_http_hls_fd);
+    if (socket_util::Bind(server_http_hls_fd, "0.0.0.0", http_hls_port) != 0)
+    {
+        std::cout << LMSG << "bind http_hls_port " << http_hls_port << " error" << std::endl;
+        return -1;
+    }
+    if (socket_util::Listen(server_http_hls_fd) != 0)
+    {
+        std::cout << LMSG << "bind http_hls_port " << http_hls_port << " error" << std::endl;
+        return -1;
+    }
     socket_util::SetNonBlock(server_http_hls_fd);
     socket_util::GetSocketName(server_http_hls_fd, local_ip, local_port);
 
@@ -385,8 +419,16 @@ int main(int argc, char* argv[])
     int server_https_hls_fd = socket_util::CreateNonBlockTcpSocket();
 
     socket_util::ReuseAddr(server_https_hls_fd);
-    socket_util::Bind(server_https_hls_fd, "0.0.0.0", https_hls_port);
-    socket_util::Listen(server_https_hls_fd);
+    if (socket_util::Bind(server_https_hls_fd, "0.0.0.0", https_hls_port) != 0)
+    {
+        std::cout << LMSG << "bind https_hls_port " << https_hls_port << " error" << std::endl;
+        return -1;
+    }
+    if (socket_util::Listen(server_https_hls_fd) != 0)
+    {
+        std::cout << LMSG << "bind https_hls_port " << https_hls_port << " error" << std::endl;
+        return -1;
+    }
     socket_util::SetNonBlock(server_https_hls_fd);
     socket_util::GetSocketName(server_https_hls_fd, local_ip, local_port);
 
@@ -399,8 +441,16 @@ int main(int argc, char* argv[])
     int web_socket_fd = socket_util::CreateNonBlockTcpSocket();
 
     socket_util::ReuseAddr(web_socket_fd);
-    socket_util::Bind(web_socket_fd, "0.0.0.0", web_socket_port);
-    socket_util::Listen(web_socket_fd);
+    if (socket_util::Bind(web_socket_fd, "0.0.0.0", web_socket_port) != 0)
+    {
+        std::cout << LMSG << "bind web_socket_port " << web_socket_port << " error" << std::endl;
+        return -1;
+    }
+    if (socket_util::Listen(web_socket_fd) != 0)
+    {
+        std::cout << LMSG << "bind web_socket_port " << web_socket_port << " error" << std::endl;
+        return -1;
+    }
     socket_util::SetNonBlock(web_socket_fd);
     socket_util::GetSocketName(web_socket_fd, local_ip, local_port);
 
@@ -413,8 +463,16 @@ int main(int argc, char* argv[])
     int ssl_web_socket_fd = socket_util::CreateNonBlockTcpSocket();
 
     socket_util::ReuseAddr(ssl_web_socket_fd);
-    socket_util::Bind(ssl_web_socket_fd, "0.0.0.0", ssl_web_socket_port);
-    socket_util::Listen(ssl_web_socket_fd);
+    if (socket_util::Bind(ssl_web_socket_fd, "0.0.0.0", ssl_web_socket_port) != 0)
+    {
+        std::cout << LMSG << "bind ssl_web_socket_port " << ssl_web_socket_port << " error" << std::endl;
+        return -1;
+    }
+    if (socket_util::Listen(ssl_web_socket_fd) != 0)
+    {
+        std::cout << LMSG << "bind ssl_web_socket_port " << ssl_web_socket_port << " error" << std::endl;
+        return -1;
+    }
     socket_util::SetNonBlock(ssl_web_socket_fd);
     socket_util::GetSocketName(ssl_web_socket_fd, local_ip, local_port);
 
@@ -427,8 +485,17 @@ int main(int argc, char* argv[])
     int server_http_file_fd = socket_util::CreateNonBlockTcpSocket();
 
     socket_util::ReuseAddr(server_http_file_fd);
-    socket_util::Bind(server_http_file_fd, "0.0.0.0", http_file_port);
-    socket_util::Listen(server_http_file_fd);
+    if (socket_util::Bind(server_http_file_fd, "0.0.0.0", http_file_port) != 0)
+    {
+        std::cout << LMSG << "bind http_file_port " << http_file_port << " error" << std::endl;
+        return -1;
+    }
+
+    if (socket_util::Listen(server_http_file_fd) != 0)
+    {
+        std::cout << LMSG << "bind http_file_port " << http_file_port << " error" << std::endl;
+        return -1;
+    }
     socket_util::SetNonBlock(server_http_file_fd);
     socket_util::GetSocketName(server_http_file_fd, local_ip, local_port);
 
@@ -441,8 +508,17 @@ int main(int argc, char* argv[])
     int server_https_file_fd = socket_util::CreateNonBlockTcpSocket();
 
     socket_util::ReuseAddr(server_https_file_fd);
-    socket_util::Bind(server_https_file_fd, "0.0.0.0", https_file_port);
-    socket_util::Listen(server_https_file_fd);
+    if (socket_util::Bind(server_https_file_fd, "0.0.0.0", https_file_port) != 0)
+    {
+        std::cout << LMSG << "bind https_file_port " << https_file_port << " error" << std::endl;
+        return -1;
+    }
+    if (socket_util::Listen(server_https_file_fd) != 0)
+    {
+        std::cout << LMSG << "bind https_file_port " << https_file_port << " error" << std::endl;
+        return -1;
+    }
+    
     socket_util::SetNonBlock(server_https_file_fd);
     socket_util::GetSocketName(server_http_file_fd, local_ip, local_port);
 
@@ -455,7 +531,11 @@ int main(int argc, char* argv[])
     int webrtc_fd = socket_util::CreateNonBlockUdpSocket();
 
     socket_util::ReuseAddr(webrtc_fd);
-    socket_util::Bind(webrtc_fd, "0.0.0.0", webrtc_port);
+    if (socket_util::Bind(webrtc_fd, "0.0.0.0", webrtc_port) != 0)
+    {
+        std::cout << LMSG << "bind webrtc_port " << webrtc_port << " error" << std::endl;
+        return -1;
+    }
     socket_util::SetNonBlock(webrtc_fd);
 
     UdpSocket server_webrtc_socket(&epoller, webrtc_fd, std::bind(&ProtocolFactory::GenWebrtcProtocol, std::placeholders::_1, std::placeholders::_2));
@@ -477,8 +557,16 @@ int main(int argc, char* argv[])
     srt_socket_util::SetUdpRecvBufSize(server_srt_fd, 10*1024*1024);
     srt_socket_util::SetPeerIdleTimeout(server_srt_fd, 20*60*1000);
     srt_socket_util::SetLatency(server_srt_fd, 1000);
-    srt_socket_util::Bind(server_srt_fd, "0.0.0.0", 9000);
-    srt_socket_util::Listen(server_srt_fd);
+    if (srt_socket_util::Bind(server_srt_fd, "0.0.0.0", 9000) != 0)
+    {
+        std::cout << LMSG << "bind srt_port " << srt_port << " error" << std::endl;
+        return -1;
+    }
+    if (srt_socket_util::Listen(server_srt_fd) != 0)
+    {
+        std::cout << LMSG << "bind srt_port " << srt_port << " error" << std::endl;
+        return -1;
+    }
 
     SrtSocket server_srt_socket(&srt_epoller, server_srt_fd, std::bind(&ProtocolFactory::GenSrtProtocol, std::placeholders::_1, std::placeholders::_2));
     server_srt_socket.ModName("srt");

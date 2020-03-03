@@ -34,7 +34,7 @@ const uint8_t kTsHeaderSyncByte = 0x47;
     11111100 //… 1111 1110 reserved data stream
     11111111 //4 program_stream_directory
 */
-
+// stream_id
 const uint8_t kProgramStreamMap                = 188;
 const uint8_t kPrivateStream1                  = 189;
 const uint8_t kPaddingStream                   = 190;
@@ -56,6 +56,11 @@ const uint8_t kAncillaryStream                 = 249;
 const uint8_t kIEC14496_1_SL_packetized_stream = 250;
 const uint8_t kIEC14496_1_FlexMux_stream       = 251;
 const uint8_t kProgramStreamDirector           = 255;
+
+// descriptor_tag
+const uint8_t kVideoStreamDescriptor    = 2;
+const uint8_t kAudioStreamDescriptor    = 3;
+const uint8_t kIBPDescriptor            = 18;
 
 bool IsStreamIdVideo(const uint8_t& stream_id)
 {
@@ -105,7 +110,8 @@ int GetChannles(const int& channel_configuration)
 
 static bool IsVideoStreamType(const uint8_t& stream_type)
 {
-    return stream_type == 0x1B;
+    // see @ https://en.wikipedia.org/wiki/Program-specific_information#Elementary_stream_types
+    return stream_type == 0x1B/*AVC*/ || stream_type == 0x24/*HEVC*/;
 }
 
 static bool IsAudioStreamType(const uint8_t& stream_type)
@@ -197,13 +203,12 @@ int TsReader::ParseTsSegment(const uint8_t* data, const int& len)
 
     os << ",adaptation_field_control=" << (int)adaptation_field_control;
     os << ",continuity_counter=" << (int)continuity_counter;
+    std::cout << LMSG << os.str() << std::endl;
 
     if (adaptation_field_control == 2 || adaptation_field_control == 3)
     {
         ParseAdaptation(bit_buffer);
     }
-
-    std::cout << LMSG << os.str() << std::endl;
 
     if (pid == 0x0000)
     {
@@ -213,21 +218,13 @@ int TsReader::ParseTsSegment(const uint8_t* data, const int& len)
     {
         return ParsePMT(bit_buffer);
     }
-    else if (pid == audio_pid_)
+    else
     {
         if (payload_unit_start_indicator)
         {
-            ParsePES(audio_pes_);
+            ParsePES(pes_[pid]);
         }
-        return CollectAudioPES(bit_buffer);
-    }
-    else if (pid == video_pid_)
-    {
-        if (payload_unit_start_indicator)
-        {
-            ParsePES(video_pes_);
-        }
-        return CollectVideoPES(bit_buffer);
+        return CollectPES(pid, bit_buffer);
     }
 
     return 0;
@@ -255,8 +252,12 @@ int TsReader::ParseAdaptation(BitBuffer& bit_buffer)
 	uint8_t random_access_indicator = 0;
     bit_buffer.GetBits(1, random_access_indicator);
 
+    os << ",random_access_indicator=" << (int)random_access_indicator;
+
 	uint8_t elementary_stream_priority_indicator = 0;
     bit_buffer.GetBits(1, elementary_stream_priority_indicator);
+
+    os << ",elementary_stream_priority_indicator=" << (int)elementary_stream_priority_indicator;
 
 	uint8_t PCR_flag = 0;
     bit_buffer.GetBits(1, PCR_flag);
@@ -520,9 +521,17 @@ int TsReader::ParsePMT(BitBuffer& bit_buffer)
     section_length -= 9;
     int es_info_bytes = section_length - 4;
 
-	for (int i = 0; i < program_info_length; i++) 
+    while (program_info_length > 0)
     {
-	    //descriptor();
+        int begin = bit_buffer.BytesLeft();
+        if (ParseDescriptor(bit_buffer) != 0)
+        {
+            std::cout << LMSG << "parse descritor failed" << std::endl;
+            return -1;
+        }
+
+        int end = bit_buffer.BytesLeft();
+        program_info_length -= (begin - end);
 	}
 
     os << ",es_info_bytes=" << es_info_bytes;
@@ -541,11 +550,13 @@ int TsReader::ParsePMT(BitBuffer& bit_buffer)
 
         if (IsVideoStreamType(stream_type))
         {
+            video_stream_type_ = stream_type;
             video_pid_ = elementary_PID;
             os << ",video_pid_=" << video_pid_;
         }
         else if (IsAudioStreamType(stream_type))
         {
+            audio_stream_type_ = stream_type;
             audio_pid_ = elementary_PID;
             os << ",audio_pid_=" << audio_pid_;
         }
@@ -557,9 +568,19 @@ int TsReader::ParsePMT(BitBuffer& bit_buffer)
 
         os << ",stream_type=" << (int)stream_type << ", elementary_PID=" << elementary_PID << ", ES_info_length=" << ES_info_length;
 
-	    for (int i = 0; i < ES_info_length; i++) 
+        while (ES_info_length > 0)
         {
-	        //descriptor();
+            std::cout << LMSG << "ES_info_length=" << ES_info_length << std::endl;
+            int begin = bit_buffer.BytesLeft();
+            if (ParseDescriptor(bit_buffer) != 0)
+            {
+                std::cout << LMSG << "parse descritor failed" << std::endl;
+                return -1;
+            }
+
+            int end = bit_buffer.BytesLeft();
+            std::cout << "begin=" << begin << ",end=" << end << std::endl;
+            ES_info_length -= (begin - end);
 	    }
 
         int end = bit_buffer.BytesLeft();
@@ -573,6 +594,51 @@ int TsReader::ParsePMT(BitBuffer& bit_buffer)
     os << ",CRC_32=" << CRC_32;
 
     std::cout << LMSG << os.str() << std::endl;
+
+    return 0;
+}
+
+int TsReader::ParseDescriptor(BitBuffer& bit_buffer)
+{
+    uint8_t descriptor_tag = 0;
+    bit_buffer.GetBits(8, descriptor_tag);
+    uint8_t descriptor_length = 0;
+    bit_buffer.GetBits(8, descriptor_length);
+
+    std::cout << LMSG << "descriptor_tag=" << (int)descriptor_tag << ",descriptor_length=" << (int)descriptor_length << std::endl;
+
+    if (bit_buffer.BytesLeft() < descriptor_length)
+    {
+        std::cout << LMSG << "parse failed, bytes_left=" << bit_buffer.BytesLeft() << std::endl;
+        return -1;
+    }
+
+    switch (descriptor_tag)
+    {
+        case kVideoStreamDescriptor:
+		{
+            bit_buffer.SkipBytes(descriptor_length);
+		}
+        break;
+
+        case kAudioStreamDescriptor:
+        {
+            bit_buffer.SkipBytes(descriptor_length);
+        }
+        break;
+
+        case kIBPDescriptor:
+        {
+            bit_buffer.SkipBytes(descriptor_length);
+        }
+        break;
+
+        default:
+        {
+            bit_buffer.SkipBytes(descriptor_length);
+        }
+        break;
+    }
 
     return 0;
 }
@@ -1080,19 +1146,26 @@ int TsReader::SystemHeader(BitBuffer& bit_buffer)
     return 0;
 }
 
-int TsReader::CollectAudioPES(BitBuffer& bit_buffer)
+int TsReader::CollectPES(const uint32_t& pid, BitBuffer& bit_buffer)
 {
-    audio_pes_.append((const char*)bit_buffer.CurData(), bit_buffer.CurLen());
-    return 0;
-}
-
-int TsReader::CollectVideoPES(BitBuffer& bit_buffer)
-{
-    video_pes_.append((const char*)bit_buffer.CurData(), bit_buffer.CurLen());
+    std::string& pes = pes_[pid];
+    pes.append((const char*)bit_buffer.CurData(), bit_buffer.CurLen());
     return 0;
 }
 
 void TsReader::OnVideo(BitBuffer& bit_buffer, const uint32_t& pts, const uint32_t& dts)
+{
+    if (video_stream_type_ == 0x1B)
+    {
+        OnH264Video(bit_buffer, pts, dts);
+    }
+    else if (video_stream_type_ == 0x24)
+    {
+        OnH265Video(bit_buffer, pts, dts);
+    }
+}
+
+void TsReader::OnH264Video(BitBuffer& bit_buffer, const uint32_t& pts, const uint32_t& dts)
 {
 	const uint8_t* p = bit_buffer.CurData();
     uint32_t len = bit_buffer.BytesLeft();
@@ -1203,6 +1276,133 @@ void TsReader::OnVideo(BitBuffer& bit_buffer, const uint32_t& pts, const uint32_
                 else
                 {
                     std::cout << LMSG << "no dispatch nal_ref_idc:" << (int)nal_ref_idc << ", nal_type:" << (int) nal_type << std::endl;
+                }
+            }   
+        }
+    }
+}
+
+void TsReader::OnH265Video(BitBuffer& bit_buffer, const uint32_t& pts, const uint32_t& dts)
+{
+	const uint8_t* p = bit_buffer.CurData();
+    uint32_t len = bit_buffer.BytesLeft();
+    size_t i = 0;
+
+    std::cout << LMSG << "video size=" << bit_buffer.BytesLeft() << ",video frame=\n" 
+         << Util::Bin2Hex(bit_buffer.CurData(), bit_buffer.BytesLeft() > 256 ? 256 : bit_buffer.BytesLeft()) 
+         << std::endl;
+
+    std::vector<std::pair<const uint8_t*, int>> nals;
+
+	if (p[i] == 0x00 && p[i+1] == 0x00 && p[i+2] == 0x00 && p[i+3] == 0x01)
+    {   
+        const uint8_t* nal = NULL;
+        while (i + 3 < len)
+        {   
+            if (p[i] != 0x00 || p[i+1] != 0x00 || p[i+2] != 0x01)
+            {   
+                ++i;
+                continue;
+            }   
+
+            if (nal != NULL)
+            {   
+                nals.push_back(std::make_pair(nal, p + i - nal - 1));
+            }   
+
+            i += 3;
+            nal = p + i;
+        }   
+
+        if (nal != NULL)
+        {   
+            nals.push_back(std::make_pair(nal, p + len - nal));
+        }   
+
+        std::string header = "";
+        for (const auto& kv :nals)
+        {
+            const uint8_t* nal = kv.first;
+            int len = kv.second;
+            if (nal != NULL)
+            {   
+                std::cout << "len=" << len << ", nal=\n" << Util::Bin2Hex(nal, len > 128 ? 128 : len) << std::endl;
+                uint8_t forbidden_zero_bit = (nal[0] & 0x80) >> 7;
+                uint8_t nal_type = (nal[0] & 0x7E) >> 1;
+                uint8_t layer_id = ((nal[0] & 0x01) << 5) | ((nal[1] & 0xF8) >> 4);
+                uint8_t tid = nal[0] & 0x07;
+
+                std::cout << LMSG << "forbidden_zero_bit=" << (int)forbidden_zero_bit << ", nal_type=" << (int) nal_type 
+                                  << ",layer_id=" << (int)layer_id << ",tid=" << (int)tid << std::endl;
+                bool dispatch = true;
+
+                uint8_t* nal_ref = (uint8_t*)malloc(len + 4);
+                nal_ref[0] = 0x00;
+                nal_ref[1] = 0x00;
+                nal_ref[2] = 0x00;
+                nal_ref[3] = 0x01;
+                memcpy(nal_ref + 4, nal, len);
+                Payload video_frame(nal_ref, len + 4);
+                video_frame.SetVideo();
+                video_frame.SetPts(pts / 90);
+                video_frame.SetDts(dts / 90);
+                if (nal_type == H265NalType_IDR_W_RADL || nal_type == H265NalType_IDR_N_LP)
+                {
+                    video_frame.SetIFrame();
+                }
+                else if (nal_type == H264NalType_SLICE)
+                {
+                    if (pts == dts)
+                    {
+                        video_frame.SetPFrame();
+                    }
+                    else
+                    {
+                        video_frame.SetBFrame();
+                    }
+                }
+                else if (nal_type == H265NalType_VPS)
+                {
+                    dispatch = false;
+                    header.append((const char*)kStartCode, 4);
+                    header.append((const char*)nal, len);
+                }
+                else if (nal_type == H265NalType_SPS)
+                {
+                    dispatch = false;
+                    header.append((const char*)kStartCode, 4);
+                    header.append((const char*)nal, len);
+                }
+                else if (nal_type == H265NalType_PPS)
+                {
+                    dispatch = false;
+
+                    bool header_complete = ! header.empty();
+                    header.append((const char*)kStartCode, 4);
+                    header.append((const char*)nal, len);
+
+                    if (header_complete && header_callback_)
+                    {
+                        uint8_t* nal_ref = (uint8_t*)malloc(header.size());
+                        memcpy(nal_ref, header.data(), header.size());
+                        Payload header_frame(nal_ref, header.size());
+                        header_frame.SetVideo();
+                        header_callback_(header_frame);
+                    }
+                }
+                else
+                {
+                    dispatch = false;
+                }
+
+                if (dispatch && frame_callback_)
+                {
+                    frame_callback_(video_frame);
+                }
+                else
+                {
+                    std::cout << LMSG << "forbidden_zero_bit=" << (int)forbidden_zero_bit << ", nal_type=" << (int) nal_type 
+                                      << ",layer_id=" << (int)layer_id << ",tid=" << (int)tid << std::endl;
                 }
             }   
         }
@@ -1329,7 +1529,14 @@ void TsReader::OpenVideoDumpFile()
 {
     if (video_dump_fd_ < 0)
     {
-        video_dump_fd_ = open("video.264", O_CREAT|O_TRUNC|O_RDWR, 0664);
+        if (video_stream_type_ == 0x1B)
+        {
+            video_dump_fd_ = open("video.264", O_CREAT|O_TRUNC|O_RDWR, 0664);
+        }
+        else
+        {
+            video_dump_fd_ = open("video.265", O_CREAT|O_TRUNC|O_RDWR, 0664);
+        }
     }
 }
 

@@ -166,6 +166,18 @@ namespace srt_socket_util
         return 0;
     }
 
+    inline int SetTspbdMode(const int& fd, const int& tsbpd)
+    {
+        int ret = srt_setsockopt(fd, SOL_SOCKET, SRTO_TSBPDMODE, &tsbpd, sizeof(tsbpd));
+        if (ret == SRT_ERROR)
+        {
+            std::cout << LMSG << "srt_setsockopt SRTO_TSBPDMODE failed, err=" << srt_getlasterror_str() << std::endl;
+            return -1;
+        }
+    
+        return 0;
+    }
+
     inline int SetPeerIdleTimeout(const int& fd, const int& peer_idle_timeout_ms)
     {
         int ret = srt_setsockopt(fd, SOL_SOCKET, SRTO_PEERIDLETIMEO, &peer_idle_timeout_ms, sizeof(peer_idle_timeout_ms));

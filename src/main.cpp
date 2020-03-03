@@ -33,12 +33,12 @@ LocalStreamCenter               g_local_stream_center;
 Epoller*                        g_epoll = NULL;
 SSL_CTX*                        g_tls_ctx = NULL;
 SSL_CTX*                        g_dtls_ctx = NULL;
-std::string                          g_dtls_fingerprint = "";
-std::string                          g_local_ice_pwd = "";
-std::string                          g_local_ice_ufrag = "";
-std::string                          g_remote_ice_pwd = "";
-std::string                          g_remote_ice_ufrag = "";
-std::string                          g_server_ip = "";
+std::string                     g_dtls_fingerprint = "";
+std::string                     g_local_ice_pwd = "";
+std::string                     g_local_ice_ufrag = "";
+std::string                     g_remote_ice_pwd = "";
+std::string                     g_remote_ice_ufrag = "";
+std::string                     g_server_ip = "";
 
 void AvLogCallback(void* ptr, int level, const char* fmt, va_list vl)
 {
@@ -557,7 +557,7 @@ int main(int argc, char* argv[])
     srt_socket_util::SetUdpRecvBufSize(server_srt_fd, 10*1024*1024);
     srt_socket_util::SetPeerIdleTimeout(server_srt_fd, 20*60*1000);
     srt_socket_util::SetLatency(server_srt_fd, 1000);
-    if (srt_socket_util::Bind(server_srt_fd, "0.0.0.0", 9000) != 0)
+    if (srt_socket_util::Bind(server_srt_fd, "0.0.0.0", srt_port) != 0)
     {
         std::cout << LMSG << "bind srt_port " << srt_port << " error" << std::endl;
         return -1;

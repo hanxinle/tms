@@ -72,12 +72,8 @@ public:
     }
 
     void SetIFrame() { frame_type_ = kIframe; }
-    void SetBFrame() { frame_type_ = kBframe; }
-    void SetPFrame() { frame_type_ = kPframe; }
 
     bool IsIFrame() const { return frame_type_ == kIframe; }
-    bool IsBFrame() const { return frame_type_ == kBframe; }
-    bool IsPFrame() const { return frame_type_ == kPframe; }
 
     void SetPts(const uint64_t& pts) { pts_ = pts; }
     void SetDts(const uint64_t& dts) { dts_ = dts; }

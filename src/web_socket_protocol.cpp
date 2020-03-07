@@ -255,8 +255,8 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
 
         Util::Replace(webrtc_test_sdp, "a=fingerprint:sha-256\r\n", "a=fingerprint:sha-256 " + g_dtls_fingerprint + "\r\n");
 
-		g_local_ice_ufrag = Util::GenRandom(15);
-        g_local_ice_pwd = Util::GenRandom(24);
+		g_local_ice_ufrag = Util::GenRandom(8);
+        g_local_ice_pwd = Util::GenRandom(32);
 
         std::cout << LMSG << "g_local_ice_ufrag:" << Util::Bin2Hex(g_local_ice_ufrag) << std::endl;
         std::cout << LMSG << "g_local_ice_pwd:" << Util::Bin2Hex(g_local_ice_pwd) << std::endl;
@@ -268,10 +268,14 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
         Util::Replace(webrtc_test_sdp, "xxx_port", "11445");
 
         // a=sendrecv sdp中这个影响chrome推流
+#if 0
         // 标准流程都是这么做的, sdpMid需要跟sdp中的mid:对齐, datachannel一定要走到这里来
         std::string candidate = R"(candidate":"candidate:1 1 udp 2115783679 xxx.xxx.xxx.xxx:what typ host generation 0 ufrag )" + g_local_ice_ufrag + R"( netwrok-cost 50", "sdpMid":"0","sdpMLineIndex":0)";
         Util::Replace(candidate, "xxx.xxx.xxx.xxx:what", g_server_ip + " 11445");
         std::string sdp_answer = "{\"sdpAnswer\":\"" + webrtc_test_sdp + "\", \"candidate\":{" + "\"" + candidate + "}}";
+#else
+        std::string sdp_answer = "{\"sdpAnswer\":\"" + webrtc_test_sdp + "\"}";
+#endif
 
         std::cout << LMSG << "==================== local sdp ====================" << std::endl;
         sdp_line = Util::SepStr(webrtc_test_sdp, "\r\n");

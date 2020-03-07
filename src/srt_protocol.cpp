@@ -148,7 +148,7 @@ void SrtProtocol::OnFrame(const Payload& frame)
 {
     if (frame.IsVideo())
     {
-        std::cout << LMSG << (frame.IsIFrame() ? "I" : (frame.IsPFrame() ? "P" : (frame.IsBFrame() ? "B" : "Unknown"))) 
+        std::cout << LMSG << (frame.IsIFrame() ? "I" : "P/B") 
              << ",pts=" << frame.GetPts() << ",dts=" << frame.GetDts() << std::endl;
         media_muxer_.OnVideo(frame);
     }

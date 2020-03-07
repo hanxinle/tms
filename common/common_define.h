@@ -31,8 +31,6 @@ enum FrameType
 {
     kUnknownFrame= -1, 
     kIframe = 1,
-    kBframe = 2,
-    kPframe = 3,
 };
 
 enum PayloadType

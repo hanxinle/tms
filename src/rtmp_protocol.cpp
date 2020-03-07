@@ -1030,57 +1030,30 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
 
                         //std::cout << LMSG << "NALU type + 4byte payload peek:[" << Util::Bin2Hex(data+cur_len+4, 5) << std::endl;
 
-                        if (nalu_unit_type == 6)
+                        if (nalu_unit_type == H264NalType_SEI)
                         {
                             //std::cout << LMSG << "SEI [" << Util::Bin2Hex(data + cur_len + 4, nalu_len) << "]" << std::endl;
                             to_media_muxer = false;
                         }
-                        else if (nalu_unit_type == 7)
+                        else if (nalu_unit_type == H264NalType_SPS)
                         {
                             std::cout << LMSG << "SPS [" << Util::Bin2Hex(data + cur_len + 4, nalu_len) << "]" << std::endl;
                         }
-                        else if (nalu_unit_type == 8)
+                        else if (nalu_unit_type == H264NalType_PPS)
                         {
                             std::cout << LMSG << "PPS [" << Util::Bin2Hex(data + cur_len + 4, nalu_len) << "]" << std::endl;
                         }
-                        else if (nalu_unit_type == 5)
+                        else if (nalu_unit_type == H264NalType_IDR_SLICE)
                         {
                             to_media_muxer = true;
                             std::cout << LMSG << "IDR" << std::endl;
                             video_payload.SetIFrame();
                             video_payload.SetPts(rtmp_msg.timestamp_calc + compositio_time_offset);
                         }
-                        else if (nalu_unit_type == 1)
+                        else if (nalu_unit_type == H264NalType_SLICE)
                         {
                             to_media_muxer = true;
-
-                            if (nal_ref_idc == 2)
-                            {
-                                //std::cout << LMSG << "P" << std::endl;
-                                video_payload.SetPFrame();
-                                video_payload.SetPts(rtmp_msg.timestamp_calc + compositio_time_offset);
-                            }
-                            else if (nal_ref_idc == 0)
-                            {
-                                //std::cout << LMSG << "B" << std::endl;
-                                video_payload.SetBFrame();
-                                video_payload.SetPts(rtmp_msg.timestamp_calc + compositio_time_offset);
-                            }
-                            else
-                            {
-                                if (compositio_time_offset == 0)
-                                {
-                                    //std::cout << LMSG << "B/P => P" << std::endl;
-                                    video_payload.SetPFrame();
-                                    video_payload.SetPts(rtmp_msg.timestamp_calc + compositio_time_offset);
-                                }
-                                else
-                                {
-                                    //std::cout << LMSG << "B/P => B" << std::endl;
-                                    video_payload.SetBFrame();
-                                    video_payload.SetPts(rtmp_msg.timestamp_calc + compositio_time_offset);
-                                }
-                            }
+                            video_payload.SetPts(rtmp_msg.timestamp_calc + compositio_time_offset);
                         }
                         else
                         {

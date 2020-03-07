@@ -583,6 +583,12 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
             binding_response.WriteBytes(2, username.size());
             binding_response.WriteData(username.size(), (const uint8_t*)username.data());
 
+            if (username.size() % 4 != 0)
+            {
+                static uint32_t padding = 0;
+                binding_response.WriteBytes(4 - (username.size() % 4), padding);
+            }
+
             uint8_t hmac[20] = {0};
             {
                 BitStream hmac_input;

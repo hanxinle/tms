@@ -398,25 +398,10 @@ void MediaMuxer::PacketTs(const Payload& payload)
                 //ts_bs.WriteBytes(1, 0x65);
                 //VERBOSE << LMSG << frame_key << " I frame" << std::endl;
             }
-            else if (payload.IsPFrame())
-            {
-                // P
-                ts_bs.WriteBytes(4, 0x00000001);
-                //ts_bs.WriteBytes(1, 0x41);
-
-                //VERBOSE << LMSG << "P frame" << std::endl;
-            }
-            else if (payload.IsBFrame())
-            {
-                // B
-                ts_bs.WriteBytes(4, 0x00000001);
-                //ts_bs.WriteBytes(1, 0x01);
-
-                //VERBOSE << LMSG << "B frame" << std::endl;
-            }
             else
             {
-                //VERBOSE << LMSG << "Unknown frame:" << (uint16_t)payload.GetFrameType() << std::endl;
+                // P/B
+                ts_bs.WriteBytes(4, 0x00000001);
             }
         }
 

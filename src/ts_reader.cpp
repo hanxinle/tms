@@ -1226,20 +1226,16 @@ void TsReader::OnH264Video(BitBuffer& bit_buffer, const uint32_t& pts, const uin
                 video_frame.SetVideo();
                 video_frame.SetPts(pts / 90);
                 video_frame.SetDts(dts / 90);
+                // see @ https://www.itu.int/rec/dologin_pub.asp?lang=e&id=T-REC-H.264-200305-S!!PDF-E&type=items
+                // 7.3.3 Slice header syntax
+                // slice_header()
                 if (nal_type == H264NalType_IDR_SLICE)
                 {
                     video_frame.SetIFrame();
                 }
                 else if (nal_type == H264NalType_SLICE)
                 {
-                    if (pts == dts)
-                    {
-                        video_frame.SetPFrame();
-                    }
-                    else
-                    {
-                        video_frame.SetBFrame();
-                    }
+                    // XXX:只有解析slice_header, 才能知道SLICE类型, 其他办法都是不准确的
                 }
                 else if (nal_type == H264NalType_SPS)
                 {
@@ -1346,20 +1342,18 @@ void TsReader::OnH265Video(BitBuffer& bit_buffer, const uint32_t& pts, const uin
                 video_frame.SetVideo();
                 video_frame.SetPts(pts / 90);
                 video_frame.SetDts(dts / 90);
-                if (nal_type == H265NalType_IDR_W_RADL || nal_type == H265NalType_IDR_N_LP)
+                // see @ https://www.itu.int/rec/dologin.asp?lang=e&id=T-REC-H.265-201504-S!!PDF-E&type=items
+                // 7.3.6.1 General slice segment header syntax
+                // slice_segment_header( ) {
+                if (nal_type == H265NalType_BLA_N_LP || nal_type == H265NalType_BLA_W_LP ||
+                	nal_type == H265NalType_BLA_W_RADL || nal_type == H265NalType_CRA_NUT ||
+                	nal_type == H265NalType_IDR_N_LP || nal_type == H265NalType_IDR_W_RADL)
                 {
                     video_frame.SetIFrame();
                 }
                 else if (nal_type == H264NalType_SLICE)
                 {
-                    if (pts == dts)
-                    {
-                        video_frame.SetPFrame();
-                    }
-                    else
-                    {
-                        video_frame.SetBFrame();
-                    }
+                    // XXX:只有解析slice_header, 才能知道SLICE类型, 其他办法都是不准确的
                 }
                 else if (nal_type == H265NalType_VPS)
                 {

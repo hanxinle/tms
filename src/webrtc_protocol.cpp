@@ -92,6 +92,8 @@ enum class WebRTCPayloadType
 const uint32_t kVideoSSRC = 3233846889;
 const uint32_t kAudioSSRC = 3233846890;
 
+std::set<WebrtcProtocol*> WebrtcProtocol::all_protocols_;
+
 WebrtcProtocol::WebrtcProtocol(IoLoop* io_loop, Fd* socket)
     : MediaPublisher()
     , MediaSubscriber(kWebrtc)
@@ -117,7 +119,17 @@ WebrtcProtocol::WebrtcProtocol(IoLoop* io_loop, Fd* socket)
 WebrtcProtocol::~WebrtcProtocol()
 {
     close(socket_->fd());
+    all_protocols_.erase(this);
 }
+
+void WebrtcProtocol::BroadcastH264(const Payload& payload)
+{
+    for (const auto& webrtc_protocol : all_protocols_)
+    {
+        webrtc_protocol->SendMediaData(payload);
+    }
+}
+
 
 int WebrtcProtocol::HandleRead(IoBuffer& io_buffer, Fd& socket)
 {
@@ -682,6 +694,7 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len)
                 udp_socket->ModName("udp <-> " + GetUdpSocket()->GetClientIp() + ":" + Util::Num2Str(GetUdpSocket()->GetClientPort()));
 
                 WebrtcProtocol* webrtc_protocol = (WebrtcProtocol*)udp_socket->socket_handler();
+                all_protocols_.insert(webrtc_protocol);
 
                 SessionInfo session_info;
                 g_webrtc_session_mgr.GetSession(g_remote_ice_ufrag, session_info);
@@ -2201,6 +2214,8 @@ int WebrtcProtocol::SendMediaData(const Payload& payload)
                                  << ",payload_length:" << parsed_payload.payload_length
                                  << ",frame_type:" << parsed_payload.frame_type
                                  << ",isFirstPacket:" << parsed_payload.type.Video.isFirstPacket
+                                 << ",width:" << parsed_payload.type.Video.width
+                                 << ",height:" << parsed_payload.type.Video.height
                                  << ",nalu_type:" << (int)parsed_payload.type.Video.codecHeader.H264.nalu_type
                                  << ",packetization_type:" << parsed_payload.type.Video.codecHeader.H264.packetization_type
                                  << ",dump:\n" << Util::Bin2Hex(parsed_payload.payload, parsed_payload.payload_length > 32 ? 32 : parsed_payload.payload_length)
@@ -2232,7 +2247,6 @@ int WebrtcProtocol::SendMediaData(const Payload& payload)
                     send_map_.erase(send_map_.begin());
                 }
 
-                std::cout << "rtp peek=\n" << Util::Bin2Hex(protect_buf, protect_buf_len > 128 ? 128 : protect_buf_len) << std::endl;
                 GetUdpSocket()->Send((const uint8_t*)protect_buf, protect_buf_len);
             }
             else

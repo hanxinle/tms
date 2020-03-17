@@ -17,6 +17,7 @@
 #include "local_stream_center.h"
 #include "protocol_factory.h"
 #include "rtmp_protocol.h"
+#include "webrtc_protocol.h"
 #include "fd.h"
 #include "tcp_socket.h"
 #include "util.h"
@@ -1017,16 +1018,15 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
 
                         Payload video_payload(video_raw_data, nalu_len + 4);
 
-                        //std::cout << LMSG << "nalu_unit_type:" << (int)nalu_unit_type << std::endl;
-                        // SEI不能传给webrtc,不然会导致只能解码关键帧,其他帧都无法解码
-                        if (nalu_unit_type != 6)
-                        {
-                            //g_webrtc_mgr->__DebugSendH264(video_raw_data + 4, nalu_len, rtmp_msg.timestamp_calc);
-                        }
-
                         video_payload.SetVideo();
                         video_payload.SetDts(rtmp_msg.timestamp_calc);
                         video_payload.SetPts(rtmp_msg.timestamp_calc);
+
+                        // SEI不能传给webrtc,不然会导致只能解码关键帧,其他帧都无法解码
+                        if (nalu_unit_type != 6)
+                        {
+                            WebrtcProtocol::BroadcastH264(video_payload);
+                        }
 
                         //std::cout << LMSG << "NALU type + 4byte payload peek:[" << Util::Bin2Hex(data+cur_len+4, 5) << std::endl;
 
@@ -1539,7 +1539,6 @@ int RtmpProtocol::OnMetaData(RtmpMessage& rtmp_msg)
 int RtmpProtocol::OnVideoHeader(RtmpMessage& rtmp_msg)
 {
     // webrtc test
-#if 0
     {
         std::string video_header((const char*)rtmp_msg.msg + 5, rtmp_msg.len - 5);
         video_header.erase(0, 6);
@@ -1556,10 +1555,25 @@ int RtmpProtocol::OnVideoHeader(RtmpMessage& rtmp_msg)
         std::cout << "sps:" << Util::Bin2Hex(sps) << std::endl;
         std::cout << "pps:" << Util::Bin2Hex(pps) << std::endl;
 
-        g_webrtc_mgr->__DebugSendH264((const uint8_t*)sps.data(), sps.size(), 0);
-        g_webrtc_mgr->__DebugSendH264((const uint8_t*)pps.data(), pps.size(), 0);
+        // 4 bytes nalu_len也push,方便后面FLV/RTMP的处理
+        uint8_t* sps_nal = (uint8_t*)malloc(sps.size() + 4);
+        memcpy(sps_nal + 4, sps.data(), sps.size());
+
+        Payload sps_payload(sps_nal, sps.size() + 4);
+        sps_payload.SetVideo();
+        sps_payload.SetDts(rtmp_msg.timestamp_calc);
+
+        WebrtcProtocol::BroadcastH264(sps_payload);
+
+        // 4 bytes nalu_len也push,方便后面FLV/RTMP的处理
+        uint8_t* pps_nal = (uint8_t*)malloc(pps.size() + 4);
+        memcpy(pps_nal + 4, pps.data(), pps.size());
+
+        Payload pps_payload(pps_nal, pps.size() + 4);
+        pps_payload.SetVideo();
+        pps_payload.SetDts(rtmp_msg.timestamp_calc);
+        WebrtcProtocol::BroadcastH264(pps_payload);
     }
-#endif
 
     std::string video_header((const char*)rtmp_msg.msg + 5, rtmp_msg.len - 5);
 

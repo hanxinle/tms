@@ -173,6 +173,8 @@ public:
     WebrtcProtocol(IoLoop* io_loop, Fd* socket);
     ~WebrtcProtocol();
 
+    static void BroadcastH264(const Payload& payload);
+
 	virtual int HandleRead(IoBuffer& io_buffer, Fd& socket);
 	virtual int HandleClose(IoBuffer& io_buffer, Fd& socket) 
     { 
@@ -272,6 +274,8 @@ private:
         all_packet_recv_map_[(int)type] += count;
     }
 
+private:
+    static std::set<WebrtcProtocol*> all_protocols_;
 private:
     IoLoop* io_loop_;
     Fd* socket_;

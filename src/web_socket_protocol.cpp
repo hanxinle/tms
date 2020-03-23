@@ -10,6 +10,7 @@
 #include "global.h"
 #include "web_socket_protocol.h"
 #include "io_buffer.h"
+#include "sdp.h"
 #include "tcp_socket.h"
 #include "webrtc_session_mgr.h"
 
@@ -211,6 +212,13 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer)
 
         rapidjson::Value& sdp = doc["sdp"];
         std::string remote_sdp(sdp.GetString());
+
+        Sdp sdp_parser;
+        if (sdp_parser.parse(remote_sdp) != 0) 
+        {
+            std::cout << LMSG << "parse sdp failed" << std::endl;
+            return kError;
+        }
 
         std::vector<std::string> sdp_line = Util::SepStr(remote_sdp, "\r\n");
 

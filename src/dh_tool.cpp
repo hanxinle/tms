@@ -25,17 +25,7 @@ DhTool::~DhTool()
 {
     if (dh_ != NULL)
     {
-        if (dh_->p != NULL)
-        {
-            BN_free(dh_->p);
-            dh_->p = NULL;
-        }
-        if (dh_->g != NULL)
-        {
-            BN_free(dh_->g);
-            dh_->g = NULL;
-        }
-
+        DH_set0_pqg(dh_, NULL, NULL, NULL);
         DH_free(dh_);
         dh_ = NULL;
     }
@@ -63,33 +53,23 @@ int DhTool::Initialize(const uint32_t& bit_count)
         return -1;
     }
 
-    dh_->p = BN_new();
-    if (dh_->p == NULL)
-    {
-        std::cout << LMSG << "BN_new failed" << std::endl;
-        return -1;
-    }
-
-    dh_->g = BN_new();
-    if (dh_->g == NULL)
-    {
-        std::cout << LMSG << "BN_new failed" << std::endl;
-        return -1;
-    }
-
-    if (BN_hex2bn(&dh_->p, BigNumber_1024) == 0)
+    BIGNUM* p = BN_new();
+    if (BN_hex2bn(&p, BigNumber_1024) == 0)
     {
         std::cout << LMSG << "BN_hex2bn failed" << std::endl;
         return -1;
     }
 
-    if (BN_set_word(dh_->g, 2) != 1)
+    BIGNUM* g = BN_new();
+    if (BN_set_word(g, 2) != 1)
     {
         std::cout << LMSG << "BN_set_word failed" << std::endl;
         return -1;
     }
 
-    dh_->length = bit_count;
+    DH_set0_pqg(dh_, p, NULL, g);
+
+    DH_set_length(dh_, bit_count);
 
     if (DH_generate_key(dh_) != 1)
     {
@@ -146,9 +126,9 @@ int DhTool::CopyPublicKey(uint8_t* dst, const uint32_t& length)
         return -1;
     }
 
-    int32_t key_size = BN_num_bytes(dh_->pub_key);
+    int32_t key_size = BN_num_bytes(DH_get0_pub_key(dh_));
 
-    if (BN_bn2bin(dh_->pub_key, dst) != key_size)
+    if (BN_bn2bin(DH_get0_pub_key(dh_), dst) != key_size)
     {
         std::cout << LMSG << "BN_bn2bin failed" << std::endl;
         return -1;

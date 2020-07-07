@@ -15,10 +15,6 @@
 
 #include "openssl/srtp.h"
 
-#include "webrtc/base/bytebuffer.h"
-#include "webrtc/modules/rtp_rtcp/source/rtp_format.h"
-#include "webrtc/p2p/base/stun.h"
-
 const int kWebRtcRecvTimeoutInMs = 10000;
 
 const int SRTP_MASTER_KEY_KEY_LEN = 16;

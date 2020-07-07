@@ -83,23 +83,18 @@ static int HmacEncode(const std::string& algo, const uint8_t* key, const int& ke
     {    
         engine = EVP_sha384();  
     }    
-    else if(algo == "sha") 
-    {    
-        engine = EVP_sha();  
-    }    
     else 
     {    
         std::cout << LMSG << "Algorithm " << algo << " is not supported by this program!" << std::endl;  
         return -1;  
     }    
   
-    HMAC_CTX ctx;  
-    HMAC_CTX_init(&ctx);  
-    HMAC_Init_ex(&ctx, key, key_length, engine, NULL);  
-    HMAC_Update(&ctx, input, input_length);
+    HMAC_CTX* ctx = HMAC_CTX_new();
+    HMAC_Init_ex(ctx, key, key_length, engine, NULL);  
+    HMAC_Update(ctx, input, input_length);
   
-    HMAC_Final(&ctx, output, &output_length);  
-    HMAC_CTX_cleanup(&ctx);  
+    HMAC_Final(ctx, output, &output_length);  
+    HMAC_CTX_free(ctx);  
   
     return 0;   
 }

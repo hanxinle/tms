@@ -81,7 +81,7 @@ struct RtmpMessage
     {
     }
 
-    RtmpMessage(const RtmpMessage& other)
+    RtmpMessage& operator=(const RtmpMessage& other)
     {
         cs_id = other.cs_id;
         timestamp = other.timestamp;
@@ -93,6 +93,13 @@ struct RtmpMessage
 
         msg = NULL;
         len = 0;
+
+        return *this;
+    }
+
+    RtmpMessage(const RtmpMessage& other)
+    {
+        operator=(other);
     }
 
     std::string ToString() const

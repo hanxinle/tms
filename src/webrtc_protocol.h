@@ -15,10 +15,6 @@
 #include "socket_handler.h"
 #include "webrtc_session_mgr.h"
 
-#include "webrtc/modules/rtp_rtcp/source/rtp_format_vp8.h"
-#include "webrtc/modules/rtp_rtcp/source/rtp_format_vp9.h"
-#include "webrtc/modules/rtp_rtcp/source/rtp_format_h264.h"
-
 class IoLoop;
 class Fd;
 class IoBuffer;
@@ -314,13 +310,6 @@ private:
 
     uint32_t media_input_open_count_;
     uint64_t media_input_read_video_frame_count;
-
-    std::map<uint16_t, webrtc::RtpDepacketizer::ParsedPayload> video_rtp_queue_;
-    std::map<uint16_t, webrtc::RtpDepacketizer::ParsedPayload> audio_rtp_queue_;
-
-    webrtc::RtpDepacketizerVp8 vp8_depacket_;
-    webrtc::RtpDepacketizerVp9 vp9_depacket_;
-    webrtc::RtpDepacketizerH264 h264_depacket_;
 
     uint32_t video_publisher_ssrc_;
     uint32_t audio_publisher_ssrc_;

@@ -27,3 +27,4 @@ tms*
 *.ts
 git.sh
 *.srt
+obj

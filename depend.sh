@@ -33,4 +33,10 @@ if [[ ! -f ${dir_obj}/lib/libsrt.a ]]; then
         && make -j16 && make install
 fi
 
+if [[ ! -d ${dir_obj}/include/rapidjson ]]; then
+    unzip ${dir}/3rdparty/rapidjson-1.1.0.zip -d ${dir_obj}
+    cd ${dir_obj}/rapidjson-1.1.0
+    mkdir build && cd build && cmake -DCMAKE_INSTALL_PREFIX:PATH=${dir_obj} ../ && make install
+fi
+
 cd ${dir}

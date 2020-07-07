@@ -59,14 +59,8 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    // Open ssl init
-	SSL_load_error_strings();
-    int ret = SSL_library_init();
-
-    assert(ret == 1);
-
     // tls init
-    g_tls_ctx = SSL_CTX_new(SSLv23_method());
+    g_tls_ctx = SSL_CTX_new(TLS_method());
 
     assert(g_tls_ctx != NULL);
 
@@ -82,7 +76,7 @@ int main(int argc, char* argv[])
     RSA_free(tls_rsa_private);
     BIO_free(tls_mem_key);
 
-    ret = SSL_CTX_check_private_key(g_tls_ctx);
+    int ret = SSL_CTX_check_private_key(g_tls_ctx);
 
     // dtls init
     //g_dtls_ctx = SSL_CTX_new(DTLSv1_2_method());
@@ -184,7 +178,7 @@ int main(int argc, char* argv[])
     BN_free(exponent);
     X509_NAME_free(subject);
 
-    g_dtls_ctx = SSL_CTX_new(DTLSv1_2_method());
+    g_dtls_ctx = SSL_CTX_new(DTLS_method());
 	ret = SSL_CTX_use_certificate(g_dtls_ctx, dtls_cert);
     if (ret != 1)
     {   

@@ -116,12 +116,10 @@ int SslSocket::OnWrite()
 {
     if (connect_status_ == kHandshaked)
     {
-        std::cout << LMSG << std::endl;
         write_buffer_.WriteToFd(fd_);
 
         if (write_buffer_.Empty())
         {
-            std::cout << LMSG << std::endl;
             DisableWrite();
         }
 

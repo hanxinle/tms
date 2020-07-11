@@ -1,6 +1,7 @@
 #ifndef __MEDIA_PUBLISHER_H__
 #define __MEDIA_PUBLISHER_H__
 
+#include "dash_muxer.h"
 #include "media_muxer.h"
 
 class HttpFlvProtocol;
@@ -50,6 +51,7 @@ protected:
     std::set<MediaSubscriber*> wait_header_subscriber_; // 当前进程app/stream所在的流还未收齐音视频头
 
     MediaMuxer media_muxer_;
+    DashMuxer dash_muxer_;
 };
 
 #endif // __MEDIA_PUBLISHER_H__

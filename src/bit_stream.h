@@ -10,8 +10,19 @@ class BitStream
 public:
     BitStream()
     {
-        bzero(buf_, sizeof(buf_));
-        bit_len_ = sizeof(buf_)*8;
+        buf_ = fixed_size_buf_;
+        buf_size_ = sizeof(fixed_size_buf_);
+        bzero(buf_, buf_size_);
+        bit_len_ = buf_size_ * 8;
+        cur_pos_ = 0;
+    }
+
+    BitStream(uint8_t* buf, size_t buf_size)
+    {
+        buf_ = buf;
+        buf_size_ = buf_size;
+        bzero(buf_, buf_size_);
+        bit_len_ = buf_size_ * 8;
         cur_pos_ = 0;
     }
 
@@ -96,7 +107,9 @@ public:
     }
 
 private:
-    uint8_t buf_[1024*16];
+    uint8_t* buf_;
+    size_t buf_size_;
+    uint8_t fixed_size_buf_[1024*16];
     uint32_t bit_len_;
     uint32_t cur_pos_;
 };

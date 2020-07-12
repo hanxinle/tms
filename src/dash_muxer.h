@@ -41,6 +41,7 @@ private:
     void WriteSampleDescriptionBox(BitStream& bs, const PayloadType& payload_type);
     void WriteVisualSampleEntry(BitStream& bs);
     void WriteAudioSampleEntry(BitStream& bs);
+    void WriteEsds(BitStream& bs);
     void WriteAVCC(BitStream& bs);
     void WriteDecodingTimeToSampleBox(BitStream& bs, const PayloadType& payload_type);
     void WriteSampleToChunkBox(BitStream& bs, const PayloadType& payload_type);
@@ -48,6 +49,7 @@ private:
     void WriteSampleSizeBox(BitStream& bs, const PayloadType& payload_type);
 private:
     std::string video_header_;
+    std::string audio_header_;
     uint32_t chunk_offset_;
     std::vector<uint32_t> video_chunk_offset_;
     std::vector<uint32_t> audio_chunk_offset_;

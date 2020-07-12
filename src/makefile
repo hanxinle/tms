@@ -38,10 +38,14 @@ all: $(TARGET)
 -include $(DEP_FILE)
 
 %.d: %.cpp
+	@echo "update $@ ..."; \
+	echo -n $< | sed s/\.cpp/\.o:/ > $@; \
+	$(CXX) $(INCLUDE_DIR) $(CXXFLAGS)  -MM $< | sed '1s/.*.://' >> $@;
+
+%.d: %.abc
 	@set -e; rm -f $@; \
 	$(CXX) -MM $(CPPFLAGS) $< > $@.$$$$; \
 	sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' < $@.$$$$ > $@; \
-	rm -f $@.$$$$
 
 %.o: %.cpp
 	$(CXX) $(INCLUDE_DIR) $(CXXFLAGS) -o $@ -c $<
@@ -50,7 +54,6 @@ all: $(TARGET)
 	@set -e; rm -f $@; \
 	$(CC) -MM $(CFLAGS) $< > $@.$$$$; \
 	sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' < $@.$$$$ > $@; \
-	rm -f $@.$$$$
 
 %.o: %.c
 	$(CC) $(INCLUDE_DIR) $(CFLAGS) -o $@ -c $<

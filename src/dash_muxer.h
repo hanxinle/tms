@@ -44,6 +44,7 @@ private:
     void WriteEsds(BitStream& bs);
     void WriteAVCC(BitStream& bs);
     void WriteDecodingTimeToSampleBox(BitStream& bs, const PayloadType& payload_type);
+    void WriteCompositionTimeToSampleBox(BitStream& bs, const PayloadType& payload_type);
     void WriteSampleToChunkBox(BitStream& bs, const PayloadType& payload_type);
     void WriteChunkOffsetBox(BitStream& bs, const PayloadType& payload_type);
     void WriteSampleSizeBox(BitStream& bs, const PayloadType& payload_type);

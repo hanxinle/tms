@@ -11,7 +11,7 @@ LIB_DIR        += -lpthread -lbz2 -lz -ldl
 CC             = gcc
 CXX 		   = g++
 CFLAGS         = -g -W -Wall -Werror -O2
-CXXFLAGS       = -g -std=c++0x -W -Wall -Werror -O2 -Wno-strict-aliasing -Wno-missing-field-initializers -Wno-unused-function -Wno-deprecated-declarations \
+CXXFLAGS       = -g -std=c++11 -W -Wall -Werror -O2 -Wno-strict-aliasing -Wno-missing-field-initializers -Wno-unused-function -Wno-deprecated-declarations \
 				 -Wno-unused-variable -Wno-unused-parameter -Wno-unused-value
 
 CXXFLAGS       += -DUSE_PUBLISH
@@ -37,23 +37,20 @@ all: $(TARGET)
 
 -include $(DEP_FILE)
 
-%.d: %.cpp
-	@echo "update $@ ..."; \
-	echo -n $< | sed s/\.cpp/\.o:/ > $@; \
-	$(CXX) $(INCLUDE_DIR) $(CXXFLAGS)  -MM $< | sed '1s/.*.://' >> $@;
-
-%.d: %.abc
+.%.d: %.cpp
 	@set -e; rm -f $@; \
-	$(CXX) -MM $(CPPFLAGS) $< > $@.$$$$; \
+	$(CXX) $(INCLUDE_DIR) $(CXXFLAGS) -MM $< > $@.$$$$; \
 	sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' < $@.$$$$ > $@; \
+	rm -f $@.$$$$
 
 %.o: %.cpp
 	$(CXX) $(INCLUDE_DIR) $(CXXFLAGS) -o $@ -c $<
 
 .%.d: %.c
 	@set -e; rm -f $@; \
-	$(CC) -MM $(CFLAGS) $< > $@.$$$$; \
+	$(CC) $(INCLUDE_DIR) $(CFLAGS) -MM $< > $@.$$$$; \
 	sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' < $@.$$$$ > $@; \
+	rm -f $@.$$$$
 
 %.o: %.c
 	$(CC) $(INCLUDE_DIR) $(CFLAGS) -o $@ -c $<

@@ -980,10 +980,10 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg)
             }
             else
             {
-                uint32_t compositio_time_offset = 0;
+                int32_t compositio_time_offset = 0;
                 if (rtmp_msg.len > 5)
                 {
-                    compositio_time_offset = (rtmp_msg.msg[2] << 16) | (rtmp_msg.msg[3] << 8) | (rtmp_msg.msg[4]);
+                    compositio_time_offset = (((rtmp_msg.msg[2] << 16) | (rtmp_msg.msg[3] << 8) | (rtmp_msg.msg[4])) + 0xFF800000) ^ 0xFF800000;
 
                     uint8_t* data = rtmp_msg.msg + 5;
                     size_t raw_len = rtmp_msg.len - 5;

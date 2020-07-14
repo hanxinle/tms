@@ -16,6 +16,33 @@
     cur_data[2] = uint8_t((box_size >> 8) & 0xFF); \
     cur_data[3] = uint8_t((box_size) & 0xFF);
 
+const int k1M = 1024*1024;
+
+DashMuxer::Chunk::Chunk()
+{
+    count_ = 0;
+    size_ = 0;
+    payload_type_ = kUnknownPayload;
+    delta_ = 0;
+    dts_ = 0;
+}
+
+DashMuxer::Chunk::Chunk(const Chunk& rhs)
+{
+    operator=(rhs);
+}
+
+DashMuxer::Chunk& DashMuxer::Chunk::operator=(const Chunk& rhs)
+{
+    count_ = rhs.count_;
+    size_ = rhs.size_;
+    payload_type_ = rhs.payload_type_;
+    delta_ = rhs.delta_;
+    dts_ = rhs.dts_;
+
+    return *this;
+}
+
 DashMuxer::DashMuxer()
 	: dump_fd_(-1)
 {
@@ -43,6 +70,10 @@ int DashMuxer::OnAudio(const Payload& payload)
 {
     audio_samples_.push_back(payload);
 
+    mdat_.append((const char*)payload.GetRawData(), payload.GetRawLen());
+
+    CalChunk(payload.GetDts(), payload.GetRawLen(), kAudioPayload);
+
     return kSuccess;
 }
 
@@ -50,16 +81,49 @@ int DashMuxer::OnVideo(const Payload& payload)
 {
     if (payload.IsIFrame())
     {
-        static int count = 0;
-        if (++count % 15 == 0)
+        if (! chunk_.empty())
         {
-            Flush();
+            std::vector<uint32_t>& chunk_offset = (chunk_.back().payload_type_ == kVideoPayload) ? video_chunk_offset_ : audio_chunk_offset_;
+            chunk_offset.push_back(chunk_offset_);
         }
+
+        Flush();
     }
+
+    mdat_.append((const char*)payload.GetAllData(), payload.GetAllLen());
+
+    CalChunk(payload.GetDts(), payload.GetAllLen(), kVideoPayload);
 
     video_samples_.push_back(payload);
 
     return kSuccess;
+}
+
+void DashMuxer::CalChunk(const uint64_t dts, const uint64_t& len, const PayloadType& payload_type)
+{
+    if (! chunk_.empty() && chunk_.back().payload_type_ == payload_type && chunk_.back().size_ + len <= k1M)
+    {
+        chunk_.back().size_ += len;
+        chunk_.back().count_ += 1;
+    }
+    else
+    {
+        if (! chunk_.empty())
+        {
+            chunk_.back().delta_ = dts - chunk_.back().dts_;
+            std::vector<uint32_t>& chunk_offset = (chunk_.back().payload_type_ == kVideoPayload) ? video_chunk_offset_ : audio_chunk_offset_;
+
+            chunk_offset.push_back(chunk_offset_);
+            chunk_offset_ += chunk_.back().size_;
+        }
+
+        Chunk chunk;
+        chunk.size_ = len;
+        chunk.count_ = 1;
+        chunk.payload_type_ = payload_type;
+        chunk.dts_ = dts;
+        chunk_.push_back(chunk);
+    }
 }
 
 int DashMuxer::OnMetaData(const std::string& metadata)
@@ -94,6 +158,7 @@ void DashMuxer::Flush()
     uint8_t* buf = (uint8_t*)malloc(buf_size);
     BitStream bs(buf, buf_size);
     WriteFileTypeBox(bs);
+    WriteFreeBox(bs);
     WriteMediaDataBox(bs);
     WriteMovieBox(bs);
 
@@ -111,6 +176,9 @@ void DashMuxer::Flush()
 void DashMuxer::Reset()
 {
     chunk_offset_ = 0;
+    media_offset_ = 0;
+    chunk_.clear();
+    mdat_.clear();
     video_chunk_offset_.clear();
     audio_chunk_offset_.clear();
     video_samples_.clear();
@@ -147,6 +215,17 @@ void DashMuxer::WriteFileTypeBox(BitStream& bs)
     NEW_SIZE(bs);
 }
 
+void DashMuxer::WriteFreeBox(BitStream& bs)
+{
+    CUR_SIZE(bs);
+
+    bs.WriteBytes(4, 0);
+    static uint8_t free[4] = {'f', 'r', 'e', 'e'};
+    bs.WriteData(4, free);
+
+    NEW_SIZE(bs);
+}
+
 void DashMuxer::WriteMovieBox(BitStream& bs)
 {
     CUR_SIZE(bs);
@@ -172,6 +251,9 @@ void DashMuxer::WriteMediaDataBox(BitStream& bs)
     static uint8_t mdat[4] = {'m', 'd', 'a', 't'};
     bs.WriteData(4, mdat);
 
+    media_offset_ = bs.SizeInBytes();
+
+#if 0
     chunk_offset_ = bs.SizeInBytes();
 
     auto iter_v = video_samples_.begin();
@@ -195,7 +277,7 @@ void DashMuxer::WriteMediaDataBox(BitStream& bs)
         }
         else
         {
-            if (iter_a->GetPts() < iter_v->GetPts())
+            if (iter_a->GetDts() <= iter_v->GetDts())
             {
                 bs.WriteData(iter_a->GetRawLen(), iter_a->GetRawData());
                 audio_chunk_offset_.push_back(chunk_offset_);
@@ -211,6 +293,9 @@ void DashMuxer::WriteMediaDataBox(BitStream& bs)
             }
         }
     }
+#else
+    bs.WriteData(mdat_.size(), (const uint8_t*)mdat_.data());
+#endif
 
     NEW_SIZE(bs);
 }
@@ -244,8 +329,8 @@ void DashMuxer::WriteMovieHeaderBox(BitStream& bs)
         uint32_t timescale = 1000;
         bs.WriteBytes(4, timescale);
 
-        uint32_t video_duration = 0;
-        uint32_t audio_duration = 0;
+        uint32_t video_duration = 1000;
+        uint32_t audio_duration = 1000;
         if (! video_samples_.empty())
         {
             video_duration = (--video_samples_.rbegin().base())->GetDts() - video_samples_.begin()->GetDts();
@@ -254,8 +339,6 @@ void DashMuxer::WriteMovieHeaderBox(BitStream& bs)
         {
             audio_duration = (--audio_samples_.rbegin().base())->GetDts() - audio_samples_.begin()->GetDts();
         }
-
-        std::cout << LMSG << "video_duration=" << video_duration << ",audio_duration=" << audio_duration << std::endl;
 
         uint32_t duration = video_duration > audio_duration ? video_duration : audio_duration;;
         bs.WriteBytes(4, duration);
@@ -273,7 +356,7 @@ void DashMuxer::WriteMovieHeaderBox(BitStream& bs)
     bs.WriteBytes(4, 0);
     bs.WriteBytes(4, 0);
 
-    uint32_t matrix[9] = {0x00010000, 0, 0, 0, 0x00010000, 0, 0, 0, 0x4000000 };
+    uint32_t matrix[9] = { 0x00010000,0,0,0,0x00010000,0,0,0,0x40000000 };;
     for (size_t i = 0; i < 9; ++i)
     {
         bs.WriteBytes(4, matrix[i]);
@@ -285,8 +368,8 @@ void DashMuxer::WriteMovieHeaderBox(BitStream& bs)
         bs.WriteBytes(4, pre_defined[i]);
     }
 
-    uint32_t next_trace_id = 0;
-    bs.WriteBytes(4, next_trace_id);
+    uint32_t next_track_ID = 1;
+    bs.WriteBytes(4, next_track_ID);
 
     NEW_SIZE(bs);
 }
@@ -300,6 +383,7 @@ void DashMuxer::WriteTrackBox(BitStream& bs, const PayloadType& payload_type)
     bs.WriteData(4, trak);
 
     WriteTrackHeaderBox(bs, payload_type);
+    WriteEditBox(bs, payload_type);
     WriteMediaBox(bs, payload_type);
 
     NEW_SIZE(bs);
@@ -316,7 +400,8 @@ void DashMuxer::WriteTrackHeaderBox(BitStream& bs, const PayloadType& payload_ty
     uint8_t version = 0;
     bs.WriteBytes(1, version);
 
-    uint32_t flags = 0;
+    // FIXME: any flags?
+    uint32_t flags = 3;
     bs.WriteBytes(3, flags);
 
     if (version == 1)
@@ -331,6 +416,10 @@ void DashMuxer::WriteTrackHeaderBox(BitStream& bs, const PayloadType& payload_ty
         bs.WriteBytes(4, modification_time);
 
         uint32_t track_ID = 1;
+        if (payload_type == kAudioPayload)
+        {
+            track_ID = 2;
+        }
         bs.WriteBytes(4, track_ID);
 
         uint32_t reversed = 0;
@@ -338,7 +427,7 @@ void DashMuxer::WriteTrackHeaderBox(BitStream& bs, const PayloadType& payload_ty
 
         if (payload_type == kVideoPayload)
         {
-            uint32_t duration = 0;
+            uint32_t duration = 1000;
             if (! video_samples_.empty())
             {
                 duration = (--video_samples_.rbegin().base())->GetDts() - video_samples_.begin()->GetDts();
@@ -347,7 +436,7 @@ void DashMuxer::WriteTrackHeaderBox(BitStream& bs, const PayloadType& payload_ty
         }
         else if (payload_type == kAudioPayload)
         {
-            uint32_t duration = 0;
+            uint32_t duration = 1000;
             if (! audio_samples_.empty())
             {
                 duration = (--audio_samples_.rbegin().base())->GetDts() - audio_samples_.begin()->GetDts();
@@ -371,17 +460,70 @@ void DashMuxer::WriteTrackHeaderBox(BitStream& bs, const PayloadType& payload_ty
 
     bs.WriteBytes(2, 0);
 
-    uint32_t matrix[9] = {0x00010000, 0, 0, 0, 0x00010000, 0, 0, 0, 0x4000000 };
+    uint32_t matrix[9] = { 0x00010000,0,0,0,0x00010000,0,0,0,0x40000000 };
     for (size_t i = 0; i < 9; ++i)
     {
         bs.WriteBytes(4, matrix[i]);
     }
 
-    uint32_t width = 1920;
+    uint32_t width = payload_type == kVideoPayload ? 1920 << 16 : 0;
     bs.WriteBytes(4, width);
 
-    uint32_t height = 1080;
+    uint32_t height = payload_type == kVideoPayload ? 1080 << 16 : 0;
     bs.WriteBytes(4, height);
+
+    NEW_SIZE(bs);
+}
+
+void DashMuxer::WriteEditBox(BitStream& bs, const PayloadType& payload_type)
+{
+    CUR_SIZE(bs);
+
+    bs.WriteBytes(4, 0);
+    static uint8_t edts[4] = {'e', 'd', 't', 's'};
+    bs.WriteData(4, edts);
+
+    WriteEditListBox(bs, payload_type);
+
+    NEW_SIZE(bs);
+}
+
+void DashMuxer::WriteEditListBox(BitStream& bs, const PayloadType& payload_type)
+{
+    CUR_SIZE(bs);
+
+    bs.WriteBytes(4, 0);
+    static uint8_t elst[4] = {'e', 'l', 's', 't'};
+    bs.WriteData(4, elst);
+
+    uint8_t version = 0;
+    bs.WriteBytes(1, version);
+
+    uint32_t flags = 0;
+    bs.WriteBytes(3, flags);
+
+    uint32_t entry_count = 1;
+    bs.WriteBytes(4, entry_count);
+
+    uint32_t segment_duration = 1000;
+    if (payload_type == kVideoPayload && ! video_samples_.empty())
+    {
+        segment_duration = (--video_samples_.rbegin().base())->GetDts() - video_samples_.begin()->GetDts();
+    }
+    else if (payload_type == kAudioPayload && ! audio_samples_.empty())
+    {
+        segment_duration = (--audio_samples_.rbegin().base())->GetDts() - audio_samples_.begin()->GetDts();
+    }
+    bs.WriteBytes(4, segment_duration);
+
+    int32_t media_time = 0;
+    bs.WriteBytes(4, media_time);
+
+    int16_t media_rate_interger = 1;
+    bs.WriteBytes(2, media_rate_interger);
+
+    int16_t media_rate_fraction = 0;
+    bs.WriteBytes(2, media_rate_fraction);
 
     NEW_SIZE(bs);
 }
@@ -431,7 +573,7 @@ void DashMuxer::WriteMediaHeaderBox(BitStream& bs, const PayloadType& payload_ty
 
         if (payload_type == kVideoPayload)
         {
-            uint32_t duration = 0;
+            uint32_t duration = 1000;
             if (! video_samples_.empty())
             {
                 duration = (--video_samples_.rbegin().base())->GetDts() - video_samples_.begin()->GetDts();
@@ -440,7 +582,7 @@ void DashMuxer::WriteMediaHeaderBox(BitStream& bs, const PayloadType& payload_ty
         }
         else if (payload_type == kAudioPayload)
         {
-            uint32_t duration = 0;
+            uint32_t duration = 1000;
             if (! audio_samples_.empty())
             {
                 duration = (--audio_samples_.rbegin().base())->GetDts() - audio_samples_.begin()->GetDts();
@@ -479,15 +621,14 @@ void DashMuxer::WriteHandlerReferenceBox(BitStream& bs, const PayloadType& paylo
     uint32_t pre_defined = 0;
     bs.WriteBytes(4, pre_defined);
 
-    static uint8_t vide[4] = {'v', 'i', 'd', 'e'};
-    static uint8_t soun[4] = {'s', 'o', 'u', 'n'};
-
     if (payload_type == kVideoPayload)
     {
+        static uint8_t vide[4] = {'v', 'i', 'd', 'e'};
         bs.WriteData(4, vide);
     }
     else if (payload_type == kAudioPayload)
     {
+        static uint8_t soun[4] = {'s', 'o', 'u', 'n'};
         bs.WriteData(4, soun);
     }
 
@@ -495,10 +636,10 @@ void DashMuxer::WriteHandlerReferenceBox(BitStream& bs, const PayloadType& paylo
     bs.WriteBytes(4, 0);
     bs.WriteBytes(4, 0);
 
-    std::string debug = "VideoHandler";
+    std::string debug = "VideoHandler#";
     if (payload_type == kAudioPayload)
     {
-        debug = "AudioHandler";
+        debug = "AudioHandler#";
     }
     bs.WriteData(debug.size(), (const uint8_t*)debug.data());
 
@@ -522,6 +663,7 @@ void DashMuxer::WriteMediaInfoBox(BitStream& bs, const PayloadType& payload_type
         WriteSoundMediaHeaderBox(bs, payload_type);
     }
 
+    WriteDataInformationBox(bs, payload_type);
     WriteSampleTableBox(bs, payload_type);
 
     NEW_SIZE(bs);
@@ -564,7 +706,7 @@ void DashMuxer::WriteSoundMediaHeaderBox(BitStream& bs, const PayloadType& paylo
     uint8_t version = 0;
     bs.WriteBytes(1, version);
 
-    uint32_t flags = 1;
+    uint32_t flags = 0;
     bs.WriteBytes(3, flags);
 
     uint16_t balance = 0;
@@ -572,6 +714,61 @@ void DashMuxer::WriteSoundMediaHeaderBox(BitStream& bs, const PayloadType& paylo
 
     uint16_t reserved = 0;
     bs.WriteBytes(2, reserved);
+
+    NEW_SIZE(bs);
+}
+
+void DashMuxer::WriteDataInformationBox(BitStream& bs, const PayloadType& payload_type)
+{
+    CUR_SIZE(bs);
+
+    bs.WriteBytes(4, 0);
+    static uint8_t dinf[4] = {'d', 'i', 'n', 'f'};
+    bs.WriteData(4, dinf);
+
+    WriteDataReferenceBox(bs, payload_type);
+
+    NEW_SIZE(bs);
+}
+
+void DashMuxer::WriteDataReferenceBox(BitStream& bs, const PayloadType& payload_type)
+{
+    CUR_SIZE(bs);
+
+    bs.WriteBytes(4, 0);
+    static uint8_t dref[4] = {'d', 'r', 'e', 'f'};
+    bs.WriteData(4, dref);
+
+    uint8_t version = 0;
+    bs.WriteBytes(1, version);
+
+    uint32_t flags = 0;
+    bs.WriteBytes(3, flags);
+
+    uint32_t entry_count = 1;
+    bs.WriteBytes(4, entry_count);
+
+    for (size_t i= 0; i < entry_count; ++i)
+    {
+        WriteDataEntry(bs, payload_type);
+    }
+
+    NEW_SIZE(bs);
+}
+
+void DashMuxer::WriteDataEntry(BitStream& bs, const PayloadType& payload_type)
+{
+    CUR_SIZE(bs);
+
+    bs.WriteBytes(4, 0);
+    static uint8_t url[4] = {'u', 'r', 'l', ' '};
+    bs.WriteData(4, url);
+
+    uint8_t version = 0;
+    bs.WriteBytes(1, version);
+
+    uint32_t flags = 1;
+    bs.WriteBytes(3, flags);
 
     NEW_SIZE(bs);
 }
@@ -586,13 +783,15 @@ void DashMuxer::WriteSampleTableBox(BitStream& bs, const PayloadType& payload_ty
 
     WriteSampleDescriptionBox(bs, payload_type);
     WriteDecodingTimeToSampleBox(bs, payload_type);
+#if 1
     if (payload_type == kVideoPayload)
     {
         WriteCompositionTimeToSampleBox(bs, payload_type);
     }
+#endif
     WriteSampleToChunkBox(bs, payload_type);
-    WriteChunkOffsetBox(bs, payload_type);
     WriteSampleSizeBox(bs, payload_type);
+    WriteChunkOffsetBox(bs, payload_type);
 
     NEW_SIZE(bs);
 }
@@ -665,7 +864,7 @@ void DashMuxer::WriteVisualSampleEntry(BitStream& bs)
     uint16_t frame_count = 1;
     bs.WriteBytes(2, frame_count);
 
-    std::string compressorname(32, 'c');
+    std::string compressorname(32, '\0');
     bs.WriteData(32, (const uint8_t*)compressorname.data());
 
     uint16_t depth = 0x0018;
@@ -760,6 +959,25 @@ void DashMuxer::WriteAVCC(BitStream& bs)
     bs.WriteData(4, avcc);
 
     bs.WriteData(video_header_.size(), (const uint8_t*)video_header_.data());
+
+    //WritePixelAspectRatioBox(bs);
+    
+    NEW_SIZE(bs);
+}
+
+void DashMuxer::WritePixelAspectRatioBox(BitStream& bs)
+{
+    CUR_SIZE(bs);
+
+    bs.WriteBytes(4, 0);
+    static uint8_t pasp[4] = {'p', 'a', 's', 'p'};
+    bs.WriteData(4, pasp);
+
+    uint32_t h_spacing = 1;
+    bs.WriteBytes(4, h_spacing);
+
+    uint32_t v_spacing = 1;
+    bs.WriteBytes(4, v_spacing);
     
     NEW_SIZE(bs);
 }
@@ -778,11 +996,12 @@ void DashMuxer::WriteDecodingTimeToSampleBox(BitStream& bs, const PayloadType& p
     uint32_t flags = 0;
     bs.WriteBytes(3, flags);
 
+#if 1
     std::vector<Payload>& samples = (payload_type == kVideoPayload) ? video_samples_ : audio_samples_;
     uint32_t entry_count = samples.size();
     bs.WriteBytes(4, entry_count);
 
-    uint32_t pre_sample_time = 0;
+    uint32_t pre_sample_time = samples.empty() ? 0 : samples[0].GetDts();
     for (size_t i = 0; i < samples.size(); ++i)
     {
         uint32_t sample_count = 1;
@@ -792,6 +1011,28 @@ void DashMuxer::WriteDecodingTimeToSampleBox(BitStream& bs, const PayloadType& p
         bs.WriteBytes(4, sample_delta);
         pre_sample_time = samples[i].GetDts();
     }
+#else
+    std::vector<Chunk> tmp;
+    for (const auto& item : chunk_)
+    {
+        if (item.payload_type_ == payload_type)
+        {
+            tmp.push_back(item);
+        }
+    }
+
+    uint32_t entry_count = tmp.size();
+    bs.WriteBytes(4, entry_count);
+
+    for (const auto& item : tmp)
+    {
+        uint32_t sample_count = item.count_;
+        bs.WriteBytes(4, sample_count);
+
+        uint32_t sample_delta = item.delta_;
+        bs.WriteBytes(4, sample_delta);
+    }
+#endif
 
     NEW_SIZE(bs);
 }
@@ -804,7 +1045,7 @@ void DashMuxer::WriteCompositionTimeToSampleBox(BitStream& bs, const PayloadType
     static uint8_t ctts[4] = {'c', 't', 't', 's'};
     bs.WriteData(4, ctts);
 
-    uint8_t version = 1;
+    uint8_t version = 0;
     bs.WriteBytes(1, version);
 
     uint32_t flags = 0;
@@ -814,15 +1055,13 @@ void DashMuxer::WriteCompositionTimeToSampleBox(BitStream& bs, const PayloadType
     uint32_t entry_count = samples.size();
     bs.WriteBytes(4, entry_count);
 
-    uint32_t pre_sample_time = 0;
     for (size_t i = 0; i < samples.size(); ++i)
     {
         uint32_t sample_count = 1;
         bs.WriteBytes(4, sample_count);
 
-        int32_t sample_offset = samples[i].GetPts() - pre_sample_time;
+        uint32_t sample_offset = samples[i].GetPts() - samples[i].GetDts();
         bs.WriteBytes(4, sample_offset);
-        pre_sample_time = samples[i].GetPts();
     }
 
     NEW_SIZE(bs);
@@ -843,13 +1082,10 @@ void DashMuxer::WriteSampleToChunkBox(BitStream& bs, const PayloadType& payload_
     bs.WriteBytes(3, flags);
 
 #if 0
-    std::vector<Payload>& samples = (payload_type == kVideoPayload) ? video_samples_ : audio_samples_;
-    uint32_t entry_count = samples.size();
+    uint32_t entry_count = 1;
     bs.WriteBytes(4, entry_count);
-
-    for (size_t i = 0; i < samples.size(); ++i)
     {
-        uint32_t first_chunk = i + 1;
+        uint32_t first_chunk = 1;
         bs.WriteBytes(4, first_chunk);
 
         uint32_t sample_per_chunk = 1;
@@ -859,13 +1095,36 @@ void DashMuxer::WriteSampleToChunkBox(BitStream& bs, const PayloadType& payload_
         bs.WriteBytes(4, sample_description_index);
     }
 #else
-    uint32_t entry_count = 1;
-    bs.WriteBytes(4, entry_count);
+    std::vector<Chunk> tmp;
+    for (const auto& item : chunk_)
     {
-        uint32_t first_chunk = 1;
+        if (item.payload_type_ == payload_type)
+        {
+            tmp.push_back(item);
+        }
+    }
+
+    uint32_t entry_count = tmp.size();
+    for (size_t i = 0; i < tmp.size(); ++i)
+    {
+        if (i > 0 && tmp[i].count_ == tmp[i-1].count_)
+        {
+            --entry_count;
+        }
+    }
+    bs.WriteBytes(4, entry_count);
+
+    for (size_t i = 0; i < tmp.size(); ++i)
+    {
+        if (i > 0 && tmp[i].count_ == tmp[i-1].count_)
+        {
+            continue;
+        }
+
+        uint32_t first_chunk = i + 1;
         bs.WriteBytes(4, first_chunk);
 
-        uint32_t sample_per_chunk = 1;
+        uint32_t sample_per_chunk = tmp[i].count_;
         bs.WriteBytes(4, sample_per_chunk);
 
         uint32_t sample_description_index = 1;
@@ -894,9 +1153,11 @@ void DashMuxer::WriteChunkOffsetBox(BitStream& bs, const PayloadType& payload_ty
     uint32_t entry_count = chunk_offset.size();
     bs.WriteBytes(4, entry_count);
 
+    std::cout << LMSG << "[stco] " << "entry_count=" << entry_count << std::endl;
+
     for (size_t i = 0; i < chunk_offset.size(); ++i)
     {
-        bs.WriteBytes(4, chunk_offset[i]);
+        bs.WriteBytes(4, chunk_offset[i] + media_offset_);
     }
 
     NEW_SIZE(bs);

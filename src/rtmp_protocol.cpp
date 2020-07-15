@@ -813,6 +813,7 @@ int RtmpProtocol::OnAudio(RtmpMessage& rtmp_msg) {
                   << std::endl;
         std::cout << Util::Bin2Hex(audio_header) << std::endl;
 
+        mp4_muxer_.OnAudioHeader(audio_header);
         dash_muxer_.OnAudioHeader(audio_header);
         media_muxer_.OnAudioHeader(audio_header);
 
@@ -825,6 +826,7 @@ int RtmpProtocol::OnAudio(RtmpMessage& rtmp_msg) {
         audio_payload.SetDts(rtmp_msg.timestamp_calc);
         audio_payload.SetPts(rtmp_msg.timestamp_calc);
 
+        mp4_muxer_.OnAudio(audio_payload);
         dash_muxer_.OnAudio(audio_payload);
         media_muxer_.OnAudio(audio_payload);
 
@@ -938,6 +940,7 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg) {
 
             if (to_media_muxer) {
               media_muxer_.OnVideo(video_payload);
+              mp4_muxer_.OnVideo(video_payload);
               dash_muxer_.OnVideo(video_payload);
 
               for (auto& sub : subscriber_) {
@@ -1372,6 +1375,7 @@ int RtmpProtocol::OnVideoHeader(RtmpMessage& rtmp_msg) {
             << ",size:" << video_header.size() << std::endl;
   std::cout << Util::Bin2Hex(video_header) << std::endl;
 
+  mp4_muxer_.OnVideoHeader(video_header);
   dash_muxer_.OnVideoHeader(video_header);
 
   return media_muxer_.OnVideoHeader(video_header);

@@ -1,5 +1,5 @@
-#include "common_define.h"
 #include "epoller.h"
+#include "common_define.h"
 #include "fd.h"
 #include "util.h"
 
@@ -10,136 +10,110 @@
 
 #include <iostream>
 
-Epoller::Epoller()
-    : IoLoop()
-{
+Epoller::Epoller() : IoLoop() {}
+
+Epoller::~Epoller() {
+  if (poll_fd_ > 0) {
+    close(poll_fd_);
+  }
 }
 
-Epoller::~Epoller()
-{
-    if (poll_fd_ > 0)
-    {
-        close(poll_fd_);
+int Epoller::Create() {
+  if (poll_fd_ < 0) {
+    poll_fd_ = epoll_create(1024);
+
+    if (poll_fd_ < 0) {
+      std::cout << LMSG << "epoll_create failed, ret=" << poll_fd_ << std::endl;
+      return -1;
     }
+
+    std::cout << LMSG << "epoll_create success. poll_fd_=" << poll_fd_
+              << std::endl;
+  }
+
+  return 0;
 }
 
-int Epoller::Create()
-{
-    if (poll_fd_ < 0)
-    {
-        poll_fd_ = epoll_create(1024);
+void Epoller::RunIOLoop(const int& timeout_in_millsecond) {
+  while (!quit_) {
+    WaitIO(timeout_in_millsecond);
+  }
+}
 
-        if (poll_fd_ < 0)
-        {
-            std::cout << LMSG << "epoll_create failed, ret=" << poll_fd_ << std::endl;
-            return -1;
+int Epoller::AddFd(Fd* fd) {
+  struct epoll_event event;
+  event.events = fd->events();
+  event.data.ptr = (void*)fd;
+
+  int ret = epoll_ctl(poll_fd_, EPOLL_CTL_ADD, fd->fd(), &event);
+
+  if (ret < 0) {
+    std::cout << LMSG << "epoll_ctl faield ret=" << ret << std::endl;
+  }
+
+  return ret;
+}
+
+int Epoller::DelFd(Fd* fd) {
+  struct epoll_event event;
+  event.events = fd->events();
+  event.data.ptr = (void*)fd;
+
+  int ret = epoll_ctl(poll_fd_, EPOLL_CTL_DEL, fd->fd(), &event);
+
+  if (ret < 0) {
+    std::cout << LMSG << "epoll_ctl failed, ret=" << ret << std::endl;
+  }
+
+  return ret;
+}
+
+int Epoller::ModFd(Fd* fd) {
+  struct epoll_event event;
+  event.events = fd->events();
+  event.data.ptr = (void*)fd;
+
+  int ret = epoll_ctl(poll_fd_, EPOLL_CTL_MOD, fd->fd(), &event);
+
+  if (ret < 0) {
+    std::cout << LMSG << "epoll_ctl failed, ret=" << ret << std::endl;
+  }
+
+  return ret;
+}
+
+void Epoller::WaitIO(const int& timeout_in_millsecond) {
+  static epoll_event events[1024];
+
+  int num_event =
+      epoll_wait(poll_fd_, events, sizeof(events), timeout_in_millsecond);
+
+  if (num_event > 0) {
+    for (int i = 0; i < num_event; ++i) {
+      Fd* fd = (Fd*)(events[i].data.ptr);
+
+      if (fd == NULL) {
+        assert(false);
+      }
+
+      if (events[i].events & (EPOLLIN | EPOLLHUP)) {
+        int ret = fd->OnRead();
+        if (ret == kClose || ret == kError) {
+          std::cout << LMSG << "closed, ret:" << ret << std::endl;
+          delete fd;
+          return;
         }
+      }
 
-        std::cout << LMSG << "epoll_create success. poll_fd_=" << poll_fd_ << std::endl;
-    }
-
-    return 0;
-}
-
-void Epoller::RunIOLoop(const int& timeout_in_millsecond)
-{
-    while (! quit_)
-    {
-        WaitIO(timeout_in_millsecond);
-    }
-}
-
-int Epoller::AddFd(Fd* fd)
-{
-    struct epoll_event event;
-    event.events = fd->events();
-    event.data.ptr = (void*)fd;
-
-    int ret = epoll_ctl(poll_fd_, EPOLL_CTL_ADD, fd->fd(), &event);
-
-    if (ret < 0)
-    {
-        std::cout << LMSG << "epoll_ctl faield ret=" << ret << std::endl;
-    }
-
-    return ret;
-}
-
-int Epoller::DelFd(Fd* fd)
-{
-    struct epoll_event event;
-    event.events = fd->events();
-    event.data.ptr = (void*)fd;
-
-    int ret = epoll_ctl(poll_fd_, EPOLL_CTL_DEL, fd->fd(), &event);
-
-    if (ret < 0)
-    {
-        std::cout << LMSG << "epoll_ctl failed, ret=" << ret << std::endl;
-    }
-
-    return ret;
-}
-
-int Epoller::ModFd(Fd* fd)
-{
-    struct epoll_event event;
-    event.events = fd->events();
-    event.data.ptr = (void*)fd;
-
-    int ret = epoll_ctl(poll_fd_, EPOLL_CTL_MOD, fd->fd(), &event);
-
-    if (ret < 0)
-    {
-        std::cout << LMSG << "epoll_ctl failed, ret=" << ret << std::endl;
-    }
-
-    return ret;
-}
-
-void Epoller::WaitIO(const int& timeout_in_millsecond)
-{
-    static epoll_event events[1024];
-
-    int num_event = epoll_wait(poll_fd_, events, sizeof(events), timeout_in_millsecond);
-
-    if (num_event > 0)
-    {
-        for (int i = 0; i < num_event; ++i)
-        {
-            Fd* fd = (Fd*)(events[i].data.ptr);
-
-            if (fd == NULL)
-            {
-                assert(false);
-            }
-
-            if (events[i].events & (EPOLLIN | EPOLLHUP))
-            {
-                int ret = fd->OnRead();
-                if (ret == kClose || ret == kError)
-                {
-                    std::cout << LMSG << "closed, ret:" << ret << std::endl;
-                    delete fd;
-                    return;
-                }
-            }
-
-            if (events[i].events & EPOLLOUT)
-            {
-                int ret = fd->OnWrite();
-                if (ret < 0)
-                {
-                    delete fd;
-                }
-            }
+      if (events[i].events & EPOLLOUT) {
+        int ret = fd->OnWrite();
+        if (ret < 0) {
+          delete fd;
         }
+      }
     }
-    else if (num_event < 0)
-    {
-        std::cout << LMSG << "epoll_wait failed, ret=" <<num_event << std::endl;
-    }
-    else
-    {
-    }
+  } else if (num_event < 0) {
+    std::cout << LMSG << "epoll_wait failed, ret=" << num_event << std::endl;
+  } else {
+  }
 }

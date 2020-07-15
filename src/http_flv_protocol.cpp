@@ -12,349 +12,321 @@
 #include "tcp_socket.h"
 
 HttpFlvProtocol::HttpFlvProtocol(IoLoop* io_loop, Fd* socket)
-    : MediaSubscriber(kHttpFlv)
-    , io_loop_(io_loop)
-    , socket_(socket)
-    , media_publisher_(NULL)
-    , pre_tag_size_(0)
-{
+    : MediaSubscriber(kHttpFlv),
+      io_loop_(io_loop),
+      socket_(socket),
+      media_publisher_(NULL),
+      pre_tag_size_(0) {}
+
+HttpFlvProtocol::~HttpFlvProtocol() {}
+
+int HttpFlvProtocol::HandleRead(IoBuffer& io_buffer, Fd& socket) {
+  int ret = kError;
+  do {
+    ret = Parse(io_buffer);
+  } while (ret == kSuccess);
+
+  return ret;
 }
 
-HttpFlvProtocol::~HttpFlvProtocol()
-{
-}
+int HttpFlvProtocol::Parse(IoBuffer& io_buffer) {
+  int ret = http_parse_.Decode(io_buffer);
 
-int HttpFlvProtocol::HandleRead(IoBuffer& io_buffer, Fd& socket)
-{
-    int ret = kError;
-    do
-    {
-        ret = Parse(io_buffer);
-    } while (ret == kSuccess);
+  if (ret == kSuccess) {
+    if (http_parse_.IsFlvRequest(app_, stream_)) {
+      if (!app_.empty() && !stream_.empty()) {
+        media_publisher_ =
+            g_local_stream_center.GetMediaPublisherByAppStream(app_, stream_);
 
-    return ret;
-}
-
-int HttpFlvProtocol::Parse(IoBuffer& io_buffer)
-{
-    int ret = http_parse_.Decode(io_buffer);
-
-    if (ret == kSuccess)
-    {
-        if (http_parse_.IsFlvRequest(app_, stream_))
+        if (media_publisher_ != NULL)  // 本进程有流
         {
-            if (! app_.empty() && ! stream_.empty())
-            {
-                media_publisher_ = g_local_stream_center.GetMediaPublisherByAppStream(app_, stream_);
+          HttpSender http_rsp;
+          http_rsp.SetStatus("200");
+          http_rsp.SetContentType("flv");
+          http_rsp.SetKeepAlive();
 
-                if (media_publisher_ != NULL) // 本进程有流
-                {
-                    HttpSender http_rsp;
-                    http_rsp.SetStatus("200");
-                    http_rsp.SetContentType("flv");
-                    http_rsp.SetKeepAlive();
+          std::string http_response = http_rsp.Encode();
 
-	                std::string http_response = http_rsp.Encode();
-
-		            GetTcpSocket()->Send((const uint8_t*)http_response.data(), http_response.size());
-                    SendFlvHeader();
-                    media_publisher_->AddSubscriber(this);
-                }
-                else
-                {
-					return kError;
-                }
-            }
-            else
-            {
-                std::cout << LMSG << "no flv" << std::endl;
-
-                HttpSender http_rsp;
-                http_rsp.SetStatus("404");
-                http_rsp.SetContentType("html");
-                http_rsp.SetClose();
-                http_rsp.SetContent("fuck you");
-
-	            std::string http_response = http_rsp.Encode();
-
-		        GetTcpSocket()->Send((const uint8_t*)http_response.data(), http_response.size());
-            }
+          GetTcpSocket()->Send((const uint8_t*)http_response.data(),
+                               http_response.size());
+          SendFlvHeader();
+          media_publisher_->AddSubscriber(this);
+        } else {
+          return kError;
         }
-        else
-        {
-            std::cout << LMSG << "no flv" << std::endl;
+      } else {
+        std::cout << LMSG << "no flv" << std::endl;
 
-            HttpSender http_rsp;
-            http_rsp.SetStatus("404");
-            http_rsp.SetContentType("html");
-            http_rsp.SetClose();
-            http_rsp.SetContent("fuck you");
+        HttpSender http_rsp;
+        http_rsp.SetStatus("404");
+        http_rsp.SetContentType("html");
+        http_rsp.SetClose();
+        http_rsp.SetContent("fuck you");
 
-	        std::string http_response = http_rsp.Encode();
+        std::string http_response = http_rsp.Encode();
 
-		    GetTcpSocket()->Send((const uint8_t*)http_response.data(), http_response.size());
-        }
+        GetTcpSocket()->Send((const uint8_t*)http_response.data(),
+                             http_response.size());
+      }
+    } else {
+      std::cout << LMSG << "no flv" << std::endl;
+
+      HttpSender http_rsp;
+      http_rsp.SetStatus("404");
+      http_rsp.SetContentType("html");
+      http_rsp.SetClose();
+      http_rsp.SetContent("fuck you");
+
+      std::string http_response = http_rsp.Encode();
+
+      GetTcpSocket()->Send((const uint8_t*)http_response.data(),
+                           http_response.size());
     }
+  }
 
-    return ret;
+  return ret;
 }
 
-int HttpFlvProtocol::SendFlvHeader()
-{
-    IoBuffer flv_header;
+int HttpFlvProtocol::SendFlvHeader() {
+  IoBuffer flv_header;
 
-    flv_header.Write("FLV");
-    flv_header.WriteU8(1);
-    flv_header.WriteU8(0x05);
-    flv_header.WriteU32(9);
+  flv_header.Write("FLV");
+  flv_header.WriteU8(1);
+  flv_header.WriteU8(0x05);
+  flv_header.WriteU32(9);
 
-    uint8_t* data = NULL;
-    int len = flv_header.Read(data, flv_header.Size());
+  uint8_t* data = NULL;
+  int len = flv_header.Read(data, flv_header.Size());
 
-    socket_->Send(data, len);
+  socket_->Send(data, len);
 
-    return kSuccess;
+  return kSuccess;
 }
 
-int HttpFlvProtocol::SendMetaData(const std::string& metadata)
-{
-    IoBuffer flv_tag;
+int HttpFlvProtocol::SendMetaData(const std::string& metadata) {
+  IoBuffer flv_tag;
 
-    uint32_t data_size = metadata.size();
+  uint32_t data_size = metadata.size();
 
-    flv_tag.WriteU32(pre_tag_size_);
+  flv_tag.WriteU32(pre_tag_size_);
 
-    flv_tag.WriteU8(kMetaData_AMF0);
+  flv_tag.WriteU8(kMetaData_AMF0);
 
-    flv_tag.WriteU24(data_size);
-    flv_tag.WriteU24(0);
-    flv_tag.WriteU8(0);
-    flv_tag.WriteU24(0);
+  flv_tag.WriteU24(data_size);
+  flv_tag.WriteU24(0);
+  flv_tag.WriteU8(0);
+  flv_tag.WriteU24(0);
 
-    uint8_t* buf = NULL;
-    int buf_len = flv_tag.Read(buf, flv_tag.Size());
+  uint8_t* buf = NULL;
+  int buf_len = flv_tag.Read(buf, flv_tag.Size());
 
-    socket_->Send(buf, buf_len);
-    socket_->Send((const uint8_t*)metadata.data(), metadata.size());
+  socket_->Send(buf, buf_len);
+  socket_->Send((const uint8_t*)metadata.data(), metadata.size());
 
-    pre_tag_size_ = data_size + 11;
+  pre_tag_size_ = data_size + 11;
 
-    return kSuccess;
+  return kSuccess;
 }
 
-int HttpFlvProtocol::SendMediaData(const Payload& payload)
-{
-    if (payload.IsAudio())
-    {
-        return SendAudio(payload);
-    }
-    else if (payload.IsVideo())
-    {
-        return SendVideo(payload);
-    }
+int HttpFlvProtocol::SendMediaData(const Payload& payload) {
+  if (payload.IsAudio()) {
+    return SendAudio(payload);
+  } else if (payload.IsVideo()) {
+    return SendVideo(payload);
+  }
 
-    return -1;
+  return -1;
 }
 
-int HttpFlvProtocol::SendVideo(const Payload& payload)
-{
-    IoBuffer flv_tag;
+int HttpFlvProtocol::SendVideo(const Payload& payload) {
+  IoBuffer flv_tag;
 
-    uint32_t data_size = payload.GetAllLen() + 5/*5 bytes avc header*/;
+  uint32_t data_size = payload.GetAllLen() + 5 /*5 bytes avc header*/;
 
-    flv_tag.WriteU32(pre_tag_size_);
+  flv_tag.WriteU32(pre_tag_size_);
 
-    flv_tag.WriteU8(kVideo);
+  flv_tag.WriteU8(kVideo);
 
-    flv_tag.WriteU24(data_size);
-    flv_tag.WriteU24((payload.GetDts32()) & 0x00FFFFFF);
-    flv_tag.WriteU8((payload.GetDts32() >> 24) & 0xFF);
-    flv_tag.WriteU24(0);
+  flv_tag.WriteU24(data_size);
+  flv_tag.WriteU24((payload.GetDts32()) & 0x00FFFFFF);
+  flv_tag.WriteU8((payload.GetDts32() >> 24) & 0xFF);
+  flv_tag.WriteU24(0);
 
-    if (payload.IsIFrame())
-    {
-        std::cout << LMSG << "I frame" << std::endl;
-        flv_tag.WriteU8(0x17);
-    }
-    else
-    {
-        flv_tag.WriteU8(0x27);
-    }
-
-    flv_tag.WriteU8(0x01); // AVC nalu
-
-    uint32_t compositio_time_offset = payload.GetPts32() - payload.GetDts32();
-
-    flv_tag.WriteU24(compositio_time_offset);
-
-    uint8_t* buf = NULL;
-    int buf_len = flv_tag.Read(buf, flv_tag.Size());
-
-    socket_->Send(buf, buf_len);
-    socket_->Send(payload.GetAllData(), payload.GetAllLen());
-
-    pre_tag_size_ = data_size + 11;
-
-    return kSuccess;
-}
-
-int HttpFlvProtocol::SendAudio(const Payload& payload)
-{
-    IoBuffer flv_tag;
-
-    uint32_t data_size = payload.GetAllLen();
-
-    flv_tag.WriteU32(pre_tag_size_);
-
-    flv_tag.WriteU8(kAudio);
-
-    flv_tag.WriteU24(data_size);
-    flv_tag.WriteU24((payload.GetDts32()) & 0x00FFFFFF);
-    flv_tag.WriteU8((payload.GetDts32() >> 24) & 0xFF);
-    flv_tag.WriteU24(0);
-
-    uint8_t* buf = NULL;
-    int buf_len = flv_tag.Read(buf, flv_tag.Size());
-
-    socket_->Send(buf, buf_len);
-    socket_->Send(payload.GetAllData(), payload.GetAllLen());
-
-    pre_tag_size_ = data_size + 11;
-
-    return kSuccess;
-}
-
-int HttpFlvProtocol::SendVideoHeader(const std::string& video_header)
-{
-    IoBuffer flv_tag;
-
-    uint32_t data_size = video_header.size() + 5;
-
-    flv_tag.WriteU32(pre_tag_size_);
-
-    flv_tag.WriteU8(kVideo);
-
-    flv_tag.WriteU24(data_size);
-    flv_tag.WriteU24(0);
-    flv_tag.WriteU8(0);
-    flv_tag.WriteU24(0);
-
+  if (payload.IsIFrame()) {
+    std::cout << LMSG << "I frame" << std::endl;
     flv_tag.WriteU8(0x17);
-    flv_tag.WriteU8(0x00); // AVC header
-    flv_tag.WriteU24(0x000000);
+  } else {
+    flv_tag.WriteU8(0x27);
+  }
 
-    uint8_t* buf = NULL;
-    int buf_len = flv_tag.Read(buf, flv_tag.Size());
+  flv_tag.WriteU8(0x01);  // AVC nalu
 
-    socket_->Send(buf, buf_len);
-    socket_->Send((const uint8_t*)video_header.data(), video_header.size());
+  uint32_t compositio_time_offset = payload.GetPts32() - payload.GetDts32();
 
-    pre_tag_size_ = data_size + 11;
+  flv_tag.WriteU24(compositio_time_offset);
 
-    return kSuccess;
+  uint8_t* buf = NULL;
+  int buf_len = flv_tag.Read(buf, flv_tag.Size());
+
+  socket_->Send(buf, buf_len);
+  socket_->Send(payload.GetAllData(), payload.GetAllLen());
+
+  pre_tag_size_ = data_size + 11;
+
+  return kSuccess;
 }
 
-int HttpFlvProtocol::SendAudioHeader(const std::string& audio_header)
-{
-    IoBuffer flv_tag;
+int HttpFlvProtocol::SendAudio(const Payload& payload) {
+  IoBuffer flv_tag;
 
-    uint32_t data_size = audio_header.size() + 2;
+  uint32_t data_size = payload.GetAllLen();
 
-    flv_tag.WriteU32(pre_tag_size_);
+  flv_tag.WriteU32(pre_tag_size_);
 
-    flv_tag.WriteU8(kAudio);
+  flv_tag.WriteU8(kAudio);
 
-    flv_tag.WriteU24(data_size);
-    flv_tag.WriteU24(0);
-    flv_tag.WriteU8(0);
-    flv_tag.WriteU24(0);
+  flv_tag.WriteU24(data_size);
+  flv_tag.WriteU24((payload.GetDts32()) & 0x00FFFFFF);
+  flv_tag.WriteU8((payload.GetDts32() >> 24) & 0xFF);
+  flv_tag.WriteU24(0);
 
-    flv_tag.WriteU8(0xAF);
-    flv_tag.WriteU8(0x00);
+  uint8_t* buf = NULL;
+  int buf_len = flv_tag.Read(buf, flv_tag.Size());
 
-    uint8_t* buf = NULL;
-    int buf_len = flv_tag.Read(buf, flv_tag.Size());
+  socket_->Send(buf, buf_len);
+  socket_->Send(payload.GetAllData(), payload.GetAllLen());
 
-    socket_->Send(buf, buf_len);
-    socket_->Send((const uint8_t*)audio_header.data(), audio_header.size());
+  pre_tag_size_ = data_size + 11;
 
-    pre_tag_size_ = data_size + 11;
-
-    return kSuccess;
+  return kSuccess;
 }
 
-int HttpFlvProtocol::HandleClose(IoBuffer& io_buffer, Fd& socket)
-{
-    UNUSED(io_buffer);
-    UNUSED(socket);
+int HttpFlvProtocol::SendVideoHeader(const std::string& video_header) {
+  IoBuffer flv_tag;
 
-    if (media_publisher_ != NULL)
-    {
-        media_publisher_->RemoveSubscriber(this);
+  uint32_t data_size = video_header.size() + 5;
+
+  flv_tag.WriteU32(pre_tag_size_);
+
+  flv_tag.WriteU8(kVideo);
+
+  flv_tag.WriteU24(data_size);
+  flv_tag.WriteU24(0);
+  flv_tag.WriteU8(0);
+  flv_tag.WriteU24(0);
+
+  flv_tag.WriteU8(0x17);
+  flv_tag.WriteU8(0x00);  // AVC header
+  flv_tag.WriteU24(0x000000);
+
+  uint8_t* buf = NULL;
+  int buf_len = flv_tag.Read(buf, flv_tag.Size());
+
+  socket_->Send(buf, buf_len);
+  socket_->Send((const uint8_t*)video_header.data(), video_header.size());
+
+  pre_tag_size_ = data_size + 11;
+
+  return kSuccess;
+}
+
+int HttpFlvProtocol::SendAudioHeader(const std::string& audio_header) {
+  IoBuffer flv_tag;
+
+  uint32_t data_size = audio_header.size() + 2;
+
+  flv_tag.WriteU32(pre_tag_size_);
+
+  flv_tag.WriteU8(kAudio);
+
+  flv_tag.WriteU24(data_size);
+  flv_tag.WriteU24(0);
+  flv_tag.WriteU8(0);
+  flv_tag.WriteU24(0);
+
+  flv_tag.WriteU8(0xAF);
+  flv_tag.WriteU8(0x00);
+
+  uint8_t* buf = NULL;
+  int buf_len = flv_tag.Read(buf, flv_tag.Size());
+
+  socket_->Send(buf, buf_len);
+  socket_->Send((const uint8_t*)audio_header.data(), audio_header.size());
+
+  pre_tag_size_ = data_size + 11;
+
+  return kSuccess;
+}
+
+int HttpFlvProtocol::HandleClose(IoBuffer& io_buffer, Fd& socket) {
+  UNUSED(io_buffer);
+  UNUSED(socket);
+
+  if (media_publisher_ != NULL) {
+    media_publisher_->RemoveSubscriber(this);
+  }
+
+  return kSuccess;
+}
+
+int HttpFlvProtocol::EveryNSecond(const uint64_t& now_in_ms,
+                                  const uint32_t& interval,
+                                  const uint64_t& count) {
+  UNUSED(interval);
+  UNUSED(count);
+
+  if (expired_time_ms_ != 0) {
+    if (now_in_ms > expired_time_ms_) {
+      std::cout << LMSG << "expired, can't find media source, app_:" << app_
+                << ",stream_:" << stream_ << std::endl;
+
+      OnPendingArrive();
     }
+  }
 
-    return kSuccess;
+  return kSuccess;
 }
 
-int HttpFlvProtocol::EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count)
-{
-    UNUSED(interval);
-    UNUSED(count);
+int HttpFlvProtocol::OnPendingArrive() {
+  std::cout << LMSG << "pending done" << std::endl;
 
-    if (expired_time_ms_ != 0)
+  if (!app_.empty() && !stream_.empty()) {
+    media_publisher_ =
+        g_local_stream_center.GetMediaPublisherByAppStream(app_, stream_);
+
+    std::cout << LMSG << std::endl;
+
+    if (media_publisher_ != NULL)  // 从MediaCenter查到了publish node
     {
-        if (now_in_ms > expired_time_ms_)
-        {
-            std::cout << LMSG << "expired, can't find media source, app_:" << app_ << ",stream_:" << stream_ << std::endl;
+      std::cout << LMSG << std::endl;
 
-            OnPendingArrive();
-        }
-    }    
+      HttpSender http_rsp;
+      http_rsp.SetStatus("200");
+      http_rsp.SetContentType("flv");
+      http_rsp.SetKeepAlive();
 
-    return kSuccess;
-}
+      std::string http_response = http_rsp.Encode();
 
-int HttpFlvProtocol::OnPendingArrive()
-{
-    std::cout << LMSG << "pending done" << std::endl;
+      GetTcpSocket()->Send((const uint8_t*)http_response.data(),
+                           http_response.size());
+      SendFlvHeader();
+      media_publisher_->AddSubscriber(this);
 
-    if (! app_.empty() && ! stream_.empty())
-    {
-        media_publisher_ = g_local_stream_center.GetMediaPublisherByAppStream(app_, stream_);
+      expired_time_ms_ = 0;
+    } else {
+      std::cout << LMSG << "can't find media source, app_:" << app_
+                << ",stream_:" << stream_ << std::endl;
 
-        std::cout << LMSG << std::endl;
+      std::ostringstream os;
 
-        if (media_publisher_ != NULL) // 从MediaCenter查到了publish node
-        {
-            std::cout << LMSG << std::endl;
+      os << "HTTP/1.1 404 Not Found\r\n"
+         << "Server: trs\r\n"
+         << "Connection: close\r\n"
+         << "\r\n";
 
-            HttpSender http_rsp;
-            http_rsp.SetStatus("200");
-            http_rsp.SetContentType("flv");
-            http_rsp.SetKeepAlive();
-
-	        std::string http_response = http_rsp.Encode();
-
-	        GetTcpSocket()->Send((const uint8_t*)http_response.data(), http_response.size());
-            SendFlvHeader();
-            media_publisher_->AddSubscriber(this);
-
-            expired_time_ms_ = 0;
-        }
-        else
-        {
-            std::cout << LMSG << "can't find media source, app_:" << app_ << ",stream_:" << stream_ << std::endl;
-
-            std::ostringstream os; 
-
-            os << "HTTP/1.1 404 Not Found\r\n"
-               << "Server: trs\r\n"
-               << "Connection: close\r\n"
-               << "\r\n";
-
-            GetTcpSocket()->Send((const uint8_t*)os.str().data(), os.str().size());
-        }
+      GetTcpSocket()->Send((const uint8_t*)os.str().data(), os.str().size());
     }
+  }
 
-    return kSuccess;
+  return kSuccess;
 }

@@ -13,47 +13,43 @@ class Fd;
 class IoBuffer;
 class TcpSocket;
 
-class HttpFileProtocol
-    : public SocketHandler
-{
-public:
-    HttpFileProtocol(IoLoop* io_loop, Fd* socket);
-    ~HttpFileProtocol();
+class HttpFileProtocol : public SocketHandler {
+ public:
+  HttpFileProtocol(IoLoop* io_loop, Fd* socket);
+  ~HttpFileProtocol();
 
-	virtual int HandleRead(IoBuffer& io_buffer, Fd& socket);
-    virtual int HandleClose(IoBuffer& io_buffer, Fd& socket) 
-    { 
-        UNUSED(io_buffer);
-        UNUSED(socket);
+  virtual int HandleRead(IoBuffer& io_buffer, Fd& socket);
+  virtual int HandleClose(IoBuffer& io_buffer, Fd& socket) {
+    UNUSED(io_buffer);
+    UNUSED(socket);
 
-        return kSuccess;
-    }
+    return kSuccess;
+  }
 
-    virtual int HandleError(IoBuffer& io_buffer, Fd& socket) 
-    { 
-        return HandleClose(io_buffer, socket); 
-    }
+  virtual int HandleError(IoBuffer& io_buffer, Fd& socket) {
+    return HandleClose(io_buffer, socket);
+  }
 
-    int Parse(IoBuffer& io_buffer);
-    int Send(const uint8_t* data, const size_t& len);
+  int Parse(IoBuffer& io_buffer);
+  int Send(const uint8_t* data, const size_t& len);
 
-    int EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count);
+  int EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval,
+                   const uint64_t& count);
 
-    int EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& interval, const uint64_t& count) { return 0; }
+  int EveryNMillSecond(const uint64_t& now_in_ms, const uint32_t& interval,
+                       const uint64_t& count) {
+    return 0;
+  }
 
+ private:
+  TcpSocket* GetTcpSocket() { return (TcpSocket*)socket_; }
 
-private:
-    TcpSocket* GetTcpSocket()
-    {   
-        return (TcpSocket*)socket_;
-    }
+ private:
+  IoLoop* io_loop_;
+  Fd* socket_;
+  HttpParse http_parse_;
 
-private:
-    IoLoop* io_loop_;
-    Fd* socket_;
-    HttpParse http_parse_;
-
-    bool upgrade_;
+  bool upgrade_;
 };
 
-#endif // __HTTP_FILE_PROTOCOL_H__
+#endif  // __HTTP_FILE_PROTOCOL_H__

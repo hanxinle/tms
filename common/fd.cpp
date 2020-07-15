@@ -1,5 +1,5 @@
-#include "common_define.h"
 #include "fd.h"
+#include "common_define.h"
 #include "io_loop.h"
 
 #include <sys/epoll.h>
@@ -8,124 +8,96 @@
 std::atomic<uint64_t> Fd::id_generator_;
 
 Fd::Fd(IoLoop* io_loop, const int& fd)
-    : events_(0)
-    , fd_(fd)
-    , io_loop_(io_loop)
-    , socket_handler_(NULL)
-    , id_(GenID())
-    , name_("unknown")
-{
+    : events_(0),
+      fd_(fd),
+      io_loop_(io_loop),
+      socket_handler_(NULL),
+      id_(GenID()),
+      name_("unknown") {}
+
+Fd::~Fd() {
+  if (fd_ > 0) {
+    DisableRead();
+    DisableWrite();
+
+    close(fd_);
+  }
 }
 
-Fd::~Fd()
-{
-    if (fd_ > 0)
-    {
-        DisableRead();
-        DisableWrite();
+void Fd::EnableRead() {
+  if (events_ & EPOLLIN) {
+    return;
+  }
 
-        close(fd_);
-    }
+  bool add = true;
+
+  if (events_ != 0) {
+    add = false;
+  }
+
+  events_ |= EPOLLIN;
+
+  if (add) {
+    io_loop_->AddFd(this);
+  } else {
+    io_loop_->ModFd(this);
+  }
 }
 
-void Fd::EnableRead()
-{
-    if (events_ & EPOLLIN)
-    {
-        return;
-    } 
+void Fd::EnableWrite() {
+  if (events_ & EPOLLOUT) {
+    return;
+  }
 
-    bool add = true;
+  bool add = true;
 
-    if (events_ != 0)
-    {
-        add = false;
-    }
+  if (events_ != 0) {
+    add = false;
+  }
 
-    events_ |= EPOLLIN;
+  events_ |= EPOLLOUT;
 
-    if (add)
-    {
-        io_loop_->AddFd(this);
-    }
-    else
-    {
-        io_loop_->ModFd(this);
-    }
+  if (add) {
+    io_loop_->AddFd(this);
+  } else {
+    io_loop_->ModFd(this);
+  }
 }
 
-void Fd::EnableWrite()
-{
-    if (events_ & EPOLLOUT)
-    {
-        return;
-    } 
+void Fd::DisableRead() {
+  if ((events_ & EPOLLIN) == 0) {
+    return;
+  }
 
-    bool add = true;
+  bool del = false;
 
-    if (events_ != 0)
-    {
-        add = false;
-    }
+  events_ &= (~EPOLLIN);
+  if (events_ == 0) {
+    del = true;
+  }
 
-    events_ |= EPOLLOUT;
-
-    if (add)
-    {
-        io_loop_->AddFd(this);
-    }
-    else
-    {
-        io_loop_->ModFd(this);
-    }
+  if (del) {
+    io_loop_->DelFd(this);
+  } else {
+    io_loop_->ModFd(this);
+  }
 }
 
-void Fd::DisableRead()
-{
-    if ((events_ & EPOLLIN) == 0)
-    {
-        return;
-    } 
+void Fd::DisableWrite() {
+  if ((events_ & EPOLLOUT) == 0) {
+    return;
+  }
 
-    bool del = false;
+  bool del = false;
 
-    events_ &= (~EPOLLIN);
-    if (events_ == 0)
-    {
-        del = true;
-    }
+  events_ &= (~EPOLLOUT);
+  if (events_ == 0) {
+    del = true;
+  }
 
-    if (del)
-    {
-        io_loop_->DelFd(this);
-    }
-    else
-    {
-        io_loop_->ModFd(this);
-    }
-}
-
-void Fd::DisableWrite()
-{
-    if ((events_ & EPOLLOUT) == 0)
-    {
-        return;
-    } 
-
-    bool del = false;
-
-    events_ &= (~EPOLLOUT);
-    if (events_ == 0)
-    {
-        del = true;
-    }
-
-    if (del)
-    {
-        io_loop_->DelFd(this);
-    }
-    else
-    {
-        io_loop_->ModFd(this);
-    }
+  if (del) {
+    io_loop_->DelFd(this);
+  } else {
+    io_loop_->ModFd(this);
+  }
 }

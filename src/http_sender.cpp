@@ -4,15 +4,11 @@
 #include "http_sender.h"
 #include "util.h"
 
-std::map<std::string, std::string> kStatusMap = 
-{
-    {"200", "OK"},
-    {"403", "Forbidden"},
-    {"404", "Not Found"},
+std::map<std::string, std::string> kStatusMap = {
+    {"200", "OK"}, {"403", "Forbidden"}, {"404", "Not Found"},
 };
 
-std::map<std::string, std::string> kTypeMap = 
-{
+std::map<std::string, std::string> kTypeMap = {
     {"flv", "flv-application/octet-stream"},
     {"m3u8", "application/x-mpegurl"},
     {"ts", "video/mp2t"},
@@ -33,68 +29,51 @@ std::map<std::string, std::string> kTypeMap =
     Connection: close
  * */
 
-HttpSender::HttpSender()
-{
-    header_kv_.push_back(std::make_pair("Server", "Trs"));
-    header_kv_.push_back(std::make_pair("Date", Util::GetNowStrHttpFormat()));
+HttpSender::HttpSender() {
+  header_kv_.push_back(std::make_pair("Server", "Trs"));
+  header_kv_.push_back(std::make_pair("Date", Util::GetNowStrHttpFormat()));
 }
 
-HttpSender::~HttpSender()
-{
+HttpSender::~HttpSender() {}
+
+int HttpSender::SetStatus(const std::string& status) {
+  status_ = "HTTP/1.1 " + status + " " + kStatusMap[status];
+
+  return 0;
 }
 
-int HttpSender::SetStatus(const std::string& status)
-{
-    status_ = "HTTP/1.1 " + status + " " + kStatusMap[status];
+int HttpSender::SetHeader(const std::string& key, const std::string& val) {
+  header_kv_.push_back(make_pair(key, val));
 
-    return 0;
+  return 0;
 }
 
-int HttpSender::SetHeader(const std::string& key, const std::string& val)
-{
-    header_kv_.push_back(make_pair(key, val));
+std::string HttpSender::Encode() {
+  std::ostringstream os;
 
-    return 0;
+  os << status_ << CRLF;
+
+  for (const auto& header : header_kv_) {
+    os << header.first << ": " << header.second << CRLF;
+  }
+
+  if (!content_.empty()) {
+    os << "Content-Length: " << content_.size() << CRLF;
+    os << CRLF;
+    os << content_;
+  } else {
+    os << CRLF;
+  }
+
+  std::cout << Util::Bin2Hex(os.str()) << std::endl;
+
+  return os.str();
 }
 
-std::string HttpSender::Encode()
-{
-    std::ostringstream os;
+void HttpSender::SetKeepAlive() { SetHeader("Connection", "keep-alive"); }
 
-    os << status_ << CRLF;
+void HttpSender::SetClose() { SetHeader("Connection", "close"); }
 
-    for (const auto& header : header_kv_)
-    {
-        os << header.first << ": " << header.second << CRLF;
-    }
-
-    if (! content_.empty())
-    {
-        os << "Content-Length: " << content_.size() << CRLF;
-        os << CRLF;
-        os << content_;
-    }
-    else
-    {
-        os << CRLF;
-    }
-
-    std::cout << Util::Bin2Hex(os.str()) << std::endl;
-
-    return os.str();
-}
-
-void HttpSender::SetKeepAlive()
-{
-    SetHeader("Connection", "keep-alive");
-}
-
-void HttpSender::SetClose()
-{
-    SetHeader("Connection", "close");
-}
-
-void HttpSender::SetContentType(const std::string& type)
-{
-    SetHeader("Content-Type", kTypeMap[type]);
+void HttpSender::SetContentType(const std::string& type) {
+  SetHeader("Content-Type", kTypeMap[type]);
 }

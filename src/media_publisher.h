@@ -10,48 +10,36 @@ class RtmpProtocol;
 class ServerProtocol;
 
 // 所有可能是发布者的Protocol都需要继承这个类
-class MediaPublisher
-{
-public:
-    MediaPublisher()
-        : media_muxer_(this)
-    {
-    }
+class MediaPublisher {
+ public:
+  MediaPublisher() : media_muxer_(this) {}
 
-    virtual ~MediaPublisher()
-    {
-    }
+  virtual ~MediaPublisher() {}
 
-    MediaMuxer& GetMediaMuxer()
-    {   
-        return media_muxer_;
-    }
-    
-    std::set<MediaSubscriber*> GetAndClearWaitHeaderSubscriber()
-    {
-        auto ret = wait_header_subscriber_;
-        wait_header_subscriber_.clear();
+  MediaMuxer& GetMediaMuxer() { return media_muxer_; }
 
-        return ret;
-    }
+  std::set<MediaSubscriber*> GetAndClearWaitHeaderSubscriber() {
+    auto ret = wait_header_subscriber_;
+    wait_header_subscriber_.clear();
 
-    std::set<MediaSubscriber*> GetSubscriber()
-    {
-        return subscriber_;
-    }
+    return ret;
+  }
 
-    bool AddSubscriber(MediaSubscriber* subscriber);
-    bool RemoveSubscriber(MediaSubscriber* subscriber);
+  std::set<MediaSubscriber*> GetSubscriber() { return subscriber_; }
 
-protected:
-    int OnNewSubscriber(MediaSubscriber* subscriber);
+  bool AddSubscriber(MediaSubscriber* subscriber);
+  bool RemoveSubscriber(MediaSubscriber* subscriber);
 
-protected:
-	std::set<MediaSubscriber*> subscriber_;
-    std::set<MediaSubscriber*> wait_header_subscriber_; // 当前进程app/stream所在的流还未收齐音视频头
+ protected:
+  int OnNewSubscriber(MediaSubscriber* subscriber);
 
-    MediaMuxer media_muxer_;
-    DashMuxer dash_muxer_;
+ protected:
+  std::set<MediaSubscriber*> subscriber_;
+  std::set<MediaSubscriber*>
+      wait_header_subscriber_;  // 当前进程app/stream所在的流还未收齐音视频头
+
+  MediaMuxer media_muxer_;
+  DashMuxer dash_muxer_;
 };
 
-#endif // __MEDIA_PUBLISHER_H__
+#endif  // __MEDIA_PUBLISHER_H__

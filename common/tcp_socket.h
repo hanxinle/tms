@@ -3,56 +3,40 @@
 
 #include <functional>
 
-#include "io_loop.h"
-#include "io_buffer.h"
 #include "fd.h"
+#include "io_buffer.h"
+#include "io_loop.h"
 
 class IoLoop;
 class SocketHandler;
 
-class TcpSocket : public Fd
-{
-public:
-    TcpSocket(IoLoop* io_loop, const int& fd, HandlerFactoryT handler_factory);
-    ~TcpSocket();
+class TcpSocket : public Fd {
+ public:
+  TcpSocket(IoLoop* io_loop, const int& fd, HandlerFactoryT handler_factory);
+  ~TcpSocket();
 
-    void AsServerSocket()
-    {
-        server_socket_ = true;
-    }
+  void AsServerSocket() { server_socket_ = true; }
 
-    virtual int OnRead();
-    virtual int OnWrite();
-    virtual int Send(const uint8_t* data, const size_t& len);
+  virtual int OnRead();
+  virtual int OnWrite();
+  virtual int Send(const uint8_t* data, const size_t& len);
 
-    void SetDisconnected()
-    {
-        connect_status_ = kDisconnected;
-    }
+  void SetDisconnected() { connect_status_ = kDisconnected; }
 
-    void SetConnecting()
-    {
-        connect_status_ = kConnecting;
-    }
+  void SetConnecting() { connect_status_ = kConnecting; }
 
-    void SetConnected()
-    {
-        connect_status_ = kConnected;
-    }
+  void SetConnected() { connect_status_ = kConnected; }
 
-    void SetDisconnecting()
-    {
-        connect_status_ = kDisconnecting;
-    }
+  void SetDisconnecting() { connect_status_ = kDisconnecting; }
 
-private:
-    bool            server_socket_;
-    IoBuffer        read_buffer_;
-    IoBuffer        write_buffer_;
+ private:
+  bool server_socket_;
+  IoBuffer read_buffer_;
+  IoBuffer write_buffer_;
 
-    int             connect_status_;
+  int connect_status_;
 
-    HandlerFactoryT  handler_factory_;
+  HandlerFactoryT handler_factory_;
 };
 
-#endif // __TCP_SOCKET_H__
+#endif  // __TCP_SOCKET_H__

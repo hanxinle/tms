@@ -9,22 +9,18 @@
 
 #include "openssl/ssl.h"
 
-class SslIoBuffer : public IoBuffer
-{
-public:
-    SslIoBuffer(const size_t& capacity = 0);
-    ~SslIoBuffer();
+class SslIoBuffer : public IoBuffer {
+ public:
+  SslIoBuffer(const size_t& capacity = 0);
+  ~SslIoBuffer();
 
-    void SetSsl(SSL* ssl)
-    {
-        ssl_ = ssl;
-    }
+  void SetSsl(SSL* ssl) { ssl_ = ssl; }
 
-    virtual int ReadFromFdAndWrite(const int& fd);
-    virtual int WriteToFd(const int& fd);
+  virtual int ReadFromFdAndWrite(const int& fd);
+  virtual int WriteToFd(const int& fd);
 
-private:
-    SSL* ssl_;
+ private:
+  SSL* ssl_;
 };
 
-#endif // __SSL_IO_BUFFER_H__
+#endif  // __SSL_IO_BUFFER_H__

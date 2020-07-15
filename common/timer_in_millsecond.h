@@ -7,40 +7,34 @@
 
 class TimerMillSecondHandle;
 
-class TimerInMillSecond : public Fd
-{
-public:
-    TimerInMillSecond(IoLoop* io_loop);
-    ~TimerInMillSecond();
+class TimerInMillSecond : public Fd {
+ public:
+  TimerInMillSecond(IoLoop* io_loop);
+  ~TimerInMillSecond();
 
-    int RunEveryNMillSecond();
+  int RunEveryNMillSecond();
 
-	bool AddTimerMillSecondHandle(TimerMillSecondHandle* handle)
-    {   
-        auto iter = millsecond_handle_.insert(handle);
+  bool AddTimerMillSecondHandle(TimerMillSecondHandle* handle) {
+    auto iter = millsecond_handle_.insert(handle);
 
-        return iter.second;
-    }
+    return iter.second;
+  }
 
-    int Send(const uint8_t* data, const size_t& len)
-    {
-        UNUSED(data);
-        UNUSED(len);
+  int Send(const uint8_t* data, const size_t& len) {
+    UNUSED(data);
+    UNUSED(len);
 
-        return 0;
-    }
+    return 0;
+  }
 
-    int OnRead();
-    int OnWrite()
-    {
-        return 0;
-    }
+  int OnRead();
+  int OnWrite() { return 0; }
 
-private:
-    std::set<TimerMillSecondHandle*> millsecond_handle_;
+ private:
+  std::set<TimerMillSecondHandle*> millsecond_handle_;
 
-    uint64_t now_in_ms_;
-    uint64_t count_;
+  uint64_t now_in_ms_;
+  uint64_t count_;
 };
 
-#endif // __TIMER_IN_MILLSECOND_H__
+#endif  // __TIMER_IN_MILLSECOND_H__

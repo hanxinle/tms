@@ -25,6 +25,7 @@ class Mp4Muxer {
     Chunk& operator=(const Chunk& rhs);
   };
 
+  void SetSegment(const bool& b);
   void OpenDumpFile(const std::string& file);
   void Dump(const uint8_t* data, const int& len);
 
@@ -78,6 +79,9 @@ class Mp4Muxer {
   void WriteMovieExtendsBox(BitStream& bs);
   void WriteMovieExtendsHeaderBox(BitStream& bs);
   void WriteTrackExtendsBox(BitStream& bs);
+
+ protected:
+  bool segment_;
 
  protected:
   std::string video_header_;

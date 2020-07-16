@@ -34,9 +34,11 @@ Mp4Muxer::Chunk& Mp4Muxer::Chunk::operator=(const Chunk& rhs) {
   return *this;
 }
 
-Mp4Muxer::Mp4Muxer() : dump_fd_(-1) {}
+Mp4Muxer::Mp4Muxer() : segment_(false), dump_fd_(-1) {}
 
 Mp4Muxer::~Mp4Muxer() {}
+
+void Mp4Muxer::SetSegment(const bool& b) { segment_ = b; }
 
 void Mp4Muxer::OpenDumpFile(const std::string& file) {
   dump_fd_ = open(file.c_str(), O_CREAT | O_TRUNC | O_RDWR, 0664);
@@ -164,21 +166,36 @@ void Mp4Muxer::WriteFileTypeBox(BitStream& bs) {
   static uint8_t ftyp[4] = {'f', 't', 'y', 'p'};
   bs.WriteData(4, ftyp);
 
-  static uint8_t major_brand[4] = {'i', 's', 'o', 'm'};
-  bs.WriteData(4, major_brand);
+  if (!segment_) {
+    static uint8_t major_brand_isom[4] = {'i', 's', 'o', 'm'};
+    bs.WriteData(4, major_brand_isom);
+  } else {
+    static uint8_t major_brand_iso5[4] = {'i', 's', 'o', '5'};
+    bs.WriteData(4, major_brand_iso5);
+  }
 
   static uint32_t minor_version = 512;
   bs.WriteBytes(4, minor_version);
 
-  static uint8_t compatible_brands[4][4] = {
-      {'i', 's', 'o', 'm'},
-      {'i', 's', 'o', '2'},
-      {'a', 'v', 'c', '1'},
-      {'m', 'p', '4', '1'},
-  };
+  if (!segment_) {
+    static uint8_t compatible_brands[4][4] = {
+        {'i', 's', 'o', 'm'},
+        {'i', 's', 'o', '2'},
+        {'a', 'v', 'c', '1'},
+        {'m', 'p', '4', '1'},
+    };
 
-  for (size_t i = 0; i < 4; ++i) {
-    bs.WriteData(4, compatible_brands[i]);
+    for (size_t i = 0; i < 4; ++i) {
+      bs.WriteData(4, compatible_brands[i]);
+    }
+  } else {
+    static uint8_t compatible_brands_segment[3][4] = {
+        {'a', 'v', 'c', '1'}, {'i', 's', 'o', '5'}, {'d', 'a', 's', 'h'},
+    };
+
+    for (size_t i = 0; i < 3; ++i) {
+      bs.WriteData(4, compatible_brands_segment[i]);
+    }
   }
 
   NEW_SIZE(bs);
@@ -264,8 +281,8 @@ void Mp4Muxer::WriteMovieHeaderBox(BitStream& bs) {
     uint32_t timescale = 1000;
     bs.WriteBytes(4, timescale);
 
-    uint32_t video_duration = 1000;
-    uint32_t audio_duration = 1000;
+    uint32_t video_duration = segment_ ? 0 : 1000;
+    uint32_t audio_duration = segment_ ? 0 : 1000;
     if (!video_samples_.empty()) {
       video_duration = (--video_samples_.rbegin().base())->GetDts() -
                        video_samples_.begin()->GetDts();
@@ -317,7 +334,9 @@ void Mp4Muxer::WriteTrackBox(BitStream& bs, const PayloadType& payload_type) {
   bs.WriteData(4, trak);
 
   WriteTrackHeaderBox(bs, payload_type);
-  WriteEditBox(bs, payload_type);
+  if (!segment_) {
+    WriteEditBox(bs, payload_type);
+  }
   WriteMediaBox(bs, payload_type);
 
   NEW_SIZE(bs);
@@ -336,6 +355,9 @@ void Mp4Muxer::WriteTrackHeaderBox(BitStream& bs,
 
   // FIXME: any flags?
   uint32_t flags = 3;
+  if (segment_) {
+    flags = 1;
+  }
   bs.WriteBytes(3, flags);
 
   if (version == 1) {
@@ -356,14 +378,14 @@ void Mp4Muxer::WriteTrackHeaderBox(BitStream& bs,
     bs.WriteBytes(4, reversed);
 
     if (payload_type == kVideoPayload) {
-      uint32_t duration = 1000;
+      uint32_t duration = segment_ ? 0 : 1000;
       if (!video_samples_.empty()) {
         duration = (--video_samples_.rbegin().base())->GetDts() -
                    video_samples_.begin()->GetDts();
       }
       bs.WriteBytes(4, duration);
     } else if (payload_type == kAudioPayload) {
-      uint32_t duration = 1000;
+      uint32_t duration = segment_ ? 0 : 1000;
       if (!audio_samples_.empty()) {
         duration = (--audio_samples_.rbegin().base())->GetDts() -
                    audio_samples_.begin()->GetDts();
@@ -429,7 +451,7 @@ void Mp4Muxer::WriteEditListBox(BitStream& bs,
   uint32_t entry_count = 1;
   bs.WriteBytes(4, entry_count);
 
-  uint32_t segment_duration = 1000;
+  uint32_t segment_duration = segment_ ? 0 : 1000;
   if (payload_type == kVideoPayload && !video_samples_.empty()) {
     segment_duration = (--video_samples_.rbegin().base())->GetDts() -
                        video_samples_.begin()->GetDts();
@@ -487,18 +509,18 @@ void Mp4Muxer::WriteMediaHeaderBox(BitStream& bs,
     uint32_t modification_time = Util::GetNow();
     bs.WriteBytes(4, modification_time);
 
-    uint32_t timescale = 1000;
+    uint32_t timescale = segment_ ? 25000 : 1000;
     bs.WriteBytes(4, timescale);
 
     if (payload_type == kVideoPayload) {
-      uint32_t duration = 1000;
+      uint32_t duration = segment_ ? 0 : 1000;
       if (!video_samples_.empty()) {
         duration = (--video_samples_.rbegin().base())->GetDts() -
                    video_samples_.begin()->GetDts();
       }
       bs.WriteBytes(4, duration);
     } else if (payload_type == kAudioPayload) {
-      uint32_t duration = 1000;
+      uint32_t duration = segment_ ? 0 : 1000;
       if (!audio_samples_.empty()) {
         duration = (--audio_samples_.rbegin().base())->GetDts() -
                    audio_samples_.begin()->GetDts();
@@ -1099,11 +1121,11 @@ void Mp4Muxer::WriteMovieExtendsHeaderBox(BitStream& bs) {
   bs.WriteBytes(3, flags);
 
   if (version == 1) {
-    uint64_t fragment_duration = 0;
+    uint64_t fragment_duration = 20;
     bs.WriteBytes(8, fragment_duration);
   } else {
-    uint32_t fragment_duration = 0;
-    bs.WriteBytes(8, fragment_duration);
+    uint32_t fragment_duration = 20;
+    bs.WriteBytes(4, fragment_duration);
   }
 
   NEW_SIZE(bs);

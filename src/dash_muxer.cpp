@@ -11,7 +11,7 @@
   uint32_t box_size = new_size - pre_size; \
   bs.ModifyBytes(pre_size, 4, box_size);
 
-DashMuxer::DashMuxer() {}
+DashMuxer::DashMuxer() { mp4_muxer_.SetSegment(true); }
 
 DashMuxer::~DashMuxer() {}
 
@@ -195,10 +195,25 @@ void DashMuxer::WriteSegmentTypeBox(BitStream& bs) {
   static uint8_t styp[4] = {'s', 't', 'y', 'p'};
   bs.WriteData(4, styp);
 
+  static uint8_t major_brand[4] = {'m', 's', 'm', 's'};
+  bs.WriteData(4, major_brand);
+
+  static uint32_t minor_version = 512;
+  bs.WriteBytes(4, minor_version);
+
+  static uint8_t compatible_brands[2][4] = {
+      {'m', 's', 'd', 'h'}, {'m', 's', 'i', 'x'},
+  };
+
+  for (size_t i = 0; i < 2; ++i) {
+    bs.WriteData(4, compatible_brands[i]);
+  }
+
   NEW_SIZE(bs);
 }
 
-void DashMuxer::WriteSegmentIndexBox(BitStream& bs, const PayloadType& payload_type) {
+void DashMuxer::WriteSegmentIndexBox(BitStream& bs,
+                                     const PayloadType& payload_type) {
   PRE_SIZE(bs);
 
   bs.WriteBytes(4, 0);
@@ -233,8 +248,13 @@ void DashMuxer::WriteSegmentIndexBox(BitStream& bs, const PayloadType& payload_t
       uint8_t reference_type = 0;
       bs.WriteBits(1, reference_type);
 
-      uint32_t referenced_size = (payload_type == kVideoPayload) ? video_mdat_.size() : audio_mdat_.size();
+      uint32_t referenced_size = (payload_type == kVideoPayload)
+                                     ? video_mdat_.size()
+                                     : audio_mdat_.size();
       bs.WriteBits(31, referenced_size);
+
+      uint32_t subsegment_duration = 40;
+      bs.WriteBytes(4, subsegment_duration);
 
       uint8_t starts_with_SAP = 1;
       bs.WriteBits(1, starts_with_SAP);

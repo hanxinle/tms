@@ -1122,19 +1122,19 @@ void Mp4Muxer::WriteTrackExtendsBox(BitStream& bs) {
   uint32_t flags = 0;
   bs.WriteBytes(3, flags);
 
-  uint32_t track_ID = 0;
+  uint32_t track_ID = 1;
   bs.WriteBytes(4, track_ID);
 
-  uint32_t default_sample_description_index = 0;
+  uint32_t default_sample_description_index = 1;
   bs.WriteBytes(4, default_sample_description_index);
 
-  uint32_t default_sample_duration = 0;
+  uint32_t default_sample_duration = 1000;
   bs.WriteBytes(4, default_sample_duration);
 
   uint32_t default_sample_size = 0;
   bs.WriteBytes(4, default_sample_size);
 
-  uint32_t default_sample_flags = 0;
+  uint32_t default_sample_flags = 65536;
   bs.WriteBytes(4, default_sample_flags);
 
   NEW_SIZE(bs);

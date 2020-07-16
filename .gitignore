@@ -28,3 +28,6 @@ tms*
 git.sh
 *.srt
 obj
+*.mp4
+*.m4s
+*.mpd

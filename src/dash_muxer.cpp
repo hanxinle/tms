@@ -67,7 +67,7 @@ void DashMuxer::Flush() {
     BitStream bs(buf, buf_size);
 
     WriteSegmentTypeBox(bs);
-    WriteSegmentIndexBox(bs);
+    WriteSegmentIndexBox(bs, kVideoPayload);
     WriteMovieFragmentBox(bs, kVideoPayload);
     WriteMediaDataBox(bs, kVideoPayload);
 
@@ -86,7 +86,7 @@ void DashMuxer::Flush() {
     BitStream bs(buf, buf_size);
 
     WriteSegmentTypeBox(bs);
-    WriteSegmentIndexBox(bs);
+    WriteSegmentIndexBox(bs, kAudioPayload);
     WriteMovieFragmentBox(bs, kAudioPayload);
     WriteMediaDataBox(bs, kAudioPayload);
 
@@ -198,7 +198,7 @@ void DashMuxer::WriteSegmentTypeBox(BitStream& bs) {
   NEW_SIZE(bs);
 }
 
-void DashMuxer::WriteSegmentIndexBox(BitStream& bs) {
+void DashMuxer::WriteSegmentIndexBox(BitStream& bs, const PayloadType& payload_type) {
   PRE_SIZE(bs);
 
   bs.WriteBytes(4, 0);
@@ -211,7 +211,7 @@ void DashMuxer::WriteSegmentIndexBox(BitStream& bs) {
   uint32_t flags = 0;
   bs.WriteBytes(3, flags);
 
-  uint32_t reference_ID = 0;
+  uint32_t reference_ID = 1;
   bs.WriteBytes(4, reference_ID);
 
   uint32_t timescale = 1000;
@@ -233,13 +233,13 @@ void DashMuxer::WriteSegmentIndexBox(BitStream& bs) {
       uint8_t reference_type = 0;
       bs.WriteBits(1, reference_type);
 
-      uint32_t referenced_size = 0;
+      uint32_t referenced_size = (payload_type == kVideoPayload) ? video_mdat_.size() : audio_mdat_.size();
       bs.WriteBits(31, referenced_size);
 
-      uint8_t starts_with_SAP = 0;
+      uint8_t starts_with_SAP = 1;
       bs.WriteBits(1, starts_with_SAP);
 
-      uint8_t SAP_type = 0;
+      uint8_t SAP_type = 1;
       bs.WriteBits(3, SAP_type);
 
       uint32_t SAP_delta_time = 0;
@@ -254,6 +254,8 @@ void DashMuxer::WriteSegmentIndexBox(BitStream& bs) {
 void DashMuxer::WriteMovieFragmentBox(BitStream& bs,
                                       const PayloadType& payload_type) {
   PRE_SIZE(bs);
+
+  moof_offset_ = bs.SizeInBytes();
 
   bs.WriteBytes(4, 0);
   static uint8_t moof[4] = {'m', 'o', 'o', 'f'};
@@ -296,8 +298,8 @@ void DashMuxer::WriteTrackFragmentBox(BitStream& bs,
   bs.WriteData(4, traf);
 
   WriteTrackFragmentHeaderBox(bs, payload_type);
-  WriteTrackFragmentRunBox(bs, payload_type);
   WriteTrackFragmentDecodeTimeBox(bs, payload_type);
+  WriteTrackFragmentRunBox(bs, payload_type);
 
   NEW_SIZE(bs);
 }
@@ -313,10 +315,11 @@ void DashMuxer::WriteTrackFragmentHeaderBox(BitStream& bs,
   uint8_t version = 0;
   bs.WriteBytes(1, version);
 
-  uint32_t tf_flags = 0;
+  // FIXME: why
+  uint32_t tf_flags = 0x020000;
   bs.WriteBytes(3, tf_flags);
 
-  uint32_t track_ID = 0;
+  uint32_t track_ID = 1;
   bs.WriteBytes(4, track_ID);
 
   if (tf_flags & 0x000001) {
@@ -372,9 +375,10 @@ void DashMuxer::WriteTrackFragmentRunBox(BitStream& bs,
   uint32_t sample_count = samples.size();
   bs.WriteBytes(4, sample_count);
 
+  uint32_t pos = bs.SizeInBytes();
   if (tr_flags & 0x000001) {
     int32_t data_offset = 0;
-    bs.WriteBytes(8, data_offset);
+    bs.WriteBytes(4, data_offset);
   }
 
   if (tr_flags & 0x000004) {
@@ -389,7 +393,9 @@ void DashMuxer::WriteTrackFragmentRunBox(BitStream& bs,
     }
 
     if (tr_flags & 0x000200) {
-      uint32_t sample_size = samples.size();
+      uint32_t sample_size =
+          (payload_type == kVideoPayload ? samples[i].GetAllLen()
+                                         : samples[i].GetRawLen());
       bs.WriteBytes(4, sample_size);
     }
 
@@ -410,6 +416,8 @@ void DashMuxer::WriteTrackFragmentRunBox(BitStream& bs,
       }
     }
   }
+
+  bs.ModifyBytes(pos, 4, bs.SizeInBytes() + 8 - moof_offset_);
 
   NEW_SIZE(bs);
 }

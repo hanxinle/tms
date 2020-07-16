@@ -1,8 +1,8 @@
 #include <string>
 #include <vector>
 
-#include "ref_ptr.h"
 #include "mp4_muxer.h"
+#include "ref_ptr.h"
 
 class BitStream;
 
@@ -29,7 +29,7 @@ class DashMuxer {
   void UpdateMpd();
   void UpdateInitMp4();
   void WriteSegmentTypeBox(BitStream& bs);
-  void WriteSegmentIndexBox(BitStream& bs);
+  void WriteSegmentIndexBox(BitStream& bs, const PayloadType& payload_type);
   void WriteMovieFragmentBox(BitStream& bs, const PayloadType& payload_type);
   void WriteMovieFragmentHeaderBox(BitStream& bs);
   void WriteTrackFragmentBox(BitStream& bs, const PayloadType& payload_type);
@@ -43,6 +43,9 @@ class DashMuxer {
  private:
   std::string video_header_;
   std::string audio_header_;
+
+ private:
+  uint32_t moof_offset_;
 
  private:
   std::vector<Payload> video_samples_;

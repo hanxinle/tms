@@ -60,3 +60,4 @@ $(TARGET): $(OBJECTS)
 
 clean:
 	rm -f $(DEP_FILE) $(OBJECTS) $(TARGET) *.o
+	rm -rf *.mp4 *.m4s

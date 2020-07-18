@@ -10,6 +10,7 @@ class ProtocolFactory {
   static SocketHandler* GenRtmpProtocol(IoLoop* io_loop, Fd* fd);
   static SocketHandler* GenHttpFlvProtocol(IoLoop* io_loop, Fd* fd);
   static SocketHandler* GenHttpHlsProtocol(IoLoop* io_loop, Fd* fd);
+  static SocketHandler* GenHttpDashProtocol(IoLoop* io_loop, Fd* fd);
   static SocketHandler* GenHttpFileProtocol(IoLoop* io_loop, Fd* fd);
   static SocketHandler* GenWebSocketProtocol(IoLoop* io_loop, Fd* fd);
   static SocketHandler* GenSrtProtocol(IoLoop* io_loop, Fd* fd);

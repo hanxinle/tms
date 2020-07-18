@@ -11,7 +11,11 @@
   uint32_t box_size = new_size - pre_size; \
   bs.ModifyBytes(pre_size, 4, box_size);
 
-DashMuxer::DashMuxer() { mp4_muxer_.SetSegment(true); }
+DashMuxer::DashMuxer() {
+  mp4_muxer_.SetSegment(true);
+  video_sequence_ = 0;
+  audio_sequence_ = 0;
+}
 
 DashMuxer::~DashMuxer() {}
 
@@ -60,6 +64,30 @@ int DashMuxer::OnAudioHeader(const std::string& audio_header) {
   return kSuccess;
 }
 
+std::string DashMuxer::GetMpd() { return mpd_; }
+std::string DashMuxer::GetM4s(const PayloadType& payload_type,
+                              const uint64_t& segment_num) {
+  std::map<uint64_t, std::string>& m4s =
+      (payload_type == kVideoPayload ? video_m4s_ : audio_m4s_);
+
+  auto iter = m4s.find(segment_num);
+  if (iter == m4s.end()) {
+    return "";
+  }
+
+  return iter->second;
+}
+
+std::string DashMuxer::GetInitMp4(const PayloadType& payload_type) {
+  if (payload_type == kVideoPayload) {
+    return video_init_mp4_;
+  } else if (payload_type == kAudioPayload) {
+    return audio_init_mp4_;
+  }
+
+  return "";
+}
+
 void DashMuxer::Flush() {
   if (!video_samples_.empty()) {
     size_t buf_size = video_mdat_.size() + 1024 * 128;
@@ -76,6 +104,10 @@ void DashMuxer::Flush() {
     os << "dump_video_" << ((video_count++) % 10) << ".m4s";
     OpenDumpFile(os.str());
     Dump(bs.GetData(), bs.SizeInBytes());
+
+    video_m4s_[video_sequence_].assign((const char*)bs.GetData(),
+                                       bs.SizeInBytes());
+    ++video_sequence_;
 
     free(buf);
   }
@@ -96,6 +128,10 @@ void DashMuxer::Flush() {
     OpenDumpFile(os.str());
     Dump(bs.GetData(), bs.SizeInBytes());
 
+    audio_m4s_[audio_sequence_].assign((const char*)bs.GetData(),
+                                       bs.SizeInBytes());
+    ++audio_sequence_;
+
     free(buf);
   }
 }
@@ -108,50 +144,47 @@ void DashMuxer::Reset() {
 }
 
 void DashMuxer::UpdateMpd() {
-  /*
-  <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-  <MPD id="f08e80da-bf1d-4e3d-8899-f0f6155f6efa"
-  profiles="urn:mpeg:dash:profile:isoff-main:2011" type="static"
-  availabilityStartTime="2015-08-04T09:33:14.000Z"
-  publishTime="2015-08-04T10:47:32.000Z"
-  mediaPresentationDuration="P0Y0M0DT0H3M30.000S"
-  minBufferTime="P0Y0M0DT0H0M1.000S" bitmovin:version="1.6.0"
-  xmlns:ns2="http://www.w3.org/1999/xlink" xmlns="urn:mpeg:dash:schema:mpd:2011"
-  xmlns:bitmovin="http://www.bitmovin.net/mpd/2015">
-      <Period>
-          <AdaptationSet mimeType="video/mp4" codecs="avc1.42c00d">
-              <SegmentTemplate
-  media="../video/$RepresentationID$/dash/segment_$Number$.m4s"
-  initialization="../video/$RepresentationID$/dash/init.mp4" duration="100000"
-  startNumber="0" timescale="25000"/>
-              <Representation id="180_250000" bandwidth="250000" width="320"
-  height="180" frameRate="25"/>
-              <Representation id="270_400000" bandwidth="400000" width="480"
-  height="270" frameRate="25"/>
-              <Representation id="360_800000" bandwidth="800000" width="640"
-  height="360" frameRate="25"/>
-              <Representation id="540_1200000" bandwidth="1200000" width="960"
-  height="540" frameRate="25"/>
-              <Representation id="720_2400000" bandwidth="2400000" width="1280"
-  height="720" frameRate="25"/>
-              <Representation id="1080_4800000" bandwidth="4800000" width="1920"
-  height="1080" frameRate="25"/>
-          </AdaptationSet>
-          <AdaptationSet lang="en" mimeType="audio/mp4" codecs="mp4a.40.2"
-  bitmovin:label="English stereo">
-              <AudioChannelConfiguration
-  schemeIdUri="urn:mpeg:dash:23003:3:audio_channel_configuration:2011"
-  value="2"/>
-              <SegmentTemplate
-  media="../audio/$RepresentationID$/dash/segment_$Number$.m4s"
-  initialization="../audio/$RepresentationID$/dash/init.mp4" duration="191472"
-  startNumber="0" timescale="48000"/>
-              <Representation id="1_stereo_128000" bandwidth="128000"
-  audioSamplingRate="48000"/>
-          </AdaptationSet>
-      </Period>
-  </MPD>
-  */
+  if (video_sequence_ <= 3 || audio_sequence_ <= 3) {
+    return;
+  }
+  std::ostringstream os;
+
+  os << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
+     << "<MPD id=\"f08e80da-bf1d-4e3d-8899-f0f6155f6efa\" "
+        "profiles=\"urn:mpeg:dash:profile:isoff-main:2011\" type=\"static\" "
+        "availabilityStartTime=\"2015-08-04T09:33:14.000Z\" "
+        "publishTime=\"2015-08-04T10:47:32.000Z\" "
+        "mediaPresentationDuration=\"P0Y0M0DT0H3M30.000S\" "
+        "minBufferTime=\"P0Y0M0DT0H0M1.000S\" "
+        "xmlns:ns2=\"http://www.w3.org/1999/xlink\" "
+        "xmlns=\"urn:mpeg:dash:schema:mpd:2011\">\n"
+     << "  <Period>\n"
+     << "    <AdaptationSet mimeType=\"video/mp4\" codecs=\"avc1.42c00d\">\n"
+     << "      <SegmentTemplate "
+        "media=\"/$RepresentationID$/video_$Number$.m4s\" "
+        "initialization=\"/$RepresentationID$/video_init.mp4\" "
+        "duration=\"100000\" startNumber=\""
+     << (video_sequence_ - 3) << "\" timescale=\"25000\"/>\n"
+     << "      <Representation id=\"${app}/${stream}\" bandwidth=\"250000\" "
+        "width=\"1920\" height=\"1080\" frameRate=\"25\"/>\n"
+     << "    </AdaptationSet>\n"
+     << "    <AdaptationSet lang=\"en\" mimeType=\"audio/mp4\" "
+        "codecs=\"mp4a.40.2\">\n"
+     << "      <AudioChannelConfiguration "
+        "schemeIdUri=\"urn:mpeg:dash:23003:3:audio_channel_configuration:"
+        "2011\" value=\"2\"/>\n"
+     << "      <SegmentTemplate "
+        "media=\"/$RepresentationID$/audio_$Number$.m4s\" "
+        "initialization=\"/$RepresentationID$/audio_init.mp4\" "
+        "duration=\"191472\" startNumber=\""
+     << (audio_sequence_ - 3) << "\" timescale=\"48000\"/>\n"
+     << "      <Representation id=\"${app}/${stream}\" bandwidth=\"128000\" "
+        "audioSamplingRate=\"48000\"/>\n"
+     << "    </AdaptationSet>\n"
+     << "  </Period>\n"
+     << "</MPD>\n";
+
+  mpd_ = os.str();
 }
 
 void DashMuxer::UpdateInitMp4() {
@@ -168,6 +201,9 @@ void DashMuxer::UpdateInitMp4() {
     os << "dump_init_video" << ((init_video_count++) % 10) << ".mp4";
     OpenDumpFile(os.str());
     Dump(bs.GetData(), bs.SizeInBytes());
+
+    video_init_mp4_.assign((const char*)bs.GetData(), bs.SizeInBytes());
+
     free(buf);
   }
 
@@ -184,6 +220,9 @@ void DashMuxer::UpdateInitMp4() {
     os << "dump_init_audio" << ((init_audio_count++) % 10) << ".mp4";
     OpenDumpFile(os.str());
     Dump(bs.GetData(), bs.SizeInBytes());
+
+    audio_init_mp4_.assign((const char*)bs.GetData(), bs.SizeInBytes());
+
     free(buf);
   }
 }
@@ -281,13 +320,14 @@ void DashMuxer::WriteMovieFragmentBox(BitStream& bs,
   static uint8_t moof[4] = {'m', 'o', 'o', 'f'};
   bs.WriteData(4, moof);
 
-  WriteMovieFragmentHeaderBox(bs);
+  WriteMovieFragmentHeaderBox(bs, payload_type);
   WriteTrackFragmentBox(bs, payload_type);
 
   NEW_SIZE(bs);
 }
 
-void DashMuxer::WriteMovieFragmentHeaderBox(BitStream& bs) {
+void DashMuxer::WriteMovieFragmentHeaderBox(BitStream& bs,
+                                            const PayloadType& payload_type) {
   PRE_SIZE(bs);
 
   bs.WriteBytes(4, 0);
@@ -300,10 +340,10 @@ void DashMuxer::WriteMovieFragmentHeaderBox(BitStream& bs) {
   uint32_t flags = 0;
   bs.WriteBytes(3, flags);
 
-  uint32_t reference_ID = 0;
-  bs.WriteBytes(4, reference_ID);
-
-  uint32_t sequence_number = 0;
+  uint32_t& sequence_number =
+      payload_type == kVideoPayload ? video_sequence_ : audio_sequence_;
+  std::cout << LMSG << ((payload_type == kVideoPayload) ? "video" : "audio")
+            << " sequence_number=" << sequence_number << std::endl;
   bs.WriteBytes(4, sequence_number);
 
   NEW_SIZE(bs);

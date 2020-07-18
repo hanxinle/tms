@@ -80,7 +80,7 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer) {
 
       std::string web_socket_rsp =
           "HTTP/1.1 101 Switching Protocols\r\n"
-          "Server: trs\r\n"
+          "Server: tms\r\n"
           "Connection: upgrade\r\n"
           "Sec-WebSocket-Accept: ";
 

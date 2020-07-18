@@ -232,8 +232,10 @@ int main(int argc, char *argv[]) {
   uint16_t http_flv_port = 8787;
   uint16_t https_hls_port = 8843;
   uint16_t http_hls_port = 8888;
-  uint16_t web_socket_port = 8901;
-  uint16_t ssl_web_socket_port = 8943;
+  uint16_t http_dash_port = 8989;
+  uint16_t https_dash_port = 8943;
+  uint16_t web_socket_port = 9090;
+  uint16_t ssl_web_socket_port = 9043;
   uint16_t srt_port = 9000;
   uint16_t webrtc_port = 11445;
 
@@ -243,6 +245,7 @@ int main(int argc, char *argv[]) {
   auto iter_rtmp_port = args_map.find("rtmp_port");
   auto iter_http_flv_port = args_map.find("http_flv_port");
   auto iter_http_hls_port = args_map.find("http_hls_port");
+  auto iter_http_dash_port = args_map.find("http_dash_port");
   auto iter_daemon = args_map.find("daemon");
 
   if (iter_server_ip == args_map.end()) {
@@ -272,6 +275,13 @@ int main(int argc, char *argv[]) {
       http_hls_port = Util::Str2Num<uint16_t>(iter_http_hls_port->second);
     }
   }
+
+  if (iter_http_dash_port != args_map.end()) {
+    if (!iter_http_dash_port->second.empty()) {
+      http_dash_port = Util::Str2Num<uint16_t>(iter_http_dash_port->second);
+    }
+  }
+
 
   if (iter_daemon != args_map.end()) {
     int tmp = Util::Str2Num<int>(iter_daemon->second);
@@ -425,6 +435,56 @@ int main(int argc, char *argv[]) {
   server_https_hls_socket.ModName(local_ip + ":" + Util::Num2Str(local_port));
   server_https_hls_socket.EnableRead();
   server_https_hls_socket.AsServerSocket();
+
+  // === Init Server Http Dash Socket ===
+  int server_http_dash_fd = socket_util::CreateNonBlockTcpSocket();
+
+  socket_util::ReuseAddr(server_http_dash_fd);
+  if (socket_util::Bind(server_http_dash_fd, "0.0.0.0", http_dash_port) != 0) {
+    std::cout << LMSG << "bind http_dash_port " << http_dash_port << " error"
+              << std::endl;
+    return -1;
+  }
+  if (socket_util::Listen(server_http_dash_fd) != 0) {
+    std::cout << LMSG << "bind http_dash_port " << http_dash_port << " error"
+              << std::endl;
+    return -1;
+  }
+  socket_util::SetNonBlock(server_http_dash_fd);
+  socket_util::GetSocketName(server_http_dash_fd, local_ip, local_port);
+
+  TcpSocket server_http_dash_socket(
+      &epoller, server_http_dash_fd,
+      std::bind(&ProtocolFactory::GenHttpDashProtocol, std::placeholders::_1,
+                std::placeholders::_2));
+  server_http_dash_socket.ModName(local_ip + ":" + Util::Num2Str(local_port));
+  server_http_dash_socket.EnableRead();
+  server_http_dash_socket.AsServerSocket();
+
+  // === Init Server Https Dash Socket ===
+  int server_https_dash_fd = socket_util::CreateNonBlockTcpSocket();
+
+  socket_util::ReuseAddr(server_https_dash_fd);
+  if (socket_util::Bind(server_https_dash_fd, "0.0.0.0", https_dash_port) != 0) {
+    std::cout << LMSG << "bind https_dash_port " << https_dash_port << " error"
+              << std::endl;
+    return -1;
+  }
+  if (socket_util::Listen(server_https_dash_fd) != 0) {
+    std::cout << LMSG << "bind https_dash_port " << https_dash_port << " error"
+              << std::endl;
+    return -1;
+  }
+  socket_util::SetNonBlock(server_https_dash_fd);
+  socket_util::GetSocketName(server_https_dash_fd, local_ip, local_port);
+
+  SslSocket server_https_dash_socket(
+      &epoller, server_https_dash_fd,
+      std::bind(&ProtocolFactory::GenHttpDashProtocol, std::placeholders::_1,
+                std::placeholders::_2));
+  server_https_dash_socket.ModName(local_ip + ":" + Util::Num2Str(local_port));
+  server_https_dash_socket.EnableRead();
+  server_https_dash_socket.AsServerSocket();
 
   // === Init WebSocket Socket ===
   int web_socket_fd = socket_util::CreateNonBlockTcpSocket();

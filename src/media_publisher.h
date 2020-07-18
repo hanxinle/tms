@@ -18,6 +18,7 @@ class MediaPublisher {
   virtual ~MediaPublisher() {}
 
   MediaMuxer& GetMediaMuxer() { return media_muxer_; }
+  DashMuxer& GetDashMuxer() { return dash_muxer_; }
 
   std::set<MediaSubscriber*> GetAndClearWaitHeaderSubscriber() {
     auto ret = wait_header_subscriber_;

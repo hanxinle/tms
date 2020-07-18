@@ -1,4 +1,5 @@
 #include "protocol_factory.h"
+#include "http_dash_protocol.h"
 #include "http_file_protocol.h"
 #include "http_flv_protocol.h"
 #include "http_hls_protocol.h"
@@ -17,6 +18,10 @@ SocketHandler* ProtocolFactory::GenHttpFlvProtocol(IoLoop* io_loop, Fd* fd) {
 
 SocketHandler* ProtocolFactory::GenHttpHlsProtocol(IoLoop* io_loop, Fd* fd) {
   return new HttpHlsProtocol(io_loop, fd);
+}
+
+SocketHandler* ProtocolFactory::GenHttpDashProtocol(IoLoop* io_loop, Fd* fd) {
+  return new HttpDashProtocol(io_loop, fd);
 }
 
 SocketHandler* ProtocolFactory::GenHttpFileProtocol(IoLoop* io_loop, Fd* fd) {

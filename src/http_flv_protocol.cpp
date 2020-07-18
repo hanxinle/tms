@@ -275,58 +275,5 @@ int HttpFlvProtocol::EveryNSecond(const uint64_t& now_in_ms,
   UNUSED(interval);
   UNUSED(count);
 
-  if (expired_time_ms_ != 0) {
-    if (now_in_ms > expired_time_ms_) {
-      std::cout << LMSG << "expired, can't find media source, app_:" << app_
-                << ",stream_:" << stream_ << std::endl;
-
-      OnPendingArrive();
-    }
-  }
-
-  return kSuccess;
-}
-
-int HttpFlvProtocol::OnPendingArrive() {
-  std::cout << LMSG << "pending done" << std::endl;
-
-  if (!app_.empty() && !stream_.empty()) {
-    media_publisher_ =
-        g_local_stream_center.GetMediaPublisherByAppStream(app_, stream_);
-
-    std::cout << LMSG << std::endl;
-
-    if (media_publisher_ != NULL)  // 从MediaCenter查到了publish node
-    {
-      std::cout << LMSG << std::endl;
-
-      HttpSender http_rsp;
-      http_rsp.SetStatus("200");
-      http_rsp.SetContentType("flv");
-      http_rsp.SetKeepAlive();
-
-      std::string http_response = http_rsp.Encode();
-
-      GetTcpSocket()->Send((const uint8_t*)http_response.data(),
-                           http_response.size());
-      SendFlvHeader();
-      media_publisher_->AddSubscriber(this);
-
-      expired_time_ms_ = 0;
-    } else {
-      std::cout << LMSG << "can't find media source, app_:" << app_
-                << ",stream_:" << stream_ << std::endl;
-
-      std::ostringstream os;
-
-      os << "HTTP/1.1 404 Not Found\r\n"
-         << "Server: trs\r\n"
-         << "Connection: close\r\n"
-         << "\r\n";
-
-      GetTcpSocket()->Send((const uint8_t*)os.str().data(), os.str().size());
-    }
-  }
-
   return kSuccess;
 }

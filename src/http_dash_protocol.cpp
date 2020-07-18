@@ -3,22 +3,22 @@
 
 #include "common_define.h"
 #include "global.h"
-#include "http_hls_protocol.h"
+#include "http_dash_protocol.h"
 #include "io_buffer.h"
 #include "local_stream_center.h"
 #include "rtmp_protocol.h"
 #include "tcp_socket.h"
 #include "util.h"
 
-HttpHlsProtocol::HttpHlsProtocol(IoLoop* io_loop, Fd* socket)
+HttpDashProtocol::HttpDashProtocol(IoLoop* io_loop, Fd* socket)
     : MediaSubscriber(kHttpHls),
       io_loop_(io_loop),
       socket_(socket),
       media_publisher_(NULL) {}
 
-HttpHlsProtocol::~HttpHlsProtocol() {}
+HttpDashProtocol::~HttpDashProtocol() {}
 
-int HttpHlsProtocol::HandleRead(IoBuffer& io_buffer, Fd& socket) {
+int HttpDashProtocol::HandleRead(IoBuffer& io_buffer, Fd& socket) {
   int ret = kError;
   do {
     ret = Parse(io_buffer);
@@ -27,7 +27,7 @@ int HttpHlsProtocol::HandleRead(IoBuffer& io_buffer, Fd& socket) {
   return ret;
 }
 
-int HttpHlsProtocol::Parse(IoBuffer& io_buffer) {
+int HttpDashProtocol::Parse(IoBuffer& io_buffer) {
   uint8_t* data = NULL;
 
   int size = io_buffer.Read(data, io_buffer.Size());
@@ -45,7 +45,7 @@ int HttpHlsProtocol::Parse(IoBuffer& io_buffer) {
 
   app_.clear();
   stream_.clear();
-  ts_.clear();
+  segment_.clear();
   type_.clear();
 
   for (int i = 0; i != size; ++i) {
@@ -58,31 +58,19 @@ int HttpHlsProtocol::Parse(IoBuffer& io_buffer) {
           std::cout << LMSG << "http done" << std::endl;
 
           std::cout << LMSG << "app_:" << app_ << ",stream_:" << stream_
-                    << ",ts_:" << ts_ << ",type_:" << type_ << std::endl;
+                    << ",segment_:" << segment_ << ",type_:" << type_
+                    << std::endl;
           if (!app_.empty() && !stream_.empty()) {
             media_publisher_ =
                 g_local_stream_center.GetMediaPublisherByAppStream(app_,
                                                                    stream_);
 
             if (media_publisher_ != NULL) {
-              if (type_ == "ts") {
-                const std::string& ts = media_publisher_->GetMediaMuxer().GetTs(
-                    Util::Str2Num<uint64_t>(ts_));
-
-                if (!ts.empty()) {
-                  std::ostringstream os;
-
-                  os << "HTTP/1.1 200 OK\r\n"
-                     << "Server: tms\r\n"
-                     << "Content-Type: application/x-mpegurl\r\n"
-                     << "Connection: keep-alive\r\n"
-                     << "Content-Length:" << ts.size() << "\r\n"
-                     << "\r\n";
-
-                  GetTcpSocket()->Send((const uint8_t*)os.str().data(),
-                                       os.str().size());
-                  GetTcpSocket()->Send((const uint8_t*)ts.data(), ts.size());
-                } else {
+              if (type_ == "m4s") {
+                std::vector<std::string> tmp = Util::SepStr(segment_, "_");
+                if (tmp.size() != 2 ||
+                    (tmp[0].find("audio") == std::string::npos &&
+                     tmp[0].find("video") == std::string::npos)) {
                   std::ostringstream os;
 
                   os << "HTTP/1.1 404 Not Found\r\n"
@@ -92,26 +80,31 @@ int HttpHlsProtocol::Parse(IoBuffer& io_buffer) {
 
                   GetTcpSocket()->Send((const uint8_t*)os.str().data(),
                                        os.str().size());
-
                   return kClose;
                 }
-              } else if (type_ == "m3u8") {
-                std::string m3u8 = media_publisher_->GetMediaMuxer().GetM3U8();
 
-                if (!m3u8.empty()) {
+                PayloadType payload_type =
+                    tmp[0].find("video") != std::string::npos ? kVideoPayload
+                                                              : kAudioPayload;
+                uint64_t seg_num = Util::Str2Num<uint64_t>(tmp[1]);
+
+                const std::string& m4s =
+                    media_publisher_->GetDashMuxer().GetM4s(payload_type,
+                                                            seg_num);
+
+                if (!m4s.empty()) {
                   std::ostringstream os;
 
                   os << "HTTP/1.1 200 OK\r\n"
                      << "Server: tms\r\n"
-                     << "Content-Type: application/x-mpegurl\r\n"
+                     << "Content-Type: text/plain\r\n"
                      << "Connection: keep-alive\r\n"
-                     << "Content-Length:" << m3u8.size() << "\r\n"
+                     << "Content-Length:" << m4s.size() << "\r\n"
                      << "\r\n";
 
                   GetTcpSocket()->Send((const uint8_t*)os.str().data(),
                                        os.str().size());
-                  GetTcpSocket()->Send((const uint8_t*)m3u8.data(),
-                                       m3u8.size());
+                  GetTcpSocket()->Send((const uint8_t*)m4s.data(), m4s.size());
                 } else {
                   std::ostringstream os;
 
@@ -122,15 +115,89 @@ int HttpHlsProtocol::Parse(IoBuffer& io_buffer) {
 
                   GetTcpSocket()->Send((const uint8_t*)os.str().data(),
                                        os.str().size());
+                  return kClose;
+                }
+              } else if (type_ == "mp4") {
+                if (segment_.find("audio") == std::string::npos &&
+                    segment_.find("video") == std::string::npos) {
+                  std::ostringstream os;
 
+                  os << "HTTP/1.1 404 Not Found\r\n"
+                     << "Server: tms\r\n"
+                     << "Connection: close\r\n"
+                     << "\r\n";
+
+                  GetTcpSocket()->Send((const uint8_t*)os.str().data(),
+                                       os.str().size());
+                  return kClose;
+                }
+
+                PayloadType payload_type =
+                    segment_.find("video") != std::string::npos ? kVideoPayload
+                                                                : kAudioPayload;
+                const std::string& init_mp4 =
+                    media_publisher_->GetDashMuxer().GetInitMp4(payload_type);
+
+                if (!init_mp4.empty()) {
+                  std::ostringstream os;
+
+                  os << "HTTP/1.1 200 OK\r\n"
+                     << "Server: tms\r\n"
+                     << "Content-Type: video/mp4\r\n"
+                     << "Connection: keep-alive\r\n"
+                     << "Content-Length:" << init_mp4.size() << "\r\n"
+                     << "\r\n";
+
+                  GetTcpSocket()->Send((const uint8_t*)os.str().data(),
+                                       os.str().size());
+                  GetTcpSocket()->Send((const uint8_t*)init_mp4.data(),
+                                       init_mp4.size());
+                } else {
+                  std::ostringstream os;
+
+                  os << "HTTP/1.1 404 Not Found\r\n"
+                     << "Server: tms\r\n"
+                     << "Connection: close\r\n"
+                     << "\r\n";
+
+                  GetTcpSocket()->Send((const uint8_t*)os.str().data(),
+                                       os.str().size());
+                  return kClose;
+                }
+              } else if (type_ == "mpd") {
+                std::string mpd = media_publisher_->GetDashMuxer().GetMpd();
+
+                if (!mpd.empty()) {
+                  std::ostringstream os;
+
+                  Util::Replace(mpd, "${app}/${stream}", app_ + "/" + stream_);
+
+                  os << "HTTP/1.1 200 OK\r\n"
+                     << "Server: tms\r\n"
+                     << "Content-Type: text/plain\r\n"
+                     << "Connection: keep-alive\r\n"
+                     << "Content-Length:" << mpd.size() << "\r\n"
+                     << "\r\n";
+
+                  GetTcpSocket()->Send((const uint8_t*)os.str().data(),
+                                       os.str().size());
+                  GetTcpSocket()->Send((const uint8_t*)mpd.data(), mpd.size());
+                } else {
+                  std::ostringstream os;
+
+                  os << "HTTP/1.1 404 Not Found\r\n"
+                     << "Server: tms\r\n"
+                     << "Connection: close\r\n"
+                     << "\r\n";
+
+                  GetTcpSocket()->Send((const uint8_t*)os.str().data(),
+                                       os.str().size());
                   return kClose;
                 }
               }
             } else {
               std::cout << LMSG << "can't find media source, app_:" << app_
                         << ",stream_:" << stream_ << std::endl;
-
-              expired_time_ms_ = Util::GetNowMs() + 10000;
 
               std::ostringstream os;
 
@@ -173,7 +240,7 @@ int HttpHlsProtocol::Parse(IoBuffer& io_buffer) {
                   if (d_count == 1) {
                     type_ += ch;
                   } else {
-                    ts_ += ch;
+                    segment_ += ch;
                   }
                 }
               }

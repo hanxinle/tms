@@ -368,10 +368,7 @@ void Mp4Muxer::WriteTrackHeaderBox(BitStream& bs,
     uint32_t modification_time = Util::GetNow();
     bs.WriteBytes(4, modification_time);
 
-    uint32_t track_ID = 1;
-    if (payload_type == kAudioPayload) {
-      track_ID = 2;
-    }
+    uint32_t track_ID = segment_ ? 1 : (payload_type == kVideoPayload ? 1 : 2);
     bs.WriteBytes(4, track_ID);
 
     uint32_t reversed = 0;

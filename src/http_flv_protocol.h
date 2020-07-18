@@ -44,8 +44,6 @@ class HttpFlvProtocol : public MediaSubscriber, public SocketHandler {
   int SendVideo(const Payload& payload);
   int SendAudio(const Payload& payload);
 
-  virtual int OnPendingArrive();
-
   int EveryNSecond(const uint64_t& now_in_ms, const uint32_t& interval,
                    const uint64_t& count);
 

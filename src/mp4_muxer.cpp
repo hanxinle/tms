@@ -506,7 +506,11 @@ void Mp4Muxer::WriteMediaHeaderBox(BitStream& bs,
     uint32_t modification_time = Util::GetNow();
     bs.WriteBytes(4, modification_time);
 
-    uint32_t timescale = segment_ ? 25000 : 1000;
+#if 0
+    uint32_t timescale = segment_ ? 30000 : 1000;
+#else
+    uint32_t timescale = 1000;
+#endif
     bs.WriteBytes(4, timescale);
 
     if (payload_type == kVideoPayload) {

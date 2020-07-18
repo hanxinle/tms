@@ -100,13 +100,25 @@ void DashMuxer::Flush() {
     WriteMediaDataBox(bs, kVideoPayload);
 
     static int video_count = 0;
-    std::ostringstream os;
-    os << "dump_video_" << ((video_count++) % 10) << ".m4s";
-    OpenDumpFile(os.str());
-    Dump(bs.GetData(), bs.SizeInBytes());
+
+    if (true) {
+      std::ostringstream os;
+      os << "dump_video_" << ((video_count) % 10) << ".m4s";
+      OpenDumpFile(os.str());
+      Dump(bs.GetData(), bs.SizeInBytes());
+    }
+
+    if (true) {
+      std::ostringstream os;
+      os << "dump_dash_video_" << ((video_count++) % 10) << ".mp4";
+      OpenDumpFile(os.str());
+      Dump((const uint8_t*)video_init_mp4_.data(), video_init_mp4_.size());
+      Dump(bs.GetData(), bs.SizeInBytes());
+    }
 
     video_m4s_[video_sequence_].assign((const char*)bs.GetData(),
                                        bs.SizeInBytes());
+    std::cout << LMSG << "video segment " << video_sequence_ << std::endl;
     ++video_sequence_;
 
     free(buf);
@@ -123,13 +135,24 @@ void DashMuxer::Flush() {
     WriteMediaDataBox(bs, kAudioPayload);
 
     static int audio_count = 0;
-    std::ostringstream os;
-    os << "dump_audio_" << ((audio_count++) % 10) << ".m4s";
-    OpenDumpFile(os.str());
-    Dump(bs.GetData(), bs.SizeInBytes());
+    if (true) {
+      std::ostringstream os;
+      os << "dump_audio_" << ((audio_count) % 10) << ".m4s";
+      OpenDumpFile(os.str());
+      Dump(bs.GetData(), bs.SizeInBytes());
+    }
+
+    if (true) {
+      std::ostringstream os;
+      os << "dump_dash_audio_" << ((audio_count++) % 10) << ".mp4";
+      OpenDumpFile(os.str());
+      Dump((const uint8_t*)audio_init_mp4_.data(), audio_init_mp4_.size());
+      Dump(bs.GetData(), bs.SizeInBytes());
+    }
 
     audio_m4s_[audio_sequence_].assign((const char*)bs.GetData(),
                                        bs.SizeInBytes());
+    std::cout << LMSG << "audio segment " << audio_sequence_ << std::endl;
     ++audio_sequence_;
 
     free(buf);
@@ -151,7 +174,7 @@ void DashMuxer::UpdateMpd() {
 
   os << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
      << "<MPD id=\"f08e80da-bf1d-4e3d-8899-f0f6155f6efa\" "
-        "profiles=\"urn:mpeg:dash:profile:isoff-main:2011\" type=\"static\" "
+        "profiles=\"urn:mpeg:dash:profile:isoff-main:2011\" type=\"dynamic\" "
         "availabilityStartTime=\"2015-08-04T09:33:14.000Z\" "
         "publishTime=\"2015-08-04T10:47:32.000Z\" "
         "mediaPresentationDuration=\"P0Y0M0DT0H3M30.000S\" "
@@ -163,10 +186,10 @@ void DashMuxer::UpdateMpd() {
      << "      <SegmentTemplate "
         "media=\"/$RepresentationID$/video_$Number$.m4s\" "
         "initialization=\"/$RepresentationID$/video_init.mp4\" "
-        "duration=\"100000\" startNumber=\""
-     << (video_sequence_ - 3) << "\" timescale=\"25000\"/>\n"
+        "duration=\"5000\" startNumber=\""
+     << (video_sequence_ - 3) << "\" timescale=\"1000\"/>\n"
      << "      <Representation id=\"${app}/${stream}\" bandwidth=\"250000\" "
-        "width=\"1920\" height=\"1080\" frameRate=\"25\"/>\n"
+        "width=\"1920\" height=\"1080\" frameRate=\"30\"/>\n"
      << "    </AdaptationSet>\n"
      << "    <AdaptationSet lang=\"en\" mimeType=\"audio/mp4\" "
         "codecs=\"mp4a.40.2\">\n"
@@ -176,8 +199,8 @@ void DashMuxer::UpdateMpd() {
      << "      <SegmentTemplate "
         "media=\"/$RepresentationID$/audio_$Number$.m4s\" "
         "initialization=\"/$RepresentationID$/audio_init.mp4\" "
-        "duration=\"191472\" startNumber=\""
-     << (audio_sequence_ - 3) << "\" timescale=\"48000\"/>\n"
+        "duration=\"5000\" startNumber=\""
+     << (audio_sequence_ - 3) << "\" timescale=\"1000\"/>\n"
      << "      <Representation id=\"${app}/${stream}\" bandwidth=\"128000\" "
         "audioSamplingRate=\"48000\"/>\n"
      << "    </AdaptationSet>\n"
@@ -292,7 +315,7 @@ void DashMuxer::WriteSegmentIndexBox(BitStream& bs,
                                      : audio_mdat_.size();
       bs.WriteBits(31, referenced_size);
 
-      uint32_t subsegment_duration = 40;
+      uint32_t subsegment_duration = 0;
       bs.WriteBytes(4, subsegment_duration);
 
       uint8_t starts_with_SAP = 1;
@@ -427,7 +450,7 @@ void DashMuxer::WriteTrackFragmentRunBox(BitStream& bs,
   uint8_t version = 0;
   bs.WriteBytes(1, version);
 
-  uint32_t tr_flags = 0x000001 | 0x000004 | 0x000200 | 0x000800;
+  uint32_t tr_flags = 0x000001 | 0x000004 | 0x000100 | 0x000200 | 0x000800;
   bs.WriteBytes(3, tr_flags);
 
   std::vector<Payload>& samples =
@@ -448,7 +471,11 @@ void DashMuxer::WriteTrackFragmentRunBox(BitStream& bs,
 
   for (size_t i = 0; i < sample_count; ++i) {
     if (tr_flags & 0x000100) {
+      // FIXME:
       uint32_t sample_duration = 0;
+      if (i < sample_count - 1) {
+        sample_duration = samples[i + 1].GetDts() - samples[i].GetDts();
+      }
       bs.WriteBytes(4, sample_duration);
     }
 

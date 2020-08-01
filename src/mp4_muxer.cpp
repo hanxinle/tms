@@ -135,15 +135,20 @@ void Mp4Muxer::Flush() {
   uint8_t* buf = (uint8_t*)malloc(buf_size);
   BitStream bs(buf, buf_size);
   WriteFileTypeBox(bs);
-  WriteFreeBox(bs);
+
+  if (!segment_) {
+    WriteFreeBox(bs);
+  }
   WriteMediaDataBox(bs);
   WriteMovieBox(bs);
 
+#if 0
   static int count = 0;
   std::ostringstream os;
   os << "dump_" << ((count++) % 10) << ".mp4";
   OpenDumpFile(os.str());
   Dump(bs.GetData(), bs.SizeInBytes());
+#endif
 
   free(buf);
 }
@@ -170,11 +175,11 @@ void Mp4Muxer::WriteFileTypeBox(BitStream& bs) {
     static uint8_t major_brand_isom[4] = {'i', 's', 'o', 'm'};
     bs.WriteData(4, major_brand_isom);
   } else {
-    static uint8_t major_brand_iso5[4] = {'i', 's', 'o', '5'};
-    bs.WriteData(4, major_brand_iso5);
+    static uint8_t major_brand_iso6[4] = {'i', 's', 'o', '6'};
+    bs.WriteData(4, major_brand_iso6);
   }
 
-  static uint32_t minor_version = 512;
+  static uint32_t minor_version = 1;
   bs.WriteBytes(4, minor_version);
 
   if (!segment_) {
@@ -190,7 +195,10 @@ void Mp4Muxer::WriteFileTypeBox(BitStream& bs) {
     }
   } else {
     static uint8_t compatible_brands_segment[3][4] = {
-        {'a', 'v', 'c', '1'}, {'i', 's', 'o', '5'}, {'d', 'a', 's', 'h'},
+        //{'a', 'v', 'c', '1'}, {'i', 's', 'o', '6'}, {'d', 'a', 's', 'h'},
+        {'i', 's', 'o', 'm'},
+        {'i', 's', 'o', '6'},
+        {'d', 'a', 's', 'h'},
     };
 
     for (size_t i = 0; i < 3; ++i) {
@@ -272,10 +280,10 @@ void Mp4Muxer::WriteMovieHeaderBox(BitStream& bs) {
 
   if (version == 1) {
   } else {
-    uint32_t creation_time = Util::GetNow();
+    uint32_t creation_time = segment_ ? 0 : Util::GetNow();
     bs.WriteBytes(4, creation_time);
 
-    uint32_t modification_time = Util::GetNow();
+    uint32_t modification_time = segment_ ? 0 : Util::GetNow();
     bs.WriteBytes(4, modification_time);
 
     uint32_t timescale = 1000;
@@ -356,16 +364,16 @@ void Mp4Muxer::WriteTrackHeaderBox(BitStream& bs,
   // FIXME: any flags?
   uint32_t flags = 3;
   if (segment_) {
-    flags = 1;
+    flags = 0x0f;
   }
   bs.WriteBytes(3, flags);
 
   if (version == 1) {
   } else {
-    uint32_t creation_time = Util::GetNow();
+    uint32_t creation_time = segment_ ? 0 : Util::GetNow();
     bs.WriteBytes(4, creation_time);
 
-    uint32_t modification_time = Util::GetNow();
+    uint32_t modification_time = segment_ ? 0 : Util::GetNow();
     bs.WriteBytes(4, modification_time);
 
     uint32_t track_ID = segment_ ? 1 : (payload_type == kVideoPayload ? 1 : 2);
@@ -500,10 +508,10 @@ void Mp4Muxer::WriteMediaHeaderBox(BitStream& bs,
 
   if (version == 1) {
   } else {
-    uint32_t creation_time = Util::GetNow();
+    uint32_t creation_time = segment_ ? 0 : Util::GetNow();
     bs.WriteBytes(4, creation_time);
 
-    uint32_t modification_time = Util::GetNow();
+    uint32_t modification_time = segment_ ? 0 : Util::GetNow();
     bs.WriteBytes(4, modification_time);
 
 #if 0
@@ -572,11 +580,13 @@ void Mp4Muxer::WriteHandlerReferenceBox(BitStream& bs,
   bs.WriteBytes(4, 0);
   bs.WriteBytes(4, 0);
 
-  std::string debug = "VideoHandler#";
-  if (payload_type == kAudioPayload) {
-    debug = "AudioHandler#";
+  if (payload_type == kAudioPayload) { 
+    static char audio_handler[] = "AudioHandler";
+    bs.WriteData(sizeof(audio_handler), (const uint8_t*)audio_handler);
+  } else if (payload_type == kVideoPayload) {
+    static char video_handler[] = "VideoHandler";
+    bs.WriteData(sizeof(video_handler), (const uint8_t*)video_handler);
   }
-  bs.WriteData(debug.size(), (const uint8_t*)debug.data());
 
   NEW_SIZE(bs);
 }
@@ -713,7 +723,9 @@ void Mp4Muxer::WriteSampleTableBox(BitStream& bs,
   WriteSampleDescriptionBox(bs, payload_type);
   WriteDecodingTimeToSampleBox(bs, payload_type);
   if (payload_type == kVideoPayload) {
-    WriteCompositionTimeToSampleBox(bs, payload_type);
+    if (!segment_) {
+      WriteCompositionTimeToSampleBox(bs, payload_type);
+    }
   }
   WriteSampleToChunkBox(bs, payload_type);
   WriteSampleSizeBox(bs, payload_type);
@@ -755,7 +767,7 @@ void Mp4Muxer::WriteVisualSampleEntry(BitStream& bs) {
   static uint8_t avc1[4] = {'a', 'v', 'c', '1'};
   bs.WriteData(4, avc1);
 
-  bs.WriteBytes(6, 0);
+  bs.WriteBytes(6, (uint64_t)0);
 
   uint16_t data_reference_index = 1;
   bs.WriteBytes(2, data_reference_index);
@@ -1102,7 +1114,9 @@ void Mp4Muxer::WriteMovieExtendsBox(BitStream& bs) {
   static uint8_t mvex[4] = {'m', 'v', 'e', 'x'};
   bs.WriteData(4, mvex);
 
-  WriteMovieExtendsHeaderBox(bs);
+  if (!segment_) {
+    WriteMovieExtendsHeaderBox(bs);
+  }
   WriteTrackExtendsBox(bs);
 
   NEW_SIZE(bs);
@@ -1151,13 +1165,13 @@ void Mp4Muxer::WriteTrackExtendsBox(BitStream& bs) {
   uint32_t default_sample_description_index = 1;
   bs.WriteBytes(4, default_sample_description_index);
 
-  uint32_t default_sample_duration = 1000;
+  uint32_t default_sample_duration = segment_ ? 0 : 1000;
   bs.WriteBytes(4, default_sample_duration);
 
   uint32_t default_sample_size = 0;
   bs.WriteBytes(4, default_sample_size);
 
-  uint32_t default_sample_flags = 65536;
+  uint32_t default_sample_flags = 0;
   bs.WriteBytes(4, default_sample_flags);
 
   NEW_SIZE(bs);

@@ -235,6 +235,43 @@ std::string Util::GetNowStr() {
   return "";
 }
 
+std::string Util::GetNowUTCStr() {
+  char time_printf[256];
+
+  timeval tv;
+  gettimeofday(&tv, NULL);
+
+  tm* time_struct = gmtime(&tv.tv_sec);
+
+  size_t ret = strftime(time_printf, sizeof(time_printf), "%Y-%m-%dT%H:%M:%SZ",
+                        time_struct);
+
+  if (ret > 0) {
+    return std::string(time_printf, ret);
+  }
+
+  return "";
+}
+
+std::string Util::SecondToUTCStr(const uint64_t& second) {
+  char time_printf[256];
+
+  timeval tv;
+  tv.tv_sec = second;
+  tv.tv_usec = 0;
+
+  tm* time_struct = gmtime(&tv.tv_sec);
+
+  size_t ret = strftime(time_printf, sizeof(time_printf), "%Y-%m-%dT%H:%M:%SZ",
+                        time_struct);
+
+  if (ret > 0) {
+    return std::string(time_printf, ret);
+  }
+
+  return "";
+}
+
 std::string Util::GetNowStrHttpFormat() {
   char time_printf[256];
 

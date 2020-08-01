@@ -98,19 +98,19 @@ int main(int argc, char *argv[]) {
     ret = SSL_CTX_check_private_key(g_dtls_ctx);
 #else
   // 代码里生成证书
-  EVP_PKEY* dtls_private_key = EVP_PKEY_new();
+  EVP_PKEY *dtls_private_key = EVP_PKEY_new();
   if (dtls_private_key == NULL) {
     std::cout << LMSG << "EVP_PKEY_new err" << std::endl;
     return -1;
   }
 
-  RSA* rsa = RSA_new();
+  RSA *rsa = RSA_new();
   if (rsa == NULL) {
     std::cout << LMSG << "RSA_new err" << std::endl;
     return -1;
   }
 
-  BIGNUM* exponent = BN_new();
+  BIGNUM *exponent = BN_new();
   if (exponent == NULL) {
     std::cout << LMSG << "BN_new err" << std::endl;
     return -1;
@@ -118,7 +118,7 @@ int main(int argc, char *argv[]) {
 
   BN_set_word(exponent, RSA_F4);
 
-  const std::string& aor = "www.john.com";
+  const std::string &aor = "www.john.com";
   int expire_day = 365;
   int private_key_len = 1024;
 
@@ -129,13 +129,13 @@ int main(int argc, char *argv[]) {
     std::cout << LMSG << "EVP_PKEY_set1_RSA err:" << ret << std::endl;
   }
 
-  X509* dtls_cert = X509_new();
+  X509 *dtls_cert = X509_new();
   if (dtls_cert == NULL) {
     std::cout << LMSG << "X509_new err" << std::endl;
     return -1;
   }
 
-  X509_NAME* subject = X509_NAME_new();
+  X509_NAME *subject = X509_NAME_new();
   if (subject == NULL) {
     std::cout << LMSG << "X509_NAME_new err" << std::endl;
     return -1;
@@ -145,7 +145,7 @@ int main(int argc, char *argv[]) {
   ASN1_INTEGER_set(X509_get_serialNumber(dtls_cert), serial);
 
   X509_NAME_add_entry_by_txt(subject, "CN", MBSTRING_ASC,
-                             (unsigned char*)aor.data(), aor.size(), -1, 0);
+                             (unsigned char *)aor.data(), aor.size(), -1, 0);
 
   X509_set_issuer_name(dtls_cert, subject);
   X509_set_subject_name(dtls_cert, subject);
@@ -281,7 +281,6 @@ int main(int argc, char *argv[]) {
       http_dash_port = Util::Str2Num<uint16_t>(iter_http_dash_port->second);
     }
   }
-
 
   if (iter_daemon != args_map.end()) {
     int tmp = Util::Str2Num<int>(iter_daemon->second);
@@ -465,7 +464,8 @@ int main(int argc, char *argv[]) {
   int server_https_dash_fd = socket_util::CreateNonBlockTcpSocket();
 
   socket_util::ReuseAddr(server_https_dash_fd);
-  if (socket_util::Bind(server_https_dash_fd, "0.0.0.0", https_dash_port) != 0) {
+  if (socket_util::Bind(server_https_dash_fd, "0.0.0.0", https_dash_port) !=
+      0) {
     std::cout << LMSG << "bind https_dash_port " << https_dash_port << " error"
               << std::endl;
     return -1;

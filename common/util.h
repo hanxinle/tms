@@ -23,6 +23,8 @@ class Util {
   static uint64_t GetNow();
   static uint64_t GetNowUs();
   static std::string GetNowStr();
+  static std::string GetNowUTCStr();
+  static std::string SecondToUTCStr(const uint64_t& second);
   static std::string GetNowStrHttpFormat();  // RFC 2822
   static std::string GetNowMsStr();
 

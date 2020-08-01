@@ -42,6 +42,10 @@ class HttpDashProtocol : public MediaSubscriber, public SocketHandler {
   }
 
  private:
+  int SendHttpRes(const int& status, const std::string& content_type,
+                  const std::string& content);
+
+ private:
   TcpSocket* GetTcpSocket() { return (TcpSocket*)socket_; }
 
  private:

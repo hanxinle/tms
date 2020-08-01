@@ -33,6 +33,8 @@ class RefPtr {
     return ref_count_;
   }
 
+  uint32_t GetRefCount() const { return ref_count_; }
+
   uint8_t* GetPtr() { return ptr_; }
 
  private:
@@ -53,6 +55,19 @@ class Payload {
         len_(len),
         frame_type_(kUnknownFrame),
         payload_type_(kUnknownPayload) {}
+
+  std::string ToString() const {
+    std::ostringstream os;
+    os << "ref_ptr=" << ref_ptr_;
+    if (ref_ptr_) {
+      os << ",referenct_count=" << ref_ptr_->GetRefCount();
+    }
+    os << ",dts=" << dts_ << ",pts=" << pts_
+       << ",frame_type=" << (int)frame_type_
+       << ",payload_type=" << (int)payload_type_;
+
+    return os.str();
+  }
 
   void SetIFrame() { frame_type_ = kIframe; }
 
@@ -92,6 +107,8 @@ class Payload {
     if (ref_ptr_ != NULL) {
       uint32_t referenct_count = ref_ptr_->DecRefCount();
 
+      // std::cout << LMSG << ToString() << std::endl;
+
       if (referenct_count == 0) {
         // std::cout << LMSG << "len:" << len_ << ",ref_ptr_:" << ref_ptr_ <<
         // std::endl;
@@ -100,17 +117,7 @@ class Payload {
     }
   }
 
-  Payload(const Payload& other) {
-    if (this != &other) {
-      this->ref_ptr_ = other.ref_ptr_;
-      ref_ptr_->AddRefCount();
-      this->len_ = other.len_;
-      this->pts_ = other.pts_;
-      this->dts_ = other.dts_;
-      this->frame_type_ = other.frame_type_;
-      this->payload_type_ = other.payload_type_;
-    }
-  }
+  Payload(const Payload& other) { operator=(other); }
 
   Payload& operator=(const Payload& other) {
     if (this != &other) {

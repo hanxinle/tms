@@ -3,6 +3,7 @@
 
 #include <set>
 
+#include "common_define.h"
 #include "fd.h"
 
 class TimerSecondHandle;

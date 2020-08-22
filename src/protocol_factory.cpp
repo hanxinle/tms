@@ -1,4 +1,6 @@
 #include "protocol_factory.h"
+
+#include "echo_protocol.h"
 #include "http_dash_protocol.h"
 #include "http_file_protocol.h"
 #include "http_flv_protocol.h"
@@ -38,4 +40,8 @@ SocketHandler* ProtocolFactory::GenSrtProtocol(IoLoop* io_loop, Fd* fd) {
 
 SocketHandler* ProtocolFactory::GenWebrtcProtocol(IoLoop* io_loop, Fd* fd) {
   return new WebrtcProtocol(io_loop, fd);
+}
+
+SocketHandler* ProtocolFactory::GenEchoProtocol(IoLoop* io_loop, Fd* fd) {
+  return new EchoProtocol(io_loop, fd);
 }

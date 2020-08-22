@@ -1,6 +1,7 @@
+#include "bit_buffer.h"
+
 #include <iostream>
 
-#include "bit_buffer.h"
 #include "common_define.h"
 #include "util.h"
 

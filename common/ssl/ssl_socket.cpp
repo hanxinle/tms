@@ -1,3 +1,5 @@
+#include "ssl_socket.h"
+
 #include <assert.h>
 
 #include <iostream>
@@ -6,7 +8,6 @@
 #include "fd.h"
 #include "socket_handler.h"
 #include "socket_util.h"
-#include "ssl_socket.h"
 
 extern SSL_CTX* g_tls_ctx;
 

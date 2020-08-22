@@ -131,7 +131,9 @@ int SdpMediaDesc::parse_line(const std::string& line) {
     case 'c': {
       break;
     }
-    default: { break; }
+    default: {
+      break;
+    }
   }
 
   return 0;
@@ -393,7 +395,9 @@ int Sdp::parse_line(const std::string& line) {
     case 'c': {
       break;
     }
-    default: { break; }
+    default: {
+      break;
+    }
   }
 
   return 0;

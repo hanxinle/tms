@@ -1,4 +1,5 @@
 #include "srt_protocol.h"
+
 #include "global.h"
 #include "io_buffer.h"
 #include "rtmp_protocol.h"
@@ -156,8 +157,9 @@ void SrtProtocol::OnFrame(const Payload& frame) {
 }
 
 void SrtProtocol::OnHeader(const Payload& header_frame) {
-  std::cout << LMSG << "header=" << Util::Bin2Hex(header_frame.GetAllData(),
-                                                  header_frame.GetAllLen())
+  std::cout << LMSG << "header="
+            << Util::Bin2Hex(header_frame.GetAllData(),
+                             header_frame.GetAllLen())
             << std::endl;
 
   if (header_frame.IsVideo()) {

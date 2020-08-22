@@ -1,13 +1,13 @@
+#include "ssl_io_buffer.h"
+
 #include <string.h>
 #include <unistd.h>
 
 #include <iostream>
 
 #include "common_define.h"
-#include "ssl_io_buffer.h"
-#include "util.h"
-
 #include "openssl/err.h"
+#include "util.h"
 
 SslIoBuffer::SslIoBuffer(const size_t& capacity) : IoBuffer(capacity) {}
 

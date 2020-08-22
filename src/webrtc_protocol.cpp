@@ -1,3 +1,5 @@
+#include "webrtc_protocol.h"
+
 #include <iostream>
 #include <map>
 
@@ -6,14 +8,11 @@
 #include "crc32.h"
 #include "global.h"
 #include "io_buffer.h"
+#include "openssl/srtp.h"
 #include "protocol_factory.h"
+#include "rtp_header.h"
 #include "socket_util.h"
 #include "udp_socket.h"
-#include "webrtc_protocol.h"
-
-#include "rtp_header.h"
-
-#include "openssl/srtp.h"
 
 const int kWebRtcRecvTimeoutInMs = 10000;
 
@@ -392,7 +391,9 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len) {
         std::cout << LMSG << "ICE_CONTROLLING" << std::endl;
       }; break;
 
-      default: { std::cout << LMSG << "Undefine" << std::endl; } break;
+      default: {
+        std::cout << LMSG << "Undefine" << std::endl;
+      } break;
     }
   }
 
@@ -413,7 +414,11 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len) {
 
       uint32_t ip_num;
       socket_util::IpStr2Num(GetUdpSocket()->GetClientIp(), ip_num);
+#if defined(__APPLE__)
+      binding_response.WriteBytes(4, htonl(htonl(magic_cookie) ^ ip_num));
+#else
       binding_response.WriteBytes(4, htobe32(htobe32(magic_cookie) ^ ip_num));
+#endif
 
       binding_response.WriteBytes(2, 0x0006);  // USERNAME
       binding_response.WriteBytes(2, username.size());
@@ -579,7 +584,9 @@ int WebrtcProtocol::OnStun(const uint8_t* data, const size_t& len) {
     case 0x0112: {
     } break;
 
-    default: { } break; }
+    default: {
+    } break;
+  }
 
   return kSuccess;
 }
@@ -766,7 +773,9 @@ int WebrtcProtocol::OnSctp(const uint8_t* data, const size_t& len) {
         case DataChannelPPID_BINARY_EMPTY: {
         } break;
 
-        default: { } break; }
+        default: {
+        } break;
+      }
 
       std::string user_data = "";
       bit_buffer.GetString(bit_buffer.BytesLeft(), user_data);
@@ -970,7 +979,9 @@ int WebrtcProtocol::OnSctp(const uint8_t* data, const size_t& len) {
     case 14: {
     } break;
 
-    default: { } break; }
+    default: {
+    } break;
+  }
 
   return 0;
 }
@@ -1190,7 +1201,9 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len) {
                         << one_rtcp_packet_bit_buffer.BytesLeft() << std::endl;
             } break;
 
-            default: { } break; }
+            default: {
+            } break;
+          }
         } break;
 
         case kPayloadSpecialFeedback: {
@@ -1222,10 +1235,14 @@ int WebrtcProtocol::OnRtpRtcp(const uint8_t* data, const size_t& len) {
                         << ", picture_id:" << picture_id << std::endl;
             } break;
 
-            default: { } break; }
+            default: {
+            } break;
+          }
         } break;
 
-        default: { } break; }
+        default: {
+        } break;
+      }
     }
   } else {
     int ret = srtp_unprotect(srtp_recv_, unprotect_buf, &unprotect_buf_len);
@@ -1485,7 +1502,9 @@ int WebrtcProtocol::Handshake() {
       std::cout << LMSG << "handshake want write" << std::endl;
     } break;
 
-    default: { std::cout << LMSG << std::endl; } break;
+    default: {
+      std::cout << LMSG << std::endl;
+    } break;
   }
 
   if (out_bio_len) {
@@ -1578,8 +1597,8 @@ int WebrtcProtocol::EveryNSecond(const uint64_t& now_in_ms,
                                  const uint64_t& count) {
   std::cout << LMSG << "datachannel_open_:" << datachannel_open_ << std::endl;
   if (datachannel_open_) {
-    std::string usr_data = "xiaozhihong_" + Util::GetNowMsStr() + ",tsn:" +
-                           Util::Num2Str(sctp_session_.local_tsn);
+    std::string usr_data = "xiaozhihong_" + Util::GetNowMsStr() +
+                           ",tsn:" + Util::Num2Str(sctp_session_.local_tsn);
     SendSctpData((const uint8_t*)usr_data.data(), usr_data.size(),
                  DataChannelPPID_STRING);
   }

@@ -1,7 +1,4 @@
 #include "srt_socket.h"
-#include "global.h"
-#include "srt_socket_util.h"
-#include "util.h"
 
 #include <fcntl.h>
 #include <netdb.h>
@@ -9,7 +6,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "global.h"
 #include "srt/srt.h"
+#include "srt_socket_util.h"
+#include "util.h"
 
 SrtSocket::SrtSocket(IoLoop* io_loop, const int& fd,
                      HandlerFactoryT handler_factory)

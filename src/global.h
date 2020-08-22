@@ -2,6 +2,7 @@
 #define __GLOBAL_H__
 
 #include <openssl/ssl.h>
+
 #include "epoller.h"
 #include "local_stream_center.h"
 

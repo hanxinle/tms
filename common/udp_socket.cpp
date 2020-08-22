@@ -1,3 +1,5 @@
+#include "udp_socket.h"
+
 #include <assert.h>
 
 #include <iostream>
@@ -5,7 +7,6 @@
 #include "common_define.h"
 #include "socket_handler.h"
 #include "socket_util.h"
-#include "udp_socket.h"
 
 UdpSocket::UdpSocket(IoLoop* io_loop, const int& fd,
                      HandlerFactoryT handler_factory)

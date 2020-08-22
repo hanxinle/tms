@@ -1,9 +1,8 @@
 #ifndef __IO_BUFFER_H__
 #define __IO_BUFFER_H__
 
-#include <sys/socket.h>
-
 #include <assert.h>
+#include <sys/socket.h>
 
 #include <iostream>
 #include <string>

@@ -15,6 +15,7 @@ class ProtocolFactory {
   static SocketHandler* GenWebSocketProtocol(IoLoop* io_loop, Fd* fd);
   static SocketHandler* GenSrtProtocol(IoLoop* io_loop, Fd* fd);
   static SocketHandler* GenWebrtcProtocol(IoLoop* io_loop, Fd* fd);
+  static SocketHandler* GenEchoProtocol(IoLoop* io_loop, Fd* fd);
 };
 
 #endif  // __PROTOCOL_FACTORY_H__

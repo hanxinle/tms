@@ -1,9 +1,9 @@
+#include "base_64.h"
+
 #include <stdint.h>
 
 #include <iostream>
 #include <map>
-
-#include "base_64.h"
 
 char kEncodeBase64Dict[64] = {
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',

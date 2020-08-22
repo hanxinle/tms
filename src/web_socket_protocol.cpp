@@ -1,7 +1,7 @@
+#include "web_socket_protocol.h"
+
 #include <iostream>
 #include <map>
-
-#include "rapidjson/document.h"
 
 #include "base_64.h"
 #include "bit_buffer.h"
@@ -9,9 +9,9 @@
 #include "common_define.h"
 #include "global.h"
 #include "io_buffer.h"
+#include "rapidjson/document.h"
 #include "sdp.h"
 #include "tcp_socket.h"
-#include "web_socket_protocol.h"
 #include "webrtc_session_mgr.h"
 
 WebSocketProtocol::WebSocketProtocol(IoLoop* io_loop, Fd* socket)
@@ -164,7 +164,11 @@ int WebSocketProtocol::Parse(IoBuffer& io_buffer) {
       uint32_t mask_4bytes = (mask_octet[0] << 24) | (mask_octet[1] << 16) |
                              (mask_octet[2] << 8) | (mask_octet[3]);
       // 用主机字节序进行XOR, 因为后面有一个uint32_t*指针读取写入的操作
+#if defined(__APPLE__)
+      mask_4bytes = ntohl(mask_4bytes);
+#else
       mask_4bytes = be32toh(mask_4bytes);
+#endif
 
       data += 4;
 

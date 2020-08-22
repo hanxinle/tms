@@ -1,20 +1,28 @@
 #include "srt_epoller.h"
-#include "common_define.h"
-#include "fd.h"
-#include "util.h"
 
-#include <sys/epoll.h>
 #include <unistd.h>
 
+#include "common_define.h"
+#include "fd.h"
 #include "srt/srt.h"
+#include "util.h"
 
 static int EpollEventToSrtEvent(const uint32_t& epoll_event) {
   int srt_event = 0;
 
+#if defined(__APPLE__)
+  if (epoll_event & POLL_IN) {
+#else
   if (epoll_event & EPOLLIN) {
+#endif
     srt_event |= SRT_EPOLL_IN;
   }
+
+#if defined(__APPLE__)
+  if (epoll_event & POLL_OUT) {
+#else
   if (epoll_event & EPOLLOUT) {
+#endif
     srt_event |= SRT_EPOLL_OUT;
   }
 

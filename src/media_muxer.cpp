@@ -1,9 +1,10 @@
+#include "media_muxer.h"
+
 #include <math.h>
 
 #include "bit_buffer.h"
 #include "bit_stream.h"
 #include "global.h"
-#include "media_muxer.h"
 #include "media_publisher.h"
 #include "media_subscriber.h"
 #include "util.h"

@@ -1,10 +1,11 @@
+#include "io_buffer.h"
+
 #include <string.h>
 #include <unistd.h>
 
 #include <iostream>
 
 #include "common_define.h"
-#include "io_buffer.h"
 #include "util.h"
 
 IoBuffer::IoBuffer(const size_t& capacity) : capacity_(capacity) {
@@ -121,7 +122,11 @@ int IoBuffer::WriteU8(const uint8_t& u8) {
 }
 
 int IoBuffer::WriteU16(const uint16_t& u16) {
+#if defined(__APPLE__)
+  uint16_t be16 = htons(u16);
+#else
   uint16_t be16 = htobe16(u16);
+#endif
 
   const uint8_t* data = (const uint8_t*)&be16;
   size_t len = sizeof(uint16_t);
@@ -130,7 +135,11 @@ int IoBuffer::WriteU16(const uint16_t& u16) {
 }
 
 int IoBuffer::WriteU24(const uint32_t& u24) {
+#if defined(__APPLE__)
+  uint32_t be24 = ntohl(u24);
+#else
   uint32_t be24 = htobe32(u24);
+#endif
 
   const uint8_t* data = (const uint8_t*)&be24;
   size_t len = 3;
@@ -139,7 +148,11 @@ int IoBuffer::WriteU24(const uint32_t& u24) {
 }
 
 int IoBuffer::WriteU32(const uint32_t& u32) {
+#if defined(__APPLE__)
+  uint32_t be32 = ntohl(u32);
+#else
   uint32_t be32 = htobe32(u32);
+#endif
 
   const uint8_t* data = (const uint8_t*)&be32;
   size_t len = sizeof(uint32_t);
@@ -148,7 +161,15 @@ int IoBuffer::WriteU32(const uint32_t& u32) {
 }
 
 int IoBuffer::WriteU64(const uint64_t& u64) {
+#if defined(__APPLE__)
+  const uint8_t* p = (const uint8_t*)&u64;
+  uint64_t be64 = (((uint64_t)p[7]) << 56) | (((uint64_t)p[6]) << 48) |
+                  (((uint64_t)p[5]) << 40) | (((uint64_t)p[4]) << 32) |
+                  (((uint64_t)p[3]) << 24) | (((uint64_t)p[2]) << 16) |
+                  (((uint64_t)p[1]) << 8) | ((uint64_t)p[0]);
+#else
   uint64_t be64 = htobe64(u64);
+#endif
 
   const uint8_t* data = (const uint8_t*)&be64;
   size_t len = sizeof(uint64_t);

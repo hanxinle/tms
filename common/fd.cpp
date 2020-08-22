@@ -1,9 +1,10 @@
 #include "fd.h"
+
+#include <poll.h>
+#include <unistd.h>
+
 #include "common_define.h"
 #include "io_loop.h"
-
-#include <sys/epoll.h>
-#include <unistd.h>
 
 std::atomic<uint64_t> Fd::id_generator_;
 
@@ -25,7 +26,7 @@ Fd::~Fd() {
 }
 
 void Fd::EnableRead() {
-  if (events_ & EPOLLIN) {
+  if (events_ & POLLIN) {
     return;
   }
 
@@ -35,7 +36,7 @@ void Fd::EnableRead() {
     add = false;
   }
 
-  events_ |= EPOLLIN;
+  events_ |= POLLIN;
 
   if (add) {
     io_loop_->AddFd(this);
@@ -45,7 +46,7 @@ void Fd::EnableRead() {
 }
 
 void Fd::EnableWrite() {
-  if (events_ & EPOLLOUT) {
+  if (events_ & POLLOUT) {
     return;
   }
 
@@ -55,7 +56,7 @@ void Fd::EnableWrite() {
     add = false;
   }
 
-  events_ |= EPOLLOUT;
+  events_ |= POLLOUT;
 
   if (add) {
     io_loop_->AddFd(this);
@@ -65,13 +66,13 @@ void Fd::EnableWrite() {
 }
 
 void Fd::DisableRead() {
-  if ((events_ & EPOLLIN) == 0) {
+  if ((events_ & POLLIN) == 0) {
     return;
   }
 
   bool del = false;
 
-  events_ &= (~EPOLLIN);
+  events_ &= (~POLLIN);
   if (events_ == 0) {
     del = true;
   }
@@ -84,13 +85,13 @@ void Fd::DisableRead() {
 }
 
 void Fd::DisableWrite() {
-  if ((events_ & EPOLLOUT) == 0) {
+  if ((events_ & POLLOUT) == 0) {
     return;
   }
 
   bool del = false;
 
-  events_ &= (~EPOLLOUT);
+  events_ &= (~POLLOUT);
   if (events_ == 0) {
     del = true;
   }

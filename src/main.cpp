@@ -8,6 +8,7 @@
 #include "bit_stream.h"
 #include "epoller.h"
 #include "local_stream_center.h"
+#include "openssl/ssl.h"
 #include "protocol_factory.h"
 #include "ref_ptr.h"
 #include "socket_util.h"
@@ -20,8 +21,6 @@
 #include "timer_in_second.h"
 #include "udp_socket.h"
 #include "util.h"
-
-#include "openssl/ssl.h"
 
 static void sighandler(int sig_no) {
   std::cout << LMSG << "sig:" << sig_no << std::endl;
@@ -77,8 +76,8 @@ int main(int argc, char *argv[]) {
 
   int ret = SSL_CTX_check_private_key(g_tls_ctx);
 
-// dtls init
-// g_dtls_ctx = SSL_CTX_new(DTLSv1_2_method());
+  // dtls init
+  // g_dtls_ctx = SSL_CTX_new(DTLSv1_2_method());
 
 #if 0 
     // 用导入证书的方法,目前不可行
@@ -237,6 +236,7 @@ int main(int argc, char *argv[]) {
   uint16_t web_socket_port = 9090;
   uint16_t ssl_web_socket_port = 9043;
   uint16_t srt_port = 9000;
+  uint16_t echo_port = 10000;
   uint16_t webrtc_port = 11445;
 
   bool daemon = false;
@@ -589,6 +589,31 @@ int main(int argc, char *argv[]) {
   server_https_file_socket.ModName(local_ip + ":" + Util::Num2Str(local_port));
   server_https_file_socket.EnableRead();
   server_https_file_socket.AsServerSocket();
+
+  // === Init Server Echo Socket ===
+  int server_echo_fd = socket_util::CreateNonBlockTcpSocket();
+
+  socket_util::ReuseAddr(server_echo_fd);
+  if (socket_util::Bind(server_echo_fd, "0.0.0.0", echo_port) != 0) {
+    std::cout << LMSG << "bind echo_port " << echo_port << " error"
+              << std::endl;
+    return -1;
+  }
+  if (socket_util::Listen(server_echo_fd) != 0) {
+    std::cout << LMSG << "bind echo_port " << echo_port << " error"
+              << std::endl;
+    return -1;
+  }
+  socket_util::SetNonBlock(server_echo_fd);
+  socket_util::GetSocketName(server_echo_fd, local_ip, local_port);
+
+  TcpSocket server_dash_socket(
+      &epoller, server_echo_fd,
+      std::bind(&ProtocolFactory::GenEchoProtocol, std::placeholders::_1,
+                std::placeholders::_2));
+  server_dash_socket.ModName(local_ip + ":" + Util::Num2Str(local_port));
+  server_dash_socket.EnableRead();
+  server_dash_socket.AsServerSocket();
 
   // === Init WebRTC Socket ===
   int webrtc_fd = socket_util::CreateNonBlockUdpSocket();

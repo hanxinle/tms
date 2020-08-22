@@ -1,18 +1,18 @@
+#include "util.h"
+
 #include <fcntl.h>
+#include <signal.h>
+#include <string.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
 
-#include <signal.h>
-#include <string.h>
-
 #include <iostream>
 #include <random>
 
 #include "common_define.h"
-#include "util.h"
 
 const std::string letter =
     "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";

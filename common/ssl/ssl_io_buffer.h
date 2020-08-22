@@ -6,7 +6,6 @@
 
 #include "common_define.h"
 #include "io_buffer.h"
-
 #include "openssl/ssl.h"
 
 class SslIoBuffer : public IoBuffer {

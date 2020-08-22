@@ -1,3 +1,5 @@
+#include "http_file_protocol.h"
+
 #include <iostream>
 #include <map>
 
@@ -5,7 +7,6 @@
 #include "bit_buffer.h"
 #include "common_define.h"
 #include "global.h"
-#include "http_file_protocol.h"
 #include "http_sender.h"
 #include "io_buffer.h"
 #include "tcp_socket.h"

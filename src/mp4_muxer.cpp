@@ -1,8 +1,9 @@
+#include "mp4_muxer.h"
+
 #include <fcntl.h>
 #include <unistd.h>
 
 #include "bit_stream.h"
-#include "mp4_muxer.h"
 #include "util.h"
 
 #define PRE_SIZE(bs) uint32_t pre_size = bs.SizeInBytes();
@@ -580,7 +581,7 @@ void Mp4Muxer::WriteHandlerReferenceBox(BitStream& bs,
   bs.WriteBytes(4, 0);
   bs.WriteBytes(4, 0);
 
-  if (payload_type == kAudioPayload) { 
+  if (payload_type == kAudioPayload) {
     static char audio_handler[] = "AudioHandler";
     bs.WriteData(sizeof(audio_handler), (const uint8_t*)audio_handler);
   } else if (payload_type == kVideoPayload) {

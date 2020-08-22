@@ -2,9 +2,8 @@
 #define __SSL_SOCKET_H__
 
 #include "fd.h"
-#include "ssl_io_buffer.h"
-
 #include "openssl/ssl.h"
+#include "ssl_io_buffer.h"
 
 class IoLoop;
 class SocketHandler;

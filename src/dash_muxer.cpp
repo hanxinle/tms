@@ -1,8 +1,9 @@
+#include "dash_muxer.h"
+
 #include <fcntl.h>
 #include <unistd.h>
 
 #include "bit_stream.h"
-#include "dash_muxer.h"
 #include "mp4_muxer.h"
 
 #define MPD_HEADER                                                           \
@@ -394,7 +395,8 @@ void DashMuxer::WriteSegmentTypeBox(BitStream &bs) {
   bs.WriteBytes(4, minor_version);
 
   static uint8_t compatible_brands[2][4] = {
-      {'m', 's', 'd', 'h'}, {'m', 's', 'i', 'x'},
+      {'m', 's', 'd', 'h'},
+      {'m', 's', 'i', 'x'},
   };
 
   for (size_t i = 0; i < 2; ++i) {

@@ -1,6 +1,22 @@
-#include <sys/timerfd.h>
+#if defined(__APPLE__)
+
+#include "timer_in_second.h"
 
 #include <string.h>
+
+#include "common_define.h"
+#include "timer_handle.h"
+#include "util.h"
+
+TimerInSecond::TimerInSecond(IoLoop* io_loop) : Fd(io_loop) {}
+TimerInSecond::~TimerInSecond() {}
+
+int TimerInSecond::OnRead() { return kSuccess; }
+
+int TimerInSecond::RunEverySecond() { return kSuccess; }
+#else
+#include <string.h>
+#include <sys/timerfd.h>
 
 #include "common_define.h"
 #include "timer_handle.h"
@@ -61,3 +77,4 @@ int TimerInSecond::RunEverySecond() {
 
   return kSuccess;
 }
+#endif

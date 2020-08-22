@@ -1,11 +1,14 @@
+#include "http_sender.h"
+
 #include <map>
 
 #include "common_define.h"
-#include "http_sender.h"
 #include "util.h"
 
 std::map<std::string, std::string> kStatusMap = {
-    {"200", "OK"}, {"403", "Forbidden"}, {"404", "Not Found"},
+    {"200", "OK"},
+    {"403", "Forbidden"},
+    {"404", "Not Found"},
 };
 
 std::map<std::string, std::string> kTypeMap = {

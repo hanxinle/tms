@@ -12,7 +12,7 @@ CC             = gcc
 CXX 		   = g++
 CFLAGS         = -g -W -Wall -Werror -O2
 CXXFLAGS       = -g -std=c++11 -W -Wall -Werror -O2 -Wno-strict-aliasing -Wno-missing-field-initializers -Wno-unused-function -Wno-deprecated-declarations \
-				 -Wno-unused-variable -Wno-unused-parameter -Wno-unused-value
+				 -Wno-unused-variable -Wno-unused-parameter -Wno-unused-value -Wno-class-memaccess
 
 CXXFLAGS       += -DUSE_PUBLISH
 CXXFLAGS       += -D__STDC_CONSTANT_MACROS

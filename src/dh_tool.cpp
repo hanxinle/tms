@@ -1,9 +1,10 @@
+#include "dh_tool.h"
+
 #include <string.h>
 
 #include <iostream>
 
 #include "common_define.h"
-#include "dh_tool.h"
 
 #define BigNumber_1024                               \
   "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1" \

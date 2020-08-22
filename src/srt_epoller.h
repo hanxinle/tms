@@ -1,9 +1,9 @@
 #ifndef __SRT_EPOLLER_H__
 #define __SRT_EPOLLER_H__
 
-#include "io_loop.h"
-
 #include <map>
+
+#include "io_loop.h"
 
 class Fd;
 

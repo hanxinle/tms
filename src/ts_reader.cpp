@@ -1,3 +1,5 @@
+#include "ts_reader.h"
+
 #include <assert.h>
 #include <fcntl.h>
 #include <string.h>
@@ -6,7 +8,6 @@
 #include "bit_buffer.h"
 #include "common_define.h"
 #include "ref_ptr.h"
-#include "ts_reader.h"
 #include "util.h"
 
 const int kTsSegmentFixedSize = 188;
@@ -366,40 +367,40 @@ int TsReader::ParseAdaptation(BitBuffer& bit_buffer) {
 int TsReader::ParsePAT(BitBuffer& bit_buffer) {
   std::ostringstream os;
 
-  uint8_t table_id;
+  uint8_t table_id = 0;
   bit_buffer.GetBits(8, table_id);
 
   os << "table_id=" << (int)table_id;
 
-  uint8_t section_syntax_indicator;
+  uint8_t section_syntax_indicator = 0;
   bit_buffer.GetBits(1, section_syntax_indicator);
 
-  uint8_t zero;
+  uint8_t zero = 0;
   bit_buffer.GetBits(1, zero);
 
-  uint8_t reserved;
+  uint8_t reserved = 0;
   bit_buffer.GetBits(2, reserved);
 
-  uint16_t section_length;
+  uint16_t section_length = 0;
   bit_buffer.GetBits(12, section_length);
 
   os << ",section_length=" << section_length;
 
-  uint16_t transport_stream_id;
+  uint16_t transport_stream_id = 0;
   bit_buffer.GetBits(16, transport_stream_id);
 
   bit_buffer.GetBits(2, reserved);
 
-  uint8_t version_number;
+  uint8_t version_number = 0;
   bit_buffer.GetBits(5, version_number);
 
-  uint8_t current_next_indicator;
+  uint8_t current_next_indicator = 0;
   bit_buffer.GetBits(1, current_next_indicator);
 
-  uint8_t section_number;
+  uint8_t section_number = 0;
   bit_buffer.GetBits(8, section_number);
 
-  uint8_t last_section_number;
+  uint8_t last_section_number = 0;
   bit_buffer.GetBits(8, last_section_number);
 
   // for (int i = 0; i < N; i++)
@@ -409,20 +410,20 @@ int TsReader::ParsePAT(BitBuffer& bit_buffer) {
 
     os << ",program_number=" << program_number;
 
-    uint8_t reserved;
+    uint8_t reserved = 0;
     bit_buffer.GetBits(3, reserved);
 
     if (program_number == 0x00) {
-      uint16_t network_PID;
+      uint16_t network_PID = 0;
       bit_buffer.GetBits(13, network_PID);
     } else {
-      uint16_t program_map_PID;
+      uint16_t program_map_PID = 0;
       bit_buffer.GetBits(13, program_map_PID);
       pmt_pid_ = program_map_PID;
       os << ",pmt_pid_=" << pmt_pid_;
     }
   }
-  uint32_t CRC_32;
+  uint32_t CRC_32 = 0;
   bit_buffer.GetBits(32, CRC_32);
 
   std::cout << LMSG << os.str() << std::endl;
@@ -583,7 +584,9 @@ int TsReader::ParseDescriptor(BitBuffer& bit_buffer) {
       bit_buffer.SkipBytes(descriptor_length);
     } break;
 
-    default: { bit_buffer.SkipBytes(descriptor_length); } break;
+    default: {
+      bit_buffer.SkipBytes(descriptor_length);
+    } break;
   }
 
   return 0;

@@ -3,10 +3,9 @@
 
 #include <string>
 
+#include "socket_util.h"
 #include "srt/srt.h"
 #include "srt/udt.h"
-
-#include "socket_util.h"
 #include "srt_socket_util.h"
 #include "util.h"
 

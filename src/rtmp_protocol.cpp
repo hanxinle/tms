@@ -1,3 +1,5 @@
+#include "rtmp_protocol.h"
+
 #include <math.h>
 
 #include <deque>
@@ -17,7 +19,6 @@
 #include "io_buffer.h"
 #include "local_stream_center.h"
 #include "protocol_factory.h"
-#include "rtmp_protocol.h"
 #include "tcp_socket.h"
 #include "util.h"
 #include "webrtc_protocol.h"
@@ -357,7 +358,11 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer) {
           rtmp_msg.timestamp_calc = timestamp;
           rtmp_msg.message_length = message_length;
           rtmp_msg.message_type_id = message_type_id;
+#if defined(__APPLE__)
+          rtmp_msg.message_stream_id = ntohl(message_stream_id);
+#else
           rtmp_msg.message_stream_id = be32toh(message_stream_id);
+#endif
         } else {
           return kNoEnoughData;
         }
@@ -1583,7 +1588,11 @@ int RtmpProtocol::SendData(const RtmpMessage& cur_info, const Payload& payload,
         header.WriteU24(cur_timestamp_delta);
         header.WriteU24(cur_message_length);
         header.WriteU8(cur_message_type_id);
+#if defined(__APPLE__)
+        header.WriteU32(ntohl(cur_message_stream_id));
+#else
         header.WriteU32(htobe32(cur_message_stream_id));
+#endif
       } else if (fmt == 1) {
         header.WriteU24(cur_timestamp_delta);
         header.WriteU24(cur_message_length);

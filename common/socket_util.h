@@ -5,7 +5,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
-
 #include <string.h>
 
 #include <iostream>
@@ -14,6 +13,23 @@
 #include "common_define.h"
 
 namespace socket_util {
+
+inline int SetNonBlock(const int& fd) {
+  int flags = fcntl(fd, F_GETFL, 0);
+  if (flags < 0) {
+    std::cout << LMSG << "fcntl err:" << strerror(errno) << std::endl;
+    return flags;
+  }
+
+  flags |= O_NONBLOCK;
+  if (fcntl(fd, F_SETFL, flags) < 0) {
+    std::cout << LMSG << "fcntl err:" << strerror(errno) << std::endl;
+    return -1;
+  }
+
+  return 0;
+}
+
 inline int IpStr2Num(const std::string& ip_str, uint32_t& ip_num) {
   in_addr addr;
 
@@ -107,7 +123,11 @@ inline int IpStrToHost(const std::string& str, uint32_t& host) {
   uint32_t net = 0;
   int ret = IpStrToNet(str, net);
 
+#if defined(__APPLE__)
+  host = htonl(net);
+#else
   host = be32toh(net);
+#endif
 
   return ret;
 }
@@ -147,7 +167,11 @@ inline int SocketAddrToIpPort(const sockaddr_in& addr, std::string& ip,
 }
 
 inline int IpHostToStr(const uint32_t& host, std::string& str) {
+#if defined(__APPLE__)
+  return IpNetToStr(ntohl(host), str);
+#else
   return IpNetToStr(be32toh(host), str);
+#endif
 }
 
 inline int CreateTcpSocket() {
@@ -161,11 +185,19 @@ inline int CreateTcpSocket() {
 }
 
 inline int CreateNonBlockTcpSocket() {
+#if defined(__APPLE__)
+  int fd = socket(AF_INET, SOCK_STREAM, 0);
+#else
   int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+#endif
 
   if (fd < 0) {
     std::cout << LMSG << "socket err:" << strerror(errno) << std::endl;
   }
+
+#if defined(__APPLE__)
+  SetNonBlock(fd);
+#endif
 
   return fd;
 }
@@ -181,11 +213,19 @@ inline int CreateUdpSocket() {
 }
 
 inline int CreateNonBlockUdpSocket() {
+#if defined(__APPLE__)
+  int fd = socket(AF_INET, SOCK_DGRAM, 0);
+#else
   int fd = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0);
+#endif
 
   if (fd < 0) {
     std::cout << LMSG << "socket err:" << strerror(errno) << std::endl;
   }
+
+#if defined(__APPLE__)
+  SetNonBlock(fd);
+#endif
 
   return fd;
 }
@@ -203,7 +243,7 @@ inline int ReuseAddr(const int& fd) {
 inline int NoCloseWait(const int& fd) {
   linger st_linger;
   st_linger.l_onoff =
-      1;                   //在close socket调用后, 但是还有数据没发送完毕的时候容许逗留
+      1;  //在close socket调用后, 但是还有数据没发送完毕的时候容许逗留
   st_linger.l_linger = 0;  //容许逗留的时间为0秒
   int ret =
       setsockopt(fd, SOL_SOCKET, SO_LINGER, &st_linger, sizeof(st_linger));
@@ -217,10 +257,13 @@ inline int NoCloseWait(const int& fd) {
 inline int SetSendBufSize(const int& fd, const int& send_buf_size,
                           const bool& force = false) {
   int opt_name = SO_SNDBUF;
+#if defined(__APPLE__)
+  UNUSED(force);
+#else
   if (force) {
     opt_name = SO_SNDBUFFORCE;
   }
-
+#endif
   int ret = setsockopt(fd, SOL_SOCKET, opt_name, (void*)&send_buf_size,
                        sizeof(send_buf_size));
 
@@ -234,9 +277,13 @@ inline int SetSendBufSize(const int& fd, const int& send_buf_size,
 inline int SetRecvBufSize(const int& fd, const int& send_buf_size,
                           const bool& force = false) {
   int opt_name = SO_RCVBUF;
+#if defined(__APPLE__)
+  UNUSED(force);
+#else
   if (force) {
     opt_name = SO_RCVBUFFORCE;
   }
+#endif
 
   int ret = setsockopt(fd, SOL_SOCKET, opt_name, (void*)&send_buf_size,
                        sizeof(send_buf_size));
@@ -368,22 +415,6 @@ inline int Accept(const int& fd, std::string& ip, uint16_t& port) {
   }
 
   return ret;
-}
-
-inline int SetNonBlock(const int& fd) {
-  int flags = fcntl(fd, F_GETFL, 0);
-  if (flags < 0) {
-    std::cout << LMSG << "fcntl err:" << strerror(errno) << std::endl;
-    return flags;
-  }
-
-  flags |= O_NONBLOCK;
-  if (fcntl(fd, F_SETFL, flags) < 0) {
-    std::cout << LMSG << "fcntl err:" << strerror(errno) << std::endl;
-    return -1;
-  }
-
-  return 0;
 }
 
 inline int GetSocketError(const int& fd, int& err) {

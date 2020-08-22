@@ -1,6 +1,7 @@
+#include "amf_0.h"
+
 #include <iostream>
 
-#include "amf_0.h"
 #include "bit_buffer.h"
 #include "common_define.h"
 #include "io_buffer.h"
@@ -105,7 +106,9 @@ int Amf0::Decode(const int& type, BitBuffer& bit_buffer, any::Any*& result) {
       break;
     }
 
-    default: { break; }
+    default: {
+      break;
+    }
   }
 
   return ret;

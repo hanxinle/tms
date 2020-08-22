@@ -40,6 +40,7 @@ class Mp4Muxer {
  protected:
   void Flush();
   void Reset();
+
  public:
   void WriteFileTypeBox(BitStream& bs);
   void WriteFreeBox(BitStream& bs);

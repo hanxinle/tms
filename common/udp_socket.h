@@ -1,6 +1,10 @@
 #ifndef __UDP_SOCKET_H__
 #define __UDP_SOCKET_H__
 
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 #include "fd.h"
 #include "io_buffer.h"
 

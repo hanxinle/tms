@@ -124,7 +124,7 @@ inline int IpStrToHost(const std::string& str, uint32_t& host) {
   int ret = IpStrToNet(str, net);
 
 #if defined(__APPLE__)
-  host = htonl(net);
+  host = ntohl(net);
 #else
   host = be32toh(net);
 #endif

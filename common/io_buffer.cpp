@@ -136,7 +136,7 @@ int IoBuffer::WriteU16(const uint16_t& u16) {
 
 int IoBuffer::WriteU24(const uint32_t& u24) {
 #if defined(__APPLE__)
-  uint32_t be24 = ntohl(u24);
+  uint32_t be24 = htonl(u24);
 #else
   uint32_t be24 = htobe32(u24);
 #endif
@@ -149,7 +149,7 @@ int IoBuffer::WriteU24(const uint32_t& u24) {
 
 int IoBuffer::WriteU32(const uint32_t& u32) {
 #if defined(__APPLE__)
-  uint32_t be32 = ntohl(u32);
+  uint32_t be32 = htonl(u32);
 #else
   uint32_t be32 = htobe32(u32);
 #endif
@@ -163,10 +163,11 @@ int IoBuffer::WriteU32(const uint32_t& u32) {
 int IoBuffer::WriteU64(const uint64_t& u64) {
 #if defined(__APPLE__)
   const uint8_t* p = (const uint8_t*)&u64;
-  uint64_t be64 = (((uint64_t)p[7]) << 56) | (((uint64_t)p[6]) << 48) |
-                  (((uint64_t)p[5]) << 40) | (((uint64_t)p[4]) << 32) |
-                  (((uint64_t)p[3]) << 24) | (((uint64_t)p[2]) << 16) |
-                  (((uint64_t)p[1]) << 8) | ((uint64_t)p[0]);
+  uint64_t be64 = (((uint64_t)p[0]) << 56) | (((uint64_t)p[1]) << 48) |
+                  (((uint64_t)p[2]) << 40) | (((uint64_t)p[3]) << 32) |
+                  (((uint64_t)p[4]) << 24) | (((uint64_t)p[5]) << 16) |
+                  (((uint64_t)p[6]) << 8) | ((uint64_t)p[7]);
+  std::cout << LMSG << "u64=" << u64 << ",be64=" << be64 << std::endl;
 #else
   uint64_t be64 = htobe64(u64);
 #endif

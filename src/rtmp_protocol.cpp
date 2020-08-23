@@ -1589,7 +1589,7 @@ int RtmpProtocol::SendData(const RtmpMessage& cur_info, const Payload& payload,
         header.WriteU24(cur_message_length);
         header.WriteU8(cur_message_type_id);
 #if defined(__APPLE__)
-        header.WriteU32(ntohl(cur_message_stream_id));
+        header.WriteU32(htonl(cur_message_stream_id));
 #else
         header.WriteU32(htobe32(cur_message_stream_id));
 #endif

@@ -69,10 +69,11 @@ int SrtProtocol::Parse(IoBuffer& io_buffer) {
 
   if (len > 0) {
     if (!register_publisher_stream_) {
-      g_local_stream_center.RegisterStream("srt", GetSrtSocket()->GetStreamId(),
-                                           this);
+      std::string stream = GetSrtSocket()->GetStreamId();
+      if (stream.empty()) stream = "live";
+      g_local_stream_center.RegisterStream("srt", stream, this);
       std::cout << LMSG << "register publisher " << this
-                << ", streamid=" << GetSrtSocket()->GetStreamId() << std::endl;
+                << ", streamid=" << stream << std::endl;
       register_publisher_stream_ = true;
     }
 
@@ -157,9 +158,8 @@ void SrtProtocol::OnFrame(const Payload& frame) {
 }
 
 void SrtProtocol::OnHeader(const Payload& header_frame) {
-  std::cout << LMSG << "header="
-            << Util::Bin2Hex(header_frame.GetAllData(),
-                             header_frame.GetAllLen())
+  std::cout << LMSG << "header=" << Util::Bin2Hex(header_frame.GetAllData(),
+                                                  header_frame.GetAllLen())
             << std::endl;
 
   if (header_frame.IsVideo()) {

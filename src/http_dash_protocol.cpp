@@ -269,6 +269,7 @@ int HttpDashProtocol::SendHttpRes(const int& status,
 
   os << "HTTP/1.1 " << status << " " << status_str[status] << "\r\n"
      << "Server: tms\r\n"
+     << "Access-Control-Allow-Origin: *\r\n"
      << "Connection: " << status_connection[status] << "\r\n"
      << "Content-Type: " << content_type << "\r\n"
      << "Content-Length:" << content.size() << "\r\n"

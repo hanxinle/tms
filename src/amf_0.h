@@ -149,8 +149,8 @@ class Amf0 {
   static int EncodeNumber(const double& val, IoBuffer& output);
   static int EncodeBoolean(const uint8_t& val, IoBuffer& output);
   static int EncodeString(const std::string& val, IoBuffer& output);
-  static int EncodeObject(const std::map<std::string, any::Any*>& val,
-                          IoBuffer& output);
+  static int EncodeEcmaArray(const any::ecma_type& val, IoBuffer& output);
+  static int EncodeObject(const any::map_type& val, IoBuffer& output);
 };
 
 #endif  // __AMF_0_H__

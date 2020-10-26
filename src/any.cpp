@@ -42,7 +42,7 @@ bool Any::GetVector(std::vector<Any*>& val) {
   return true;
 }
 
-bool Any::GetMap(std::map<std::string, Any*>& val) {
+bool Any::GetMap(map_type& val) {
   if (!IsMap()) {
     return false;
   }
@@ -51,6 +51,17 @@ bool Any::GetMap(std::map<std::string, Any*>& val) {
 
   return true;
 }
+
+bool Any::GetEcma(ecma_type& val) {
+  if (!IsEcma()) {
+    return false;
+  }
+
+  val = ToEcma().val_;
+
+  return true;
+}
+
 
 Any::operator Int*() { return (dynamic_cast<Int*>(this)); }
 
@@ -62,6 +73,8 @@ Any::operator Vector*() { return (dynamic_cast<Vector*>(this)); }
 
 Any::operator Map*() { return (dynamic_cast<Map*>(this)); }
 
+Any::operator Ecma*() { return (dynamic_cast<Ecma*>(this)); }
+
 Int& Any::ToInt() const { return *((Int*)this); }
 
 Double& Any::ToDouble() const { return *((Double*)this); }
@@ -71,6 +84,8 @@ String& Any::ToString() const { return *((String*)this); }
 Vector& Any::ToVector() const { return *((Vector*)this); }
 
 Map& Any::ToMap() const { return *((Map*)this); }
+
+Ecma& Any::ToEcma() const { return *((Ecma*)this); }
 
 Any* Any::operator[](const size_t& index) { return ToVector()[index]; }
 

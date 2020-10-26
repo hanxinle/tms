@@ -475,7 +475,7 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer) {
 
           handshake_status_ = kStatus_Done;
 
-          SetOutChunkSize(4096);
+          SetOutChunkSize(1024 * 64);
 
           SendConnect("rtmp://" + domain_ + "/" + app_ + "/" + stream_);
 
@@ -701,8 +701,6 @@ int RtmpProtocol::Parse(IoBuffer& io_buffer) {
 
           handshake_status_ = kStatus_Done;
 
-          SetOutChunkSize(4096);
-
           std::cout << LMSG << "Handshake done!!!" << std::endl;
           return kSuccess;
         } else {
@@ -791,9 +789,13 @@ int RtmpProtocol::OnUserControlMessage(RtmpMessage& rtmp_msg) {
 }
 
 int RtmpProtocol::OnAudio(RtmpMessage& rtmp_msg) {
-  // std::cout << LMSG << "timestamp:" << rtmp_msg.timestamp <<
-  // ",timestamp_delta:" << rtmp_msg.timestamp_delta << ",timestamp_calc:" <<
-  // rtmp_msg.timestamp_calc << std::endl;
+#if 0
+  std::cout << LMSG << "timestamp:" << rtmp_msg.timestamp
+            << ",timestamp_delta:" << rtmp_msg.timestamp_delta
+            << ",timestamp_calc:" << rtmp_msg.timestamp_calc 
+            << ",content=" << Util::Bin2Hex(rtmp_msg.msg, rtmp_msg.len)
+            << std::endl;
+#endif
   if (rtmp_msg.len >= 2) {
     BitBuffer bit_buffer(rtmp_msg.msg, 2);
 
@@ -849,6 +851,13 @@ int RtmpProtocol::OnAudio(RtmpMessage& rtmp_msg) {
 }
 
 int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg) {
+#if 0
+  std::cout << LMSG << "timestamp:" << rtmp_msg.timestamp
+            << ",timestamp_delta:" << rtmp_msg.timestamp_delta
+            << ",timestamp_calc:" << rtmp_msg.timestamp_calc 
+            << ",content=" << Util::Bin2Hex(rtmp_msg.msg, rtmp_msg.len)
+            << std::endl;
+#endif
   bool to_media_muxer = false;
   uint8_t frame_type = 0xff;
   uint8_t codec_id = 0xff;
@@ -931,7 +940,8 @@ int RtmpProtocol::OnVideo(RtmpMessage& rtmp_msg) {
                         << std::endl;
             } else if (nalu_unit_type == H264NalType_IDR_SLICE) {
               to_media_muxer = true;
-              std::cout << LMSG << "IDR" << std::endl;
+              std::cout << LMSG << "IDR, app=" << app_ << ",stream=" << stream_
+                        << std::endl;
               video_payload.SetIFrame();
               video_payload.SetPts(rtmp_msg.timestamp_calc +
                                    compositio_time_offset);
@@ -1030,7 +1040,7 @@ int RtmpProtocol::OnAmf0Message(RtmpMessage& rtmp_msg) {
 
 int RtmpProtocol::OnConnectCommand(AmfCommand& amf_command) {
   double trans_id = 0;
-  std::map<std::string, any::Any*> command_object;
+  any::map_type command_object;
 
   if (amf_command.size() >= 3) {
     if (amf_command[1]->GetDouble(trans_id)) {
@@ -1068,10 +1078,27 @@ int RtmpProtocol::OnConnectCommand(AmfCommand& amf_command) {
     if (!app_.empty()) {
       any::String result("_result");
       any::Double transaction_id(trans_id);
-      any::Map properties;
 
+      any::String fms_ver("FMS/3,5,3,888");
+      any::Double capabilities(127.0);
+      any::Double mode(1.0);
+      any::Map properties({{"fmsVer", (any::Any*)&fms_ver},
+                           {"capabilities", (any::Any*)&capabilities},
+                           {"mode", (any::Any*)&mode}});
+
+      any::String level("status");
       any::String code("NetConnection.Connect.Success");
-      any::Map information({{"code", (any::Any*)&code}});
+      any::String desc("Connection succeeded");
+      any::Double object_encoding(0.0);
+
+      any::String version("3,5,3,888");
+      any::Ecma data({{"version", (any::Any*)&version}});
+
+      any::Map information({{"level", (any::Any*)&level},
+                            {"code", (any::Any*)&code},
+                            {"description", (any::Any*)&desc},
+                            {"objectEncoding", (any::Any*)&object_encoding}});
+      //{"data", (any::Any*)&data}});
 
       IoBuffer output;
       std::vector<any::Any*> connect_result = {
@@ -1085,10 +1112,12 @@ int RtmpProtocol::OnConnectCommand(AmfCommand& amf_command) {
         int len = output.Read(data, output.Size());
 
         if (data != NULL && len > 0) {
-          SetWindowAcknowledgementSize(16 * 1024 * 1024);
-          SetPeerBandwidth(0x10000000, 2);
+          SetWindowAcknowledgementSize(2500000);
+          SetPeerBandwidth(2500000, 2);
+          SetOutChunkSize(60000);
           SendUserControlMessage(0, 0);
-          SendRtmpMessage(2, 0, kAmf0Command, data, len);
+          SendRtmpMessage(3, 0, kAmf0Command, data, len);
+          SendBwDone();
         }
       }
     }
@@ -1519,10 +1548,8 @@ int RtmpProtocol::SendRtmpMessage(const uint32_t cs_id,
   rtmp_message.msg = (uint8_t*)data;
   rtmp_message.len = len;
 
-  if (message_type_id == kAmf0Command) {
-    return SendData(rtmp_message, Payload(), true);
-  }
-  return SendData(rtmp_message);
+  bool force_fmt0 = (message_type_id != kAudio && message_type_id != kVideo);
+  return SendData(rtmp_message, Payload(), force_fmt0);
 }
 
 int RtmpProtocol::SendData(const RtmpMessage& cur_info, const Payload& payload,
@@ -1778,6 +1805,29 @@ int RtmpProtocol::SetWindowAcknowledgementSize(
   return kSuccess;
 }
 
+int RtmpProtocol::SendBwDone() {
+  any::String on_bw_done("onBWDone");
+  any::Double transaction_id(0.0);
+  any::Null null;
+
+  IoBuffer output;
+  std::vector<any::Any*> bw_done = {
+      (any::Any*)&on_bw_done, (any::Any*)&transaction_id, (any::Any*)&null};
+  int ret = Amf0::Encode(bw_done, output);
+  std::cout << LMSG << "Amf0 encode ret:" << ret << std::endl;
+  if (ret == 0) {
+    uint8_t* data = NULL;
+    int len = output.Read(data, output.Size());
+
+    if (data != NULL && len > 0) {
+      SendRtmpMessage(2, 0, kAmf0Command, data, len);
+      std::cout << LMSG << "send [onBWDone command]" << std::endl;
+    }
+  }
+
+  return kSuccess;
+}
+
 int RtmpProtocol::SetPeerBandwidth(const uint32_t& ack_window_size,
                                    const uint8_t& limit_type) {
   IoBuffer io_buffer;
@@ -1821,13 +1871,14 @@ int RtmpProtocol::SendConnect(const std::string& url) {
   any::Double transaction_id(GetTransactionId());
 
   any::String app(rtmp_url.app);
-  // String tc_url("rtmp://" + rtmp_url.ip + ":" + Util::Num2Str(rtmp_url.port)
+  // String tc_url("rtmp://" + rtmp_url.ip + ":" +
+  // Util::Num2Str(rtmp_url.port)
   // + "/" + rtmp_url.app);
   any::String tc_url("rtmp://" + rtmp_url.ip + "/" + rtmp_url.app);
 
-  std::map<std::string, any::Any*> m = {{"app", &app}, {"tcUrl", &tc_url}};
+  any::map_type m = {{"app", &app}, {"tcUrl", &tc_url}};
 
-  std::map<std::string, any::Any*> empty;
+  any::map_type empty;
 
   any::Map command_object(m);
   any::Map optional_uer_args(empty);

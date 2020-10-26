@@ -167,6 +167,7 @@ class RtmpProtocol : public MediaPublisher,
   int SendHandShakeStatus1();
   int SetOutChunkSize(const uint32_t& chunk_size);
   int SetWindowAcknowledgementSize(const uint32_t& ack_window_size);
+  int SendBwDone();
   int SetPeerBandwidth(const uint32_t& ack_window_size,
                        const uint8_t& limit_type);
   int SendUserControlMessage(const uint16_t& event, const uint32_t& data);

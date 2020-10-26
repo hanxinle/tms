@@ -315,6 +315,9 @@ int Amf0::Encode(const any::Any* any, IoBuffer& output) {
   } else if (any->IsString()) {
     ret = EncodeType(kString, output);
     ret = EncodeString(any->ToString().GetVal(), output);
+  } else if (any->IsEcma()) {
+    ret = EncodeType(kEcmaArray, output);
+    ret = EncodeEcmaArray(any->ToEcma().GetVal(), output);
   } else if (any->IsMap()) {
     ret = EncodeType(kObject, output);
     ret = EncodeObject(any->ToMap().GetVal(), output);
@@ -374,7 +377,7 @@ int Amf0::EncodeString(const std::string& val, IoBuffer& output) {
   return 0;
 }
 
-int Amf0::EncodeObject(const std::map<std::string, any::Any*>& val,
+int Amf0::EncodeObject(const any::map_type& val,
                        IoBuffer& output) {
   int ret = 0;
   for (const auto& kv : val) {
@@ -404,6 +407,43 @@ int Amf0::EncodeObject(const std::map<std::string, any::Any*>& val,
   if (ret != sizeof(uint16_t)) {
     return -1;
   }
+
+  return 0;
+}
+
+int Amf0::EncodeEcmaArray(const any::ecma_type& val,
+                       IoBuffer& output) {
+  int ret = 0;
+  //output.WriteU32((uint32_t)val.size());
+  output.WriteU32(0);
+  for (const auto& kv : val) {
+    const std::string& key = kv.first;
+    const any::Any* val = kv.second;
+
+    uint16_t key_len = key.length();
+
+    ret = output.WriteU16(key_len);
+
+    if (ret != sizeof(uint16_t)) {
+      return -1;
+    }
+
+    ret = output.Write(key);
+    if (ret != (int)key.size()) {
+      return -1;
+    }
+
+    ret = Encode(val, output);
+    if (ret != 0) {
+      return -1;
+    }
+  }
+
+  ret = output.WriteU16(0);
+  if (ret != sizeof(uint16_t)) {
+    return -1;
+  }
+
 
   return 0;
 }

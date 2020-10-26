@@ -25,7 +25,7 @@ fi
 if [[ ! -f ${dir_obj}/lib/libsrt.a ]]; then
     unzip ${dir}/3rdparty/srt-1.4.1.zip -d ${dir_obj}
     cd ${dir_obj}/srt-1.4.1
-    ./configure --prefix=${dir_obj} --disable-c++11 --disable-shared --enable-static \
+    PKG_CONFIG_PATH="${dir_obj}/lib/pkgconfig/" ./configure --prefix=${dir_obj} --disable-c++11 --disable-shared --enable-static \
         --enable-debug=0 --enable-heavy-logging=OFF \
         --openssl-include-dir=${dir_obj}/include/ \
         --openssl-ssl-library=${dir_obj}/lib/libssl.a \

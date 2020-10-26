@@ -13,6 +13,7 @@ const uint8_t kString = 2;
 const uint8_t kVector = 3;
 const uint8_t kMap = 4;
 const uint8_t kNull = 5;
+const uint8_t kEcma = 6;
 
 static std::string AnyTypeToStr(const uint8_t& type) {
   switch (type) {
@@ -34,17 +35,26 @@ static std::string AnyTypeToStr(const uint8_t& type) {
     case kNull:
       return "kNull";
       break;
+    case kEcma:
+      return "kEcma";
+      break;
     default:
       return "kUnknown";
       break;
   }
 }
 
+class Any;
+typedef std::vector<std::pair<std::string, Any*>> map_type;
+typedef std::vector<Any*> vec_type;
+typedef std::vector<std::pair<std::string, Any*>> ecma_type;
+
 class Int;
 class Double;
 class String;
 class Vector;
 class Map;
+class Ecma;
 
 class Any {
  public:
@@ -57,34 +67,33 @@ class Any {
   uint8_t GetType() const { return type_; }
 
   bool IsInt() const { return type_ == kInt; }
-
   bool IsDouble() const { return type_ == kDouble; }
-
   bool IsString() const { return type_ == kString; }
-
   bool IsVector() const { return type_ == kVector; }
-
   bool IsMap() const { return type_ == kMap; }
-
   bool IsNull() const { return type_ == kNull; }
+  bool IsEcma() const { return type_ == kEcma; }
 
   explicit operator Int*();
   explicit operator Double*();
   explicit operator String*();
   explicit operator Vector*();
   explicit operator Map*();
+  explicit operator Ecma*();
 
   Int& ToInt() const;
   Double& ToDouble() const;
   String& ToString() const;
   Vector& ToVector() const;
   Map& ToMap() const;
+  Ecma& ToEcma() const;
 
   bool GetInt(int64_t& val);
   bool GetDouble(double& val);
   bool GetString(std::string& val);
   bool GetVector(std::vector<Any*>& val);
-  bool GetMap(std::map<std::string, Any*>& val);
+  bool GetMap(any::map_type& val);
+  bool GetEcma(any::ecma_type& val);
 
   Any* operator[](const size_t& index);
   Any* operator[](const std::string& key);
@@ -159,6 +168,49 @@ class Vector : public Any {
   bool delete_when_destruct_;
 };
 
+#if 1
+class Map : public Any {
+  friend class Any;
+
+ public:
+  Map(const std::vector<std::pair<std::string, Any*>>& m,
+      const bool& delete_when_destruct = false)
+      : Any(kMap), val_(m), delete_when_destruct_(delete_when_destruct) {}
+
+  Map(const bool& delete_when_destruct = false)
+      : Any(kMap), delete_when_destruct_(delete_when_destruct) {}
+
+  ~Map() {
+    if (delete_when_destruct_) {
+      for (auto& kv : val_) {
+        delete kv.second;
+      }
+    }
+  }
+
+  Any* operator[](const std::string& key) {
+    for (auto& item : val_) {
+      if (item.first == key) {
+        return item.second;
+      }
+    }
+    return NULL;
+  }
+
+  bool Insert(const std::string& key, Any* val) {
+    val_.push_back(std::make_pair(key, val));
+    return true;
+  }
+
+  std::vector<std::pair<std::string, Any*>> GetVal() { return val_; }
+
+ private:
+  std::vector<std::pair<std::string, Any*>> val_;
+  bool delete_when_destruct_;
+};
+
+#else
+
 class Map : public Any {
   friend class Any;
 
@@ -197,11 +249,53 @@ class Map : public Any {
   bool delete_when_destruct_;
 };
 
+#endif
+
 class Null : public Any {
   friend class Any;
 
  public:
   Null() : Any(kNull) {}
+};
+
+class Ecma : public Any {
+  friend class Any;
+
+ public:
+  Ecma(const std::vector<std::pair<std::string, Any*>>& m,
+      const bool& delete_when_destruct = false)
+      : Any(kEcma), val_(m), delete_when_destruct_(delete_when_destruct) {}
+
+  Ecma(const bool& delete_when_destruct = false)
+      : Any(kEcma), delete_when_destruct_(delete_when_destruct) {}
+
+  ~Ecma() {
+    if (delete_when_destruct_) {
+      for (auto& kv : val_) {
+        delete kv.second;
+      }
+    }
+  }
+
+  Any* operator[](const std::string& key) {
+    for (auto& item : val_) {
+      if (item.first == key) {
+        return item.second;
+      }
+    }
+    return NULL;
+  }
+
+  bool Insert(const std::string& key, Any* val) {
+    val_.push_back(std::make_pair(key, val));
+    return true;
+  }
+
+  std::vector<std::pair<std::string, Any*>> GetVal() { return val_; }
+
+ private:
+  std::vector<std::pair<std::string, Any*>> val_;
+  bool delete_when_destruct_;
 };
 
 }  // namespace any

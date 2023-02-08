@@ -27,7 +27,14 @@ There are many bugs in WebRTC, because the complexity.
 
 ## Usage
 
+**Step 0**: build-tools 
+
+```sudo apt-get install tcl```
+
+this is for srt install.
+
 **Step 1:** get source code
+
 ```
 git clone https://github.com/HuyaJohn/tms.git
 cd tms
@@ -35,11 +42,26 @@ cd tms
 
 **Step 2:** fetch depend
 ```
-cd depend
+chmod +x depend.sh
+```
+
+vim depend.sh on line 38, change *rapidjson-1.1.0g* to *rapidjson*.
+
+```
+mkdir obj
+
+cd obj
+
+git clone git@github.com:Tencent/rapidjson.git
+
 ./depend.sh
 ```
 
+
+
+
 **Step 3:** build
+
 ```
 cd ../src
 make
